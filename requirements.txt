@@ -1,0 +1,9 @@
+# Golden Library Dependencies
+
+# Core
+python>=3.9
+
+# Optional compression modules (install as needed)
+# v4z_encoder  # For V4Z compression
+# fsl_v7_ultimate  # For FSL compression
+# ztpcf_pipeline  # For ZTPCF compression
