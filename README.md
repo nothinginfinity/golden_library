@@ -72,7 +72,7 @@ Then optionally compress further with V4Z/FSL/ZTPCF → **10MB final size (86% t
 ### Installation
 
 ```bash
-git clone https://github.com/yourusername/golden_library.git
+git clone https://github.com/nothinginfinity/golden_library.git
 cd golden_library
 pip install -r requirements.txt
 ```
@@ -343,16 +343,15 @@ MIT License - see [LICENSE](LICENSE) file
 ## 🔗 Related Projects
 
 - [qastone-mcp-twin](https://github.com/nothinginfinity/qastone-mcp-twin) - QA.Stone wallet system
-- [phi_proxy](https://github.com/yourusername/phi_proxy) - Local AI command center
-- [trinity-os](https://github.com/yourusername/trinity-os) - Multi-terminal AI system
+- phi_proxy - Local AI command center (private repo)
+- trinity-os - Multi-terminal AI system
 
 ---
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/golden_library/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/golden_library/discussions)
-- **Email**: your.email@example.com
+- **Issues**: [GitHub Issues](https://github.com/nothinginfinity/golden_library/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/nothinginfinity/golden_library/discussions)
 
 ---
 
