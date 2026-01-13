@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golden Library 3D - Handoff Visualization</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #050505; color: #fff; font-family: 'Inter', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; }
+
+        /* Main UI Panel */
+        .ui-panel {
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(10, 10, 10, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 0; width: 320px; z-index: 10;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .ui-header {
+            padding: 12px 15px; border-bottom: 1px solid #333;
+            display: flex; justify-content: space-between; align-items: center;
+            cursor: move; background: rgba(20, 20, 20, 0.8);
+        }
+
+        .ui-header h3 { margin: 0; font-size: 13px; color: #f7b731; letter-spacing: 1px; }
+        .win-btn { background: none; border: none; color: #666; cursor: pointer; font-size: 14px; }
+        .win-btn:hover { color: #fff; }
+
+        .ui-content { padding: 15px; }
+
+        /* Search Panel */
+        .search-panel {
+            background: rgba(40, 30, 15, 0.8); border: 1px solid #f7b731;
+            border-radius: 8px; padding: 12px; margin-bottom: 15px;
+        }
+        .search-panel h4 { margin: 0 0 10px 0; color: #f7b731; font-size: 12px; }
+        .search-input {
+            width: 100%; background: #111; border: 1px solid #444; color: #fff;
+            padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 12px;
+        }
+        .search-options { display: flex; gap: 12px; margin-bottom: 10px; }
+        .search-checkbox { display: flex; align-items: center; gap: 4px; font-size: 11px; }
+        .search-button {
+            width: 100%; background: #f7b731; color: #000; border: none;
+            padding: 8px; border-radius: 6px; font-weight: bold; cursor: pointer;
+        }
+        .search-status { font-size: 10px; color: #888; margin-top: 5px; min-height: 12px; }
+
+        /* Compression Stats */
+        .compression-stats {
+            background: rgba(25, 15, 40, 0.8); border: 1px solid #aa66cc;
+            border-radius: 8px; padding: 10px; margin-bottom: 15px;
+        }
+        .compression-stats h4 { margin: 0 0 8px 0; color: #aa66cc; font-size: 12px; }
+        .metric { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .metric .label { font-size: 10px; color: #888; }
+        .metric .value { font-size: 11px; font-weight: bold; color: #fff; }
+        .metric .value.savings { color: #00C851; }
+
+        /* View Controls */
+        .control-group { margin-bottom: 15px; }
+        .control-group label { display: block; font-size: 11px; color: #888; margin-bottom: 5px; }
+        button {
+            width: 100%; background: #222; border: 1px solid #444; color: #eee;
+            padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; margin: 2px 0;
+        }
+        button:hover { border-color: #f7b731; color: #f7b731; }
+        button.active { background: #f7b731; color: #000; }
+
+        /* Side Panel */
+        .side-panel {
+            position: absolute; top: 100px; right: 20px; width: 350px; max-height: 700px;
+            background: rgba(15, 15, 15, 0.95); border: 1px solid #333; border-radius: 12px;
+            backdrop-filter: blur(20px); box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            display: none; flex-direction: column; z-index: 20; overflow: hidden;
+        }
+        .side-panel.open { display: flex; }
+        .panel-header {
+            padding: 12px 15px; border-bottom: 1px solid #333;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .panel-content { padding: 20px; overflow-y: auto; flex: 1; font-size: 12px; }
+
+        /* Format indicators */
+        .format-indicator {
+            display: inline-block; width: 12px; height: 12px;
+            border-radius: 2px; margin-right: 6px; vertical-align: middle;
+        }
+        .format-indicator.slim_only { background: #4facfe; }
+        .format-indicator.slim_v4z { background: #f7b731; }
+        .format-indicator.slim_fsl { background: #aa66cc; }
+        .format-indicator.slim_ztpcf { background: #00C851; }
+
+        /* Compression ratio badge */
+        .compression-badge {
+            display: inline-block; padding: 2px 6px; border-radius: 4px;
+            font-size: 10px; font-weight: bold; margin-left: 8px;
+        }
+        .compression-badge.excellent { background: #00C851; color: #000; }
+        .compression-badge.good { background: #f7b731; color: #000; }
+        .compression-badge.moderate { background: #4facfe; color: #000; }
+
+        /* Action buttons */
+        .action-buttons {
+            display: flex; gap: 8px; margin-top: 15px;
+        }
+        .action-btn {
+            flex: 1; padding: 8px; background: #444; border: 1px solid #666;
+            color: #fff; border-radius: 6px; cursor: pointer; font-size: 11px;
+        }
+        .action-btn:hover { background: #555; border-color: #f7b731; }
+        .action-btn.primary { background: #f7b731; color: #000; border-color: #f7b731; }
+
+        .info-group {
+            margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #333;
+        }
+        .info-group:last-child { border-bottom: none; }
+        .info-row {
+            display: flex; justify-content: space-between; margin-bottom: 6px;
+        }
+        .info-label { color: #888; font-size: 11px; }
+        .info-value { color: #fff; font-size: 11px; font-weight: bold; }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div class="ui-panel" id="mainPanel">
+        <div class="ui-header">
+            <h3>🏆 GOLDEN LIBRARY 3D</h3>
+            <button class="win-btn" onclick="togglePanel()">−</button>
+        </div>
+
+        <div class="ui-content">
+            <!-- Search Panel -->
+            <div class="search-panel">
+                <h4>HYBRID SEARCH</h4>
+                <input type="text" id="search-input" class="search-input" placeholder="Search handoffs..." value="">
+                <div class="search-options">
+                    <label class="search-checkbox">
+                        <input type="checkbox" id="search-local" checked> Local
+                    </label>
+                    <label class="search-checkbox">
+                        <input type="checkbox" id="search-metadata" checked> Metadata
+                    </label>
+                </div>
+                <button class="search-button" onclick="performSearch()">Search</button>
+                <div class="search-status" id="search-status">Ready</div>
+            </div>
+
+            <!-- Compression Stats -->
+            <div class="compression-stats">
+                <h4>COMPRESSION STATS</h4>
+                <div class="metric">
+                    <span class="label">Total Handoffs:</span>
+                    <span class="value" id="total-handoffs">0</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Original Size:</span>
+                    <span class="value" id="original-size">0 MB</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Compressed Size:</span>
+                    <span class="value" id="compressed-size">0 MB</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Total Savings:</span>
+                    <span class="value savings" id="total-savings">0%</span>
+                </div>
+            </div>
+
+            <!-- View Controls -->
+            <div class="control-group">
+                <label>View Mode</label>
+                <button class="view-btn active" onclick="changeLayout('sphere')">Globe</button>
+                <button class="view-btn" onclick="changeLayout('clusters')">Clusters</button>
+                <button class="view-btn" onclick="changeLayout('grid')">Cubic Grid</button>
+                <button class="view-btn" onclick="changeLayout('helix')">Helix</button>
+                <button class="view-btn" onclick="changeLayout('scatter')">Scatter</button>
+            </div>
+
+            <div class="control-group">
+                <label>Controls</label>
+                <button id="orbit-btn" onclick="toggleAutoOrbit()">Auto-Orbit: OFF</button>
+                <button onclick="toggleConnections()">Toggle Connections</button>
+                <button onclick="reloadData()">Reload Data</button>
+            </div>
+
+            <div style="margin-top: 10px; border-top: 1px solid #333; padding-top: 10px; font-size: 10px; color: #666;">
+                <span id="stats">Nodes: 0 | Links: 0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Side Panel for Handoff Details -->
+    <div id="side-panel" class="side-panel">
+        <div class="panel-header">
+            <h3 style="margin: 0; font-size: 14px;">Handoff Details</h3>
+            <button class="win-btn" onclick="closeSidePanel()">×</button>
+        </div>
+        <div class="panel-content" id="panel-content">
+            <p style="color: #666;">Select a handoff node to view details</p>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        let scene, camera, renderer, controls;
+        let nodes = [], links = [];
+        let nodeObjects = [], linkObjects = [];
+        let autoOrbit = false;
+        let showConnections = true;
+        let selectedNode = null;
+
+        // Initialize scene
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.fog = new THREE.Fog(0x050505, 50, 200);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 30, 80);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 20;
+            controls.maxDistance = 200;
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+
+            const pointLight1 = new THREE.PointLight(0xf7b731, 1, 100);
+            pointLight1.position.set(50, 50, 50);
+            scene.add(pointLight1);
+
+            const pointLight2 = new THREE.PointLight(0x4facfe, 0.8, 100);
+            pointLight2.position.set(-50, -50, -50);
+            scene.add(pointLight2);
+
+            // Background stars
+            createStars();
+
+            // Load handoff data
+            loadHandoffs();
+
+            // Event listeners
+            window.addEventListener('resize', onWindowResize);
+            renderer.domElement.addEventListener('click', onNodeClick);
+
+            // Start animation
+            animate();
+        }
+
+        function createStars() {
+            const starsGeometry = new THREE.BufferGeometry();
+            const starCount = 1000;
+            const positions = new Float32Array(starCount * 3);
+
+            for (let i = 0; i < starCount * 3; i++) {
+                positions[i] = (Math.random() - 0.5) * 400;
+            }
+
+            starsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const starsMaterial = new THREE.PointsMaterial({ color: 0x888888, size: 0.5 });
+            const stars = new THREE.Points(starsGeometry, starsMaterial);
+            scene.add(stars);
+        }
+
+        async function loadHandoffs() {
+            try {
+                const response = await fetch('/api/handoffs');
+                const data = await response.json();
+
+                if (data.ok) {
+                    nodes = data.handoffs.map(h => ({
+                        id: h.handoff_id,
+                        label: h.original_file || h.handoff_id,
+                        format: h.compression_format,
+                        originalSize: h.original_size,
+                        finalSize: h.final_size,
+                        reduction: h.reduction_percent,
+                        created: h.created,
+                        data: h
+                    }));
+
+                    updateStats();
+                    createGraph();
+                } else {
+                    // Demo data for testing
+                    createDemoData();
+                }
+            } catch (error) {
+                console.error('Failed to load handoffs:', error);
+                createDemoData();
+            }
+        }
+
+        function createDemoData() {
+            // Create demo handoffs for visualization
+            const formats = ['slim_only', 'slim_v4z', 'slim_fsl', 'slim_ztpcf'];
+            const count = 20;
+
+            for (let i = 0; i < count; i++) {
+                const format = formats[i % formats.length];
+                const originalSize = Math.floor(Math.random() * 100000000) + 1000000; // 1-100MB
+                const reductions = { slim_only: 50, slim_v4z: 80, slim_fsl: 85, slim_ztpcf: 86 };
+                const reduction = reductions[format];
+                const finalSize = Math.floor(originalSize * (1 - reduction / 100));
+
+                nodes.push({
+                    id: `handoff_${i}`,
+                    label: `session_${i}.jsonl`,
+                    format: format,
+                    originalSize: originalSize,
+                    finalSize: finalSize,
+                    reduction: reduction,
+                    created: new Date().toISOString()
+                });
+            }
+
+            updateStats();
+            createGraph();
+        }
+
+        function updateStats() {
+            const totalOriginal = nodes.reduce((sum, n) => sum + (n.originalSize || 0), 0);
+            const totalCompressed = nodes.reduce((sum, n) => sum + (n.finalSize || 0), 0);
+            const avgReduction = nodes.length > 0
+                ? Math.round((1 - totalCompressed / totalOriginal) * 100)
+                : 0;
+
+            document.getElementById('total-handoffs').textContent = nodes.length;
+            document.getElementById('original-size').textContent = formatBytes(totalOriginal);
+            document.getElementById('compressed-size').textContent = formatBytes(totalCompressed);
+            document.getElementById('total-savings').textContent = avgReduction + '%';
+            document.getElementById('stats').textContent = `Nodes: ${nodes.length} | Links: 0`;
+            document.getElementById('search-status').textContent = `Ready - ${nodes.length} handoffs loaded`;
+        }
+
+        function createGraph() {
+            // Clear existing objects
+            nodeObjects.forEach(obj => scene.remove(obj));
+            linkObjects.forEach(obj => scene.remove(obj));
+            nodeObjects = [];
+            linkObjects = [];
+
+            // Create nodes
+            nodes.forEach((node, i) => {
+                const color = getFormatColor(node.format);
+                const geometry = new THREE.BoxGeometry(2, 2, 2);
+                const material = new THREE.MeshStandardMaterial({
+                    color: color,
+                    emissive: color,
+                    emissiveIntensity: 0.3,
+                    roughness: 0.5,
+                    metalness: 0.5
+                });
+                const cube = new THREE.Mesh(geometry, material);
+
+                // Position based on current layout
+                positionNode(cube, i, nodes.length);
+
+                cube.userData = { nodeData: node };
+                scene.add(cube);
+                nodeObjects.push(cube);
+            });
+        }
+
+        function positionNode(obj, index, total) {
+            // Default sphere layout
+            const phi = Math.acos(-1 + (2 * index) / total);
+            const theta = Math.sqrt(total * Math.PI) * phi;
+            const radius = 40;
+
+            obj.position.x = radius * Math.cos(theta) * Math.sin(phi);
+            obj.position.y = radius * Math.sin(theta) * Math.sin(phi);
+            obj.position.z = radius * Math.cos(phi);
+        }
+
+        function getFormatColor(format) {
+            const colors = {
+                slim_only: 0x4facfe,
+                slim_v4z: 0xf7b731,
+                slim_fsl: 0xaa66cc,
+                slim_ztpcf: 0x00C851
+            };
+            return colors[format] || 0x888888;
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function onNodeClick(event) {
+            const mouse = new THREE.Vector2(
+                (event.clientX / window.innerWidth) * 2 - 1,
+                -(event.clientY / window.innerHeight) * 2 + 1
+            );
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects(nodeObjects);
+
+            if (intersects.length > 0) {
+                const clickedNode = intersects[0].object.userData.nodeData;
+                showNodeDetails(clickedNode);
+            }
+        }
+
+        function showNodeDetails(node) {
+            selectedNode = node;
+            const panel = document.getElementById('side-panel');
+            const content = document.getElementById('panel-content');
+
+            const reductionClass = node.reduction >= 80 ? 'excellent' : node.reduction >= 60 ? 'good' : 'moderate';
+
+            content.innerHTML = `
+                <div class="info-group">
+                    <h4 style="color: #f7b731; margin: 0 0 10px 0;">
+                        <span class="format-indicator ${node.format}"></span>
+                        ${node.label}
+                    </h4>
+                    <div style="color: #888; font-size: 10px; margin-bottom: 10px;">
+                        ID: ${node.id}
+                    </div>
+                </div>
+
+                <div class="info-group">
+                    <h5 style="color: #888; font-size: 11px; margin: 0 0 8px 0;">COMPRESSION</h5>
+                    <div class="info-row">
+                        <span class="info-label">Format:</span>
+                        <span class="info-value">${node.format.replace(/_/g, ' + ').toUpperCase()}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Reduction:</span>
+                        <span class="info-value">
+                            ${node.reduction}%
+                            <span class="compression-badge ${reductionClass}">${reductionClass}</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="info-group">
+                    <h5 style="color: #888; font-size: 11px; margin: 0 0 8px 0;">FILE SIZES</h5>
+                    <div class="info-row">
+                        <span class="info-label">Original:</span>
+                        <span class="info-value">${formatBytes(node.originalSize)}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Compressed:</span>
+                        <span class="info-value">${formatBytes(node.finalSize)}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Saved:</span>
+                        <span class="info-value" style="color: #00C851;">${formatBytes(node.originalSize - node.finalSize)}</span>
+                    </div>
+                </div>
+
+                <div class="info-group">
+                    <h5 style="color: #888; font-size: 11px; margin: 0 0 8px 0;">METADATA</h5>
+                    <div class="info-row">
+                        <span class="info-label">Created:</span>
+                        <span class="info-value">${new Date(node.created).toLocaleDateString()}</span>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="action-btn" onclick="decompressHandoff('${node.id}')">Decompress</button>
+                    <button class="action-btn" onclick="viewDetails('${node.id}')">Stats</button>
+                    <button class="action-btn primary" onclick="downloadHandoff('${node.id}')">Download</button>
+                </div>
+            `;
+
+            panel.classList.add('open');
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Auto-orbit
+            if (autoOrbit) {
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 0.5;
+            } else {
+                controls.autoRotate = false;
+            }
+
+            // Rotate cubes
+            nodeObjects.forEach(cube => {
+                cube.rotation.x += 0.01;
+                cube.rotation.y += 0.01;
+            });
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Global functions
+        window.togglePanel = function() {
+            const panel = document.getElementById('mainPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        };
+
+        window.closeSidePanel = function() {
+            document.getElementById('side-panel').classList.remove('open');
+        };
+
+        window.toggleAutoOrbit = function() {
+            autoOrbit = !autoOrbit;
+            document.getElementById('orbit-btn').textContent = 'Auto-Orbit: ' + (autoOrbit ? 'ON' : 'OFF');
+        };
+
+        window.toggleConnections = function() {
+            showConnections = !showConnections;
+            linkObjects.forEach(link => link.visible = showConnections);
+        };
+
+        window.reloadData = function() {
+            loadHandoffs();
+        };
+
+        window.changeLayout = function(layout) {
+            // Update button states
+            document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Reposition nodes based on layout
+            nodes.forEach((node, i) => {
+                const obj = nodeObjects[i];
+                switch(layout) {
+                    case 'sphere':
+                        positionNode(obj, i, nodes.length);
+                        break;
+                    case 'grid':
+                        const gridSize = Math.ceil(Math.sqrt(nodes.length));
+                        obj.position.x = (i % gridSize - gridSize/2) * 10;
+                        obj.position.y = 0;
+                        obj.position.z = (Math.floor(i / gridSize) - gridSize/2) * 10;
+                        break;
+                    case 'helix':
+                        const t = i / nodes.length * Math.PI * 4;
+                        obj.position.x = 30 * Math.cos(t);
+                        obj.position.y = (i - nodes.length/2) * 2;
+                        obj.position.z = 30 * Math.sin(t);
+                        break;
+                    case 'scatter':
+                        obj.position.x = (Math.random() - 0.5) * 100;
+                        obj.position.y = (Math.random() - 0.5) * 100;
+                        obj.position.z = (Math.random() - 0.5) * 100;
+                        break;
+                    case 'clusters':
+                        const clusters = 4;
+                        const cluster = i % clusters;
+                        const clusterAngle = (cluster / clusters) * Math.PI * 2;
+                        const clusterRadius = 30;
+                        const inCluster = Math.floor(i / clusters);
+                        const localAngle = (inCluster / Math.ceil(nodes.length / clusters)) * Math.PI * 2;
+                        obj.position.x = clusterRadius * Math.cos(clusterAngle) + 10 * Math.cos(localAngle);
+                        obj.position.y = (Math.random() - 0.5) * 20;
+                        obj.position.z = clusterRadius * Math.sin(clusterAngle) + 10 * Math.sin(localAngle);
+                        break;
+                }
+            });
+        };
+
+        window.performSearch = function() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            if (!query) return;
+
+            const results = nodes.filter(n =>
+                n.label.toLowerCase().includes(query) ||
+                n.format.toLowerCase().includes(query)
+            );
+
+            document.getElementById('search-status').textContent = `Found ${results.length} results`;
+
+            if (results.length > 0) {
+                showNodeDetails(results[0]);
+            }
+        };
+
+        window.decompressHandoff = async function(id) {
+            alert(`Decompressing handoff: ${id}\n\nRun: python3 src/handoff_slim.py decompress ${id}`);
+        };
+
+        window.viewDetails = async function(id) {
+            alert(`View stats for: ${id}\n\nRun: python3 src/handoff_slim.py stats ${id}`);
+        };
+
+        window.downloadHandoff = function(id) {
+            const node = nodes.find(n => n.id === id);
+            if (node && node.data) {
+                const dataStr = JSON.stringify(node.data, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `handoff_${id}.json`;
+                link.click();
+            }
+        };
+
+        // Initialize
+        init();
+    </script>
+</body>
+</html>

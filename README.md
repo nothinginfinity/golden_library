@@ -103,6 +103,18 @@ python src/handoff_slim.py list
 python src/handoff_slim.py decompress abc123def456
 ```
 
+### 3D Visualization
+
+```bash
+# Start the 3D viewer
+python3 viewer_backend.py
+
+# Open in browser
+open http://localhost:8080
+```
+
+See [VIEWER_README.md](VIEWER_README.md) for details.
+
 ---
 
 ## 🏗️ Architecture
@@ -156,9 +168,9 @@ python src/handoff_slim.py decompress abc123def456
 - ✅ **SLIM Format**: Schema-once compression
 - ✅ **Handoff System**: Compress/decompress conversations
 - ✅ **CLI Tools**: Easy command-line interface
+- ✅ **3D Viewer**: Beautiful visualization of handoffs
 - ⚠️ **Roundtrip Testing**: Needs fixes for nested structures
 - 🔄 **QA.Stone Integration**: In progress
-- 🔄 **Web UI**: Planned
 
 ---
 
