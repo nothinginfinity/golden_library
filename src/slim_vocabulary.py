@@ -41,13 +41,13 @@ class SlimVocabulary:
             '##### ': '§5§',    # H5 heading
             '# ': '§1§',        # H1 heading (after longer patterns)
 
-            # Lists and tasks
-            '- [ ] ': '¤t¤',    # Unchecked task
-            '- [x] ': '¤x¤',    # Checked task
-            '- [X] ': '¤X¤',    # Checked task (uppercase)
-            '- ': '¤-¤',        # Bullet point
-            '* ': '¤*¤',        # Alt bullet
-            '1. ': '¤1¤',       # Numbered list
+            # Lists and tasks (non-overlapping tokens to prevent decompression corruption)
+            '- [ ] ': '¤TD¤',   # Task unDone (unchecked)
+            '- [x] ': '¤TC¤',   # Task Checked (lowercase x)
+            '- [X] ': '¤TU¤',   # Task Uppercase (uppercase X)
+            '- ': '¤B¤',        # Bullet point
+            '* ': '¤S¤',        # Star bullet
+            '1. ': '¤N¤',       # Numbered list
 
             # Code blocks
             '```bash\n': '«b»',
@@ -57,21 +57,21 @@ class SlimVocabulary:
             '```\n': '«c»',
             '```': '«»',
 
-            # Emphasis
-            '**': '‡',          # Bold
-            '__': '‡‡',         # Alt bold
-            '*': '†',           # Italic (after ** to avoid conflict)
-            '_': '†_',          # Alt italic
+            # Emphasis (non-overlapping tokens to prevent decompression errors)
+            '**': '‡2',         # Bold (double asterisk)
+            '__': '‡u',         # Alt bold (underscore)
+            '*': '†',           # Italic
+            '_': '†u',          # Alt italic (underscore)
 
-            # Links and references
-            '](': '»',          # Link middle part
+            # Links and references (non-overlapping tokens)
+            '](': '»(',         # Link middle part (keep paren to avoid overlap)
             '[': '«',           # Link start
-            ']': '»]',          # Link end (kept for clarity)
+            ']': '»',           # Link end
 
-            # Common punctuation sequences
-            ': ': ':·',         # Colon-space
-            ', ': ',·',         # Comma-space
-            '. ': '.·',         # Period-space
+            # Common punctuation sequences (use ◦ to avoid collision with ~ tokens)
+            ': ': ':◦',         # Colon-space
+            ', ': ',◦',         # Comma-space
+            '. ': '.◦',         # Period-space
         }
 
         # ==================================================================
@@ -89,51 +89,51 @@ class SlimVocabulary:
             'Tasks': 'Ⓣ',
             'Requirements': 'Ⓡ',
 
-            # Time/Dates (use multi-char tokens to avoid collisions)
-            ' days': '·d',
-            ' hours': '·h',
-            ' weeks': '·w',
-            ' months': '·m',
+            # Time/Dates (use ~ delimiters to avoid collisions with punctuation tokens)
+            ' days': '~d~',
+            ' hours': '~h~',
+            ' weeks': '~w~',
+            ' months': '~m~',
 
-            # Common actions
-            'Implement': 'impl',
-            'implement': 'impl',
-            'Create': 'crt',
-            'create': 'crt',
-            'Build': 'bld',
-            'build': 'bld',
-            'Add': 'add',
-            'Update': 'upd',
-            'update': 'upd',
-            'Modify': 'mod',
-            'modify': 'mod',
-            'Design': 'dsgn',
-            'design': 'dsgn',
-            'Test': 'tst',
-            'test': 'tst',
-            'Deploy': 'dpl',
-            'deploy': 'dpl',
+            # Common actions (preserve case, use ~ delimiters to prevent substring collisions)
+            'Implement': '~Impl~',
+            'implement': '~impl~',
+            'Create': '~Crt~',
+            'create': '~crt~',
+            'Build': '~Bld~',
+            'build': '~bld~',
+            'Add': '~Add~',
+            'Update': '~Upd~',
+            'update': '~upd~',
+            'Modify': '~Mod~',
+            'modify': '~mod~',
+            'Design': '~Dsgn~',
+            'design': '~dsgn~',
+            'Test': '~Tst~',
+            'test': '~tst~',
+            'Deploy': '~Dpl~',
+            'deploy': '~dpl~',
 
-            # Technical terms
-            'function': 'fn',
-            'Function': 'Fn',
-            'component': 'cmp',
-            'Component': 'Cmp',
-            'database': 'db',
-            'Database': 'DB',
-            'API': 'api',
-            'endpoint': 'ep',
-            'Endpoint': 'Ep',
-            'authentication': 'auth',
-            'Authentication': 'Auth',
-            'configuration': 'cfg',
-            'Configuration': 'Cfg',
-            'compression': 'cmprs',
-            'Compression': 'Cmprs',
-            'optimization': 'opt',
-            'Optimization': 'Opt',
-            'performance': 'perf',
-            'Performance': 'Perf',
+            # Technical terms (use ~ delimiters to prevent substring collisions)
+            'function': '~fn~',
+            'Function': '~Fn~',
+            'component': '~cmp~',
+            'Component': '~Cmp~',
+            'database': '~db~',
+            'Database': '~DB~',
+            'API': '~api~',
+            'endpoint': '~ep~',
+            'Endpoint': '~Ep~',
+            'authentication': '~auth~',
+            'Authentication': '~Auth~',
+            'configuration': '~cfg~',
+            'Configuration': '~Cfg~',
+            'compression': '~cmprs~',
+            'Compression': '~Cmprs~',
+            'optimization': '~opt~',
+            'Optimization': '~Opt~',
+            'performance': '~perf~',
+            'Performance': '~Perf~',
 
             # File extensions (keep as-is, these are safe with the dot prefix)
             '.py': '.ᵖʸ',
@@ -144,12 +144,12 @@ class SlimVocabulary:
             '.yaml': '.ʸᵐˡ',
             '.sh': '.ˢʰ',
 
-            # Common phrases
-            'Not Started': 'NS',
-            'In Progress': 'IP',
+            # Common phrases (use ~ delimiters for short abbreviations)
+            'Not Started': '~NS~',
+            'In Progress': '~IP~',
             'Complete': '✓',
-            'Pending': 'PND',
-            'Blocked': 'BLK',
+            'Pending': '~PND~',
+            'Blocked': '~BLK~',
             'the ': 'θ ',    # Very common word
             'that ': 'ð ',   # Very common word
             'this ': 'ϑ ',   # Very common word
@@ -157,7 +157,7 @@ class SlimVocabulary:
             'from ': 'φ ',   # Very common word
             'will ': 'ψ ',   # Very common word
             'should ': 'ς ',
-            'would ': 'ω ',
+            'would ': 'ω̃ ',  # Different from 'with' (uses combining tilde)
         }
 
         # ==================================================================
