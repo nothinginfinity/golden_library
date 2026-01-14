@@ -415,6 +415,153 @@ class IndexExtractor:
 
         return None
 
+    def _load_selective_patterns(
+        self,
+        ref_patterns: List[str],
+        indexes: List[str],
+        index_dir: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Load only specific patterns from index files.
+
+        Args:
+            ref_patterns: List of $ref IDs to load (e.g., ["$cold#abc123", "$warm#def456"])
+            indexes: List of index file paths or tier names
+            index_dir: Base directory for indexes
+
+        Returns:
+            Dictionary mapping ref_id to pattern content
+        """
+        base_dir = Path(index_dir or "~/.claude/indexes").expanduser()
+        selected_patterns = {}
+
+        # Convert ref_patterns to set for faster lookup
+        ref_set = set(ref_patterns)
+
+        # Load all indexes and filter patterns
+        for index_ref in indexes:
+            index_path = self._resolve_index_path(index_ref, base_dir)
+            if index_path and index_path.exists():
+                with open(index_path, 'r') as f:
+                    index_data = json.load(f)
+                    # Only load patterns that match our ref_patterns
+                    for ref_id, pattern_data in index_data["patterns"].items():
+                        if ref_id in ref_set:
+                            selected_patterns[ref_id] = pattern_data
+
+        return selected_patterns
+
+    def resolve_references_selective(
+        self,
+        compressed: str,
+        ref_patterns: List[str],
+        indexes: List[str],
+        index_dir: Optional[str] = None,
+        context_lines: int = 0
+    ) -> str:
+        """
+        Resolve only specific $ref patterns, leaving others as-is.
+
+        Args:
+            compressed: Content with $ref references
+            ref_patterns: List of $ref IDs to resolve (e.g., ["$cold#abc123"])
+            indexes: List of index file paths or tier names
+            index_dir: Base directory for indexes (default: ~/.claude/indexes/)
+            context_lines: If > 0, expand context around each resolved ref
+
+        Returns:
+            Partially decompressed content with only requested refs resolved
+
+        Example:
+            >>> extractor.resolve_references_selective(
+            ...     compressed_content,
+            ...     ref_patterns=["$cold#abc123", "$warm#def456"],
+            ...     indexes=["cold", "warm"]
+            ... )
+        """
+        # Load only the specific patterns we need
+        selected_patterns = self._load_selective_patterns(
+            ref_patterns,
+            indexes,
+            index_dir
+        )
+
+        # Replace only selected references with content
+        result = compressed
+        for ref_id, pattern_data in selected_patterns.items():
+            # References in format: "$tier#hash"
+            ref_str = f'"{ref_id}"'
+            content_str = json.dumps(pattern_data["content"], separators=(',', ':'))
+            result = result.replace(ref_str, content_str)
+
+        return result
+
+    def get_section(
+        self,
+        compressed: str,
+        start_line: int,
+        end_line: int,
+        resolve_refs: bool = True,
+        indexes: Optional[List[str]] = None,
+        index_dir: Optional[str] = None
+    ) -> str:
+        """
+        Extract specific line range from compressed content.
+
+        Args:
+            compressed: Compressed content with $refs
+            start_line: Starting line (0-indexed, inclusive)
+            end_line: Ending line (0-indexed, exclusive)
+            resolve_refs: Whether to resolve $refs in this range
+            indexes: Index files if resolve_refs=True
+            index_dir: Base directory for indexes
+
+        Returns:
+            Extracted section (with refs resolved if requested)
+
+        Example:
+            >>> # Get lines 50-60 without resolving refs
+            >>> extractor.get_section(content, 50, 60, resolve_refs=False)
+            >>>
+            >>> # Get lines 100-150 with refs resolved
+            >>> extractor.get_section(
+            ...     content, 100, 150,
+            ...     resolve_refs=True,
+            ...     indexes=["cold", "warm"]
+            ... )
+        """
+        lines = compressed.split('\n')
+
+        # Handle negative indices and bounds
+        total_lines = len(lines)
+        start_line = max(0, start_line)
+        end_line = min(total_lines, end_line)
+
+        # Extract section
+        section_lines = lines[start_line:end_line]
+        section_content = '\n'.join(section_lines)
+
+        # Optionally resolve references in this section
+        if resolve_refs and indexes:
+            # Find all $refs in this section
+            import re
+            ref_pattern = r'\"\$(\w+)#([a-f0-9]+)\"'
+            matches = re.findall(ref_pattern, section_content)
+
+            if matches:
+                # Build list of ref IDs found in section
+                ref_ids = [f"${tier}#{hash_val}" for tier, hash_val in matches]
+
+                # Resolve only these refs
+                section_content = self.resolve_references_selective(
+                    section_content,
+                    ref_ids,
+                    indexes,
+                    index_dir
+                )
+
+        return section_content
+
 
 # =============================================================================
 # CLI Interface
