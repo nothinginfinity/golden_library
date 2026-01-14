@@ -1,0 +1,1717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Control Center - Dashboard</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'SF Mono', Monaco, monospace;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: rgba(15, 23, 42, 0.95);
+      border-bottom: 2px solid rgba(99, 102, 241, 0.4);
+      padding: 20px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      font-size: 1.8rem;
+      color: #a5b4fc;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .daemon-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      color: #6ee7b7;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #10b981;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .container {
+      padding: 40px;
+      max-width: 1800px;
+      margin: 0 auto;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 12px;
+      padding: 24px;
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      border-color: rgba(99, 102, 241, 0.6);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-title {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    .card-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #a5b4fc;
+      margin-bottom: 8px;
+    }
+
+    .card-subtitle {
+      font-size: 0.9rem;
+      color: #64748b;
+    }
+
+    .card-subtitle.positive {
+      color: #6ee7b7;
+    }
+
+    .search-section {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 12px;
+      padding: 32px;
+      margin-bottom: 32px;
+    }
+
+    .search-box {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .search-input {
+      flex: 1;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      border-radius: 8px;
+      padding: 12px 20px;
+      font-size: 1rem;
+      color: #e2e8f0;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+
+    .search-btn {
+      background: rgba(99, 102, 241, 0.3);
+      border: 1px solid rgba(99, 102, 241, 0.5);
+      color: #a5b4fc;
+      padding: 12px 32px;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 600;
+    }
+
+    .search-btn:hover {
+      background: rgba(99, 102, 241, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .filters {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(100, 116, 139, 0.3);
+      color: #94a3b8;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .filter-btn:hover, .filter-btn.active {
+      background: rgba(99, 102, 241, 0.3);
+      border-color: rgba(99, 102, 241, 0.6);
+      color: #a5b4fc;
+    }
+
+    .results {
+      margin-top: 24px;
+    }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    .result-item {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(100, 116, 139, 0.2);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .result-item:hover {
+      border-color: rgba(99, 102, 241, 0.5);
+      background: rgba(30, 41, 59, 0.7);
+    }
+
+    .result-title {
+      font-size: 1.1rem;
+      color: #a5b4fc;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .result-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-bottom: 12px;
+    }
+
+    .result-preview {
+      color: #94a3b8;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .chart-container {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 12px;
+      padding: 32px;
+      margin-bottom: 32px;
+    }
+
+    .chart-title {
+      font-size: 1.2rem;
+      color: #a5b4fc;
+      margin-bottom: 24px;
+    }
+
+    .bar {
+      fill: #6366f1;
+      transition: fill 0.2s;
+    }
+
+    .bar:hover {
+      fill: #818cf8;
+    }
+
+    .axis text {
+      fill: #94a3b8;
+      font-size: 11px;
+    }
+
+    .axis line, .axis path {
+      stroke: rgba(100, 116, 139, 0.3);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #64748b;
+      font-size: 1.1rem;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 60px 40px;
+      color: #64748b;
+    }
+
+    .empty-icon {
+      font-size: 3rem;
+      margin-bottom: 16px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 32px;
+      border-bottom: 2px solid rgba(99, 102, 241, 0.3);
+      padding-bottom: 8px;
+    }
+
+    .tab-btn {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(100, 116, 139, 0.3);
+      color: #94a3b8;
+      padding: 12px 24px;
+      border-radius: 8px 8px 0 0;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 600;
+    }
+
+    .tab-btn:hover {
+      background: rgba(30, 41, 59, 0.8);
+      color: #a5b4fc;
+    }
+
+    .tab-btn.active {
+      background: rgba(99, 102, 241, 0.3);
+      border-color: rgba(99, 102, 241, 0.6);
+      color: #a5b4fc;
+      border-bottom-color: transparent;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Config styles */
+    .config-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+    }
+
+    .config-section {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(100, 116, 139, 0.2);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .config-section-title {
+      font-size: 1rem;
+      color: #a5b4fc;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    .config-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .config-item {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(100, 116, 139, 0.2);
+      border-radius: 6px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .config-item:hover {
+      border-color: rgba(99, 102, 241, 0.5);
+      background: rgba(15, 23, 42, 0.8);
+    }
+
+    .config-item-name {
+      font-size: 0.95rem;
+      color: #a5b4fc;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .config-item-meta {
+      font-size: 0.8rem;
+      color: #64748b;
+      display: flex;
+      gap: 12px;
+    }
+
+    .config-item-enabled {
+      color: #6ee7b7;
+    }
+
+    .config-item-disabled {
+      color: #94a3b8;
+    }
+
+    .config-viewer-meta {
+      background: rgba(30, 41, 59, 0.5);
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+      color: #94a3b8;
+    }
+
+    .config-viewer-content {
+      background: rgba(0, 0, 0, 0.4);
+      padding: 20px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 0.85rem;
+      line-height: 1.6;
+      color: #e2e8f0;
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      max-height: 600px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>
+      <span>🎛️</span>
+      Claude Control Center
+    </h1>
+    <div class="daemon-status">
+      <div class="status-dot"></div>
+      <span id="daemon-status-text">Checking...</span>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Navigation Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="showTab('dashboard')">📊 Dashboard</button>
+      <button class="tab-btn" onclick="showTab('search')">🔍 Search</button>
+      <button class="tab-btn" onclick="showTab('config')">⚙️ Config</button>
+      <button class="tab-btn" onclick="showTab('arsenal')">🎯 Arsenal</button>
+      <button class="tab-btn" onclick="showTab('mcp')">🔌 MCP</button>
+      <button class="tab-btn" onclick="showTab('daemons')">🤖 Daemons</button>
+      <button class="tab-btn" onclick="showTab('charts')">📈 Charts</button>
+    </div>
+
+    <!-- Dashboard Tab -->
+    <div id="tab-dashboard" class="tab-content active">
+    <!-- Stats Grid -->
+    <div class="grid">
+      <div class="card">
+        <div class="card-title">Conversations Compressed</div>
+        <div class="card-value" id="stat-conversations">-</div>
+        <div class="card-subtitle">Total indexed</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Token Savings</div>
+        <div class="card-value" id="stat-tokens">-</div>
+        <div class="card-subtitle positive" id="stat-reduction">- reduction</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Disk Space Saved</div>
+        <div class="card-value" id="stat-disk">-</div>
+        <div class="card-subtitle positive">Compressed storage</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Last Compressed</div>
+        <div class="card-value" id="stat-last" style="font-size: 1.5rem;">-</div>
+        <div class="card-subtitle" id="stat-last-detail">-</div>
+      </div>
+    </div>
+
+    </div>
+    <!-- End Dashboard Tab -->
+
+    <!-- Search Tab -->
+    <div id="tab-search" class="tab-content">
+    <!-- Search Section -->
+    <div class="search-section">
+      <div class="search-box">
+        <input
+          type="text"
+          class="search-input"
+          id="search-input"
+          placeholder="Search all Claude memory... (e.g., 'authentication', 'bug fix', 'phi_proxy')"
+        />
+        <button class="search-btn" onclick="performSearch()">Search</button>
+      </div>
+
+      <div class="filters">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="conversations">Conversations</button>
+        <button class="filter-btn" data-filter="history">History</button>
+        <button class="filter-btn" data-filter="todos">Todos</button>
+        <button class="filter-btn" data-filter="debug">Debug</button>
+        <button class="filter-btn" data-filter="logs">Logs</button>
+      </div>
+
+      <div class="results" id="search-results">
+        <div class="empty">
+          <div class="empty-icon">🔍</div>
+          <div>Enter a search query to find across all Claude data</div>
+        </div>
+      </div>
+    </div>
+    </div>
+    <!-- End Search Tab -->
+
+    <!-- Config Tab -->
+    <div id="tab-config" class="tab-content">
+      <div class="chart-container">
+        <div class="chart-title">Claude Configuration</div>
+
+        <div class="config-grid">
+          <!-- CLAUDE.md & agents.md -->
+          <div class="config-section">
+            <h3 class="config-section-title">📝 Markdown Configs</h3>
+            <div id="config-markdown-list" class="config-list">
+              <div class="loading">Loading...</div>
+            </div>
+          </div>
+
+          <!-- Settings JSON -->
+          <div class="config-section">
+            <h3 class="config-section-title">🔧 Settings</h3>
+            <div id="config-json-list" class="config-list">
+              <div class="loading">Loading...</div>
+            </div>
+          </div>
+
+          <!-- Hooks -->
+          <div class="config-section">
+            <h3 class="config-section-title">🪝 Hooks</h3>
+            <div id="config-hooks-list" class="config-list">
+              <div class="loading">Loading...</div>
+            </div>
+          </div>
+
+          <!-- Skills -->
+          <div class="config-section">
+            <h3 class="config-section-title">🎯 Skills</h3>
+            <div id="config-skills-list" class="config-list">
+              <div class="loading">Loading...</div>
+            </div>
+          </div>
+
+          <!-- MCP Servers -->
+          <div class="config-section">
+            <h3 class="config-section-title">🔌 MCP Servers</h3>
+            <div id="config-mcp-list" class="config-list">
+              <div class="loading">Loading...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Config Viewer -->
+      <div class="chart-container" id="config-viewer" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <div class="chart-title" id="config-viewer-title">File Content</div>
+          <button class="search-btn" onclick="closeConfigViewer()">Close</button>
+        </div>
+        <div class="config-viewer-meta" id="config-viewer-meta"></div>
+        <pre class="config-viewer-content" id="config-viewer-content"></pre>
+      </div>
+    </div>
+    <!-- End Config Tab -->
+
+    <!-- Arsenal Tab -->
+    <div id="tab-arsenal" class="tab-content">
+      <div class="chart-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <div>
+            <div class="chart-title">Config Arsenal</div>
+            <div style="color: #94a3b8; font-size: 0.9rem;">Manage multiple Claude configurations</div>
+          </div>
+          <div style="display: flex; gap: 12px;">
+            <button class="search-btn" onclick="saveCurrentAsPreset()">💾 Save Current</button>
+            <button class="search-btn" onclick="showCreatePresetForm()">+ New Preset</button>
+          </div>
+        </div>
+
+        <!-- Current Active Config -->
+        <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+          <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 8px;">CURRENTLY ACTIVE</div>
+          <div style="font-size: 1.3rem; color: #a5b4fc; font-weight: 600;" id="active-preset-name">Loading...</div>
+          <div style="font-size: 0.9rem; color: #64748b; margin-top: 4px;">Restart Claude Code after switching to apply changes</div>
+        </div>
+
+        <!-- Saved Presets -->
+        <div>
+          <h3 style="font-size: 1rem; color: #a5b4fc; margin-bottom: 16px;">Saved Presets</h3>
+          <div id="arsenal-presets-list">
+            <div class="loading">Loading presets...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Create Preset Form -->
+      <div class="chart-container" id="create-preset-form" style="display: none;">
+        <div class="chart-title">Create New Preset</div>
+        <div style="display: grid; gap: 16px;">
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #a5b4fc;">Preset Name</label>
+            <input type="text" id="new-preset-name" class="search-input" placeholder="My Custom Config" />
+          </div>
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #a5b4fc;">Template</label>
+            <select id="new-preset-template" class="search-input" style="width: 100%;">
+              <option value="current">Copy Current CLAUDE.md</option>
+              <option value="empty">Start Empty</option>
+            </select>
+          </div>
+          <div style="display: flex; gap: 12px;">
+            <button class="search-btn" onclick="createPreset()">Create Preset</button>
+            <button class="filter-btn" onclick="hideCreatePresetForm()">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- End Arsenal Tab -->
+
+    <!-- MCP Servers Tab -->
+    <div id="tab-mcp" class="tab-content">
+      <div class="chart-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <div class="chart-title">MCP Server Management</div>
+          <button class="search-btn" onclick="showAddMCPForm()">+ Add Server</button>
+        </div>
+
+        <div id="mcp-servers-list">
+          <div class="loading">Loading MCP servers...</div>
+        </div>
+      </div>
+
+      <!-- Add MCP Server Form -->
+      <div class="chart-container" id="add-mcp-form" style="display: none;">
+        <div class="chart-title">Add New MCP Server</div>
+        <div style="display: grid; gap: 16px;">
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #a5b4fc;">Server Name</label>
+            <input type="text" id="new-mcp-name" class="search-input" placeholder="my-server" />
+          </div>
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #a5b4fc;">Command</label>
+            <input type="text" id="new-mcp-command" class="search-input" placeholder="node" />
+          </div>
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #a5b4fc;">Args (JSON array)</label>
+            <input type="text" id="new-mcp-args" class="search-input" placeholder='["/path/to/server.js"]' />
+          </div>
+          <div style="display: flex; gap: 12px;">
+            <button class="search-btn" onclick="addMCPServer()">Add Server</button>
+            <button class="filter-btn" onclick="hideAddMCPForm()">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- End MCP Tab -->
+
+    <!-- Daemons Tab -->
+    <div id="tab-daemons" class="tab-content">
+      <div class="chart-container">
+        <div class="chart-title">Daemon Manager</div>
+
+        <div id="daemons-list">
+          <div class="loading">Loading daemons...</div>
+        </div>
+      </div>
+    </div>
+    <!-- End Daemons Tab -->
+
+    <!-- Charts Tab -->
+    <div id="tab-charts" class="tab-content">
+    <!-- Chart Section -->
+    <div class="chart-container">
+      <div class="chart-title">Storage by Category</div>
+      <svg id="storage-chart" width="100%" height="300"></svg>
+    </div>
+
+    <!-- Activity Feed -->
+    <div class="chart-container">
+      <div class="chart-title">Recent Activity</div>
+      <div id="activity-feed">
+        <div class="loading">Loading activity...</div>
+      </div>
+    </div>
+    </div>
+    <!-- End Charts Tab -->
+  </div>
+
+  <script>
+    // =========================================================================
+    // DATA LOADING & API
+    // =========================================================================
+
+    let currentFilter = 'all';
+    let compressionData = null;
+
+    // Initialize filter buttons
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentFilter = this.dataset.filter;
+      });
+    });
+
+    // Search on Enter key
+    document.getElementById('search-input').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        performSearch();
+      }
+    });
+
+    // =========================================================================
+    // LOAD STATS - Use API Backend
+    // =========================================================================
+
+    const API_BASE = window.location.origin;
+
+    async function loadDashboardData() {
+      try {
+        // Check if daemon is running
+        const daemonStatus = await checkDaemonStatus();
+        updateDaemonStatus(daemonStatus);
+
+        // Load compression stats from API
+        const response = await fetch(`${API_BASE}/api/stats`);
+        if (!response.ok) {
+          throw new Error('Failed to load stats');
+        }
+
+        const stats = await response.json();
+        compressionData = stats;
+
+        updateStats(stats);
+        updateStorageChart(stats);
+        updateActivityFeed(stats);
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        // Show error in UI
+        document.getElementById('stat-conversations').textContent = 'Error';
+        document.getElementById('stat-tokens').textContent = 'Error';
+      }
+    }
+
+    async function checkDaemonStatus() {
+      try {
+        const response = await fetch(`${API_BASE}/api/daemon-status`);
+        if (!response.ok) {
+          return { running: false, message: 'Unknown' };
+        }
+        return await response.json();
+      } catch (error) {
+        console.error('Error checking daemon status:', error);
+        return { running: false, message: 'Error' };
+      }
+    }
+
+    function updateDaemonStatus(status) {
+      const statusEl = document.getElementById('daemon-status-text');
+      const dotEl = document.querySelector('.status-dot');
+
+      if (status.running) {
+        statusEl.textContent = 'Daemon Running';
+        dotEl.style.background = '#10b981';
+      } else {
+        statusEl.textContent = 'Daemon Stopped';
+        dotEl.style.background = '#ef4444';
+      }
+    }
+
+    function updateStats(data) {
+      // Conversations
+      document.getElementById('stat-conversations').textContent =
+        data.total_conversations || data.conversations.length;
+
+      // Token savings
+      const totalOriginal = data.total_original_tokens || 0;
+      const totalCompressed = data.total_compressed_tokens || 0;
+      const saved = totalOriginal - totalCompressed;
+      const reduction = totalOriginal > 0 ? ((saved / totalOriginal) * 100).toFixed(1) : 0;
+
+      document.getElementById('stat-tokens').textContent = formatNumber(saved);
+      document.getElementById('stat-reduction').textContent = `${reduction}% reduction`;
+
+      // Disk space (estimate: 1 token ≈ 4 bytes)
+      const diskSaved = (saved * 4) / (1024 * 1024); // MB
+      document.getElementById('stat-disk').textContent =
+        diskSaved > 1024 ? `${(diskSaved / 1024).toFixed(1)} GB` : `${diskSaved.toFixed(0)} MB`;
+
+      // Last compressed
+      if (data.conversations && data.conversations.length > 0) {
+        const sorted = [...data.conversations].sort((a, b) =>
+          new Date(b.created) - new Date(a.created)
+        );
+        const latest = sorted[0];
+        document.getElementById('stat-last').textContent = timeAgo(latest.created);
+        document.getElementById('stat-last-detail').textContent = latest.title || latest.id;
+      }
+    }
+
+    function formatNumber(num) {
+      if (num >= 1000000) {
+        return (num / 1000000).toFixed(1) + 'M';
+      } else if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+      }
+      return num.toString();
+    }
+
+    function timeAgo(dateString) {
+      const date = new Date(dateString);
+      const now = new Date();
+      const seconds = Math.floor((now - date) / 1000);
+
+      if (seconds < 60) return `${seconds}s ago`;
+      if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+      return `${Math.floor(seconds / 86400)}d ago`;
+    }
+
+    // =========================================================================
+    // STORAGE CHART
+    // =========================================================================
+
+    function updateStorageChart(data) {
+      const categoryCounts = {};
+      const categoryTokens = {};
+
+      data.conversations.forEach(conv => {
+        const cat = conv.category || 'conversations';
+        categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+        categoryTokens[cat] = (categoryTokens[cat] || 0) + (conv.compressed_tokens || 0);
+      });
+
+      const chartData = Object.entries(categoryCounts).map(([category, count]) => ({
+        category: category.charAt(0).toUpperCase() + category.slice(1),
+        count,
+        tokens: categoryTokens[category],
+        size: (categoryTokens[category] * 4) / (1024 * 1024) // MB
+      }));
+
+      drawBarChart('#storage-chart', chartData);
+    }
+
+    function drawBarChart(selector, data) {
+      const svg = d3.select(selector);
+      const width = parseInt(svg.style('width'));
+      const height = 300;
+      const margin = { top: 20, right: 20, bottom: 60, left: 60 };
+      const chartWidth = width - margin.left - margin.right;
+      const chartHeight = height - margin.top - margin.bottom;
+
+      svg.selectAll('*').remove();
+
+      const g = svg.append('g')
+        .attr('transform', `translate(${margin.left}, ${margin.top})`);
+
+      const x = d3.scaleBand()
+        .domain(data.map(d => d.category))
+        .range([0, chartWidth])
+        .padding(0.3);
+
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(data, d => d.size)])
+        .nice()
+        .range([chartHeight, 0]);
+
+      // Bars
+      g.selectAll('.bar')
+        .data(data)
+        .enter()
+        .append('rect')
+        .attr('class', 'bar')
+        .attr('x', d => x(d.category))
+        .attr('y', d => y(d.size))
+        .attr('width', x.bandwidth())
+        .attr('height', d => chartHeight - y(d.size))
+        .append('title')
+        .text(d => `${d.category}: ${d.size.toFixed(1)} MB (${d.count} files)`);
+
+      // X axis
+      g.append('g')
+        .attr('class', 'axis')
+        .attr('transform', `translate(0, ${chartHeight})`)
+        .call(d3.axisBottom(x))
+        .selectAll('text')
+        .attr('transform', 'rotate(-45)')
+        .style('text-anchor', 'end');
+
+      // Y axis
+      g.append('g')
+        .attr('class', 'axis')
+        .call(d3.axisLeft(y).ticks(5).tickFormat(d => `${d.toFixed(0)} MB`));
+    }
+
+    // =========================================================================
+    // ACTIVITY FEED
+    // =========================================================================
+
+    function updateActivityFeed(data) {
+      const feedEl = document.getElementById('activity-feed');
+
+      if (!data.conversations || data.conversations.length === 0) {
+        feedEl.innerHTML = '<div class="empty">No activity yet</div>';
+        return;
+      }
+
+      const sorted = [...data.conversations]
+        .sort((a, b) => new Date(b.created) - new Date(a.created))
+        .slice(0, 10);
+
+      feedEl.innerHTML = sorted.map(conv => {
+        const reduction = conv.original_tokens > 0
+          ? (((conv.original_tokens - conv.compressed_tokens) / conv.original_tokens) * 100).toFixed(1)
+          : 0;
+
+        return `
+          <div class="result-item">
+            <div class="result-title">${conv.title || conv.id}</div>
+            <div class="result-meta">
+              <span>🕐 ${timeAgo(conv.created)}</span>
+              <span>📦 ${conv.project || 'Unknown'}</span>
+              <span style="color: #6ee7b7;">💾 ${reduction}% compressed</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // =========================================================================
+    // SEARCH - Use API Backend
+    // =========================================================================
+
+    async function performSearch() {
+      const query = document.getElementById('search-input').value.trim();
+      const resultsEl = document.getElementById('search-results');
+
+      if (!query) {
+        resultsEl.innerHTML = `
+          <div class="empty">
+            <div class="empty-icon">🔍</div>
+            <div>Enter a search query</div>
+          </div>
+        `;
+        return;
+      }
+
+      resultsEl.innerHTML = '<div class="loading">Searching...</div>';
+
+      try {
+        const response = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}&category=${currentFilter}`);
+        if (!response.ok) {
+          throw new Error('Search failed');
+        }
+
+        const searchResults = await response.json();
+        displaySearchResults(searchResults.results, query);
+      } catch (error) {
+        console.error('Search error:', error);
+        resultsEl.innerHTML = `
+          <div class="empty">
+            <div class="empty-icon">⚠️</div>
+            <div>Search failed: ${error.message}</div>
+          </div>
+        `;
+      }
+    }
+
+    function displaySearchResults(results, query) {
+      const resultsEl = document.getElementById('search-results');
+
+      if (results.length === 0) {
+        resultsEl.innerHTML = `
+          <div class="empty">
+            <div class="empty-icon">🔍</div>
+            <div>No results found for "${query}"</div>
+          </div>
+        `;
+        return;
+      }
+
+      const totalOriginal = results.reduce((sum, r) => sum + (r.original_tokens || 0), 0);
+      const totalCompressed = results.reduce((sum, r) => sum + (r.compressed_tokens || 0), 0);
+      const savings = totalOriginal > 0
+        ? (((totalOriginal - totalCompressed) / totalOriginal) * 100).toFixed(1)
+        : 0;
+
+      resultsEl.innerHTML = `
+        <div class="result-header">
+          <div>
+            <strong>${results.length}</strong> result${results.length !== 1 ? 's' : ''} found
+          </div>
+          <div style="color: #6ee7b7;">
+            ${formatNumber(totalCompressed)} tokens used (${savings}% savings)
+          </div>
+        </div>
+        ${results.map(result => `
+          <div class="result-item" onclick="viewConversation('${result.id}')">
+            <div class="result-title">${result.title || result.id}</div>
+            <div class="result-meta">
+              <span>📅 ${new Date(result.created).toLocaleDateString()}</span>
+              <span>📦 ${result.project || 'Unknown'}</span>
+              <span>📊 ${formatNumber(result.compressed_tokens)} tokens</span>
+            </div>
+            <div class="result-preview">
+              Original: ${formatNumber(result.original_tokens)} tokens →
+              Compressed: ${formatNumber(result.compressed_tokens)} tokens
+              (${(((result.original_tokens - result.compressed_tokens) / result.original_tokens) * 100).toFixed(1)}% reduction)
+            </div>
+          </div>
+        `).join('')}
+      `;
+    }
+
+    function viewConversation(id) {
+      alert(`View conversation: ${id}\n\nThis would open the compressed conversation file.\nIntegration with decompression coming soon!`);
+    }
+
+    // =========================================================================
+    // TAB SWITCHING
+    // =========================================================================
+
+    function showTab(tabName) {
+      // Hide all tabs
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+
+      // Show selected tab
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+      event.target.classList.add('active');
+
+      // Load config data if switching to config tab
+      if (tabName === 'config') {
+        loadConfigData();
+      }
+
+      // Load MCP data if switching to MCP tab
+      if (tabName === 'mcp') {
+        loadMCPServers();
+      }
+
+      // Load daemon data if switching to daemons tab
+      if (tabName === 'daemons') {
+        loadDaemons();
+      }
+
+      // Load arsenal data if switching to arsenal tab
+      if (tabName === 'arsenal') {
+        loadArsenal();
+      }
+    }
+
+    // =========================================================================
+    // CONFIG LOADING
+    // =========================================================================
+
+    async function loadConfigData() {
+      try {
+        const response = await fetch(`${API_BASE}/api/config/list`);
+        if (!response.ok) {
+          throw new Error('Failed to load config');
+        }
+
+        const config = await response.json();
+        displayConfigFiles(config);
+      } catch (error) {
+        console.error('Error loading config:', error);
+      }
+    }
+
+    function displayConfigFiles(config) {
+      // Markdown files
+      const markdownList = document.getElementById('config-markdown-list');
+      if (config.markdown && config.markdown.length > 0) {
+        markdownList.innerHTML = config.markdown.map(file => `
+          <div class="config-item">
+            <div class="config-item-name">${file.name}</div>
+            <div class="config-item-meta">
+              <span>📅 ${new Date(file.modified).toLocaleDateString()}</span>
+              <span>💾 ${(file.size / 1024).toFixed(1)} KB</span>
+            </div>
+            <div style="margin-top: 8px; display: flex; gap: 8px;">
+              <button class="filter-btn" onclick="viewConfig('${file.name.replace('.md', '').toLowerCase()}'); event.stopPropagation();">View</button>
+              <button class="search-btn" style="padding: 6px 16px; font-size: 0.85rem;" onclick="editConfig('${file.name.replace('.md', '').toLowerCase()}'); event.stopPropagation();">Edit</button>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        markdownList.innerHTML = '<div class="empty">No markdown configs found</div>';
+      }
+
+      // JSON settings
+      const jsonList = document.getElementById('config-json-list');
+      if (config.json && config.json.length > 0) {
+        jsonList.innerHTML = config.json.map(file => `
+          <div class="config-item">
+            <div class="config-item-name">${file.name}</div>
+            <div class="config-item-meta">
+              <span>📅 ${new Date(file.modified).toLocaleDateString()}</span>
+              <span>💾 ${(file.size / 1024).toFixed(1)} KB</span>
+            </div>
+            <div style="margin-top: 8px; display: flex; gap: 8px;">
+              <button class="filter-btn" onclick="viewConfig('${file.name.replace('.json', '')}'); event.stopPropagation();">View</button>
+              <button class="search-btn" style="padding: 6px 16px; font-size: 0.85rem;" onclick="editConfig('${file.name.replace('.json', '')}'); event.stopPropagation();">Edit</button>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        jsonList.innerHTML = '<div class="empty">No settings files found</div>';
+      }
+
+      // Hooks - Load from dedicated endpoint for enable/disable
+      loadHooksWithStatus();
+
+      // Skills
+      const skillsList = document.getElementById('config-skills-list');
+      if (config.skills && config.skills.length > 0) {
+        skillsList.innerHTML = config.skills.map(skill => `
+          <div class="config-item">
+            <div class="config-item-name">${skill.name}</div>
+            <div class="config-item-meta">
+              <span class="${skill.enabled ? 'config-item-enabled' : 'config-item-disabled'}">
+                ${skill.enabled ? '✅ Enabled' : '❌ Disabled'}
+              </span>
+              ${skill.path ? `<span>📁 ${skill.path.split('/').pop()}</span>` : ''}
+            </div>
+          </div>
+        `).join('');
+      } else {
+        skillsList.innerHTML = '<div class="empty">No skills configured</div>';
+      }
+
+      // MCP Servers
+      const mcpList = document.getElementById('config-mcp-list');
+      if (config.mcp_servers && config.mcp_servers.length > 0) {
+        mcpList.innerHTML = config.mcp_servers.map(server => `
+          <div class="config-item">
+            <div class="config-item-name">${server.name}</div>
+            <div class="config-item-meta">
+              <span>🔌 ${server.command}</span>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        mcpList.innerHTML = '<div class="empty">No MCP servers configured</div>';
+      }
+    }
+
+    async function viewConfig(fileType) {
+      try {
+        const response = await fetch(`${API_BASE}/api/config?type=${encodeURIComponent(fileType)}`);
+        if (!response.ok) {
+          throw new Error('Failed to load config file');
+        }
+
+        const content = await response.json();
+        displayConfigContent(content);
+      } catch (error) {
+        console.error('Error loading config file:', error);
+        alert('Failed to load configuration file');
+      }
+    }
+
+    function displayConfigContent(content) {
+      const viewer = document.getElementById('config-viewer');
+      const title = document.getElementById('config-viewer-title');
+      const meta = document.getElementById('config-viewer-meta');
+      const contentEl = document.getElementById('config-viewer-content');
+
+      title.textContent = content.name;
+
+      let metaHTML = `<strong>Path:</strong> ${content.path}`;
+      if (content.size) {
+        metaHTML += ` | <strong>Size:</strong> ${(content.size / 1024).toFixed(1)} KB`;
+      }
+      if (content.modified) {
+        metaHTML += ` | <strong>Modified:</strong> ${new Date(content.modified).toLocaleString()}`;
+      }
+      meta.innerHTML = metaHTML;
+
+      // Format content based on type
+      if (content.type === 'json') {
+        try {
+          const formatted = JSON.stringify(JSON.parse(content.content), null, 2);
+          contentEl.textContent = formatted;
+        } catch (e) {
+          contentEl.textContent = content.content;
+        }
+      } else {
+        contentEl.textContent = content.content;
+      }
+
+      viewer.style.display = 'block';
+      viewer.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function closeConfigViewer() {
+      document.getElementById('config-viewer').style.display = 'none';
+    }
+
+    async function editConfig(fileType) {
+      try {
+        const response = await fetch(`${API_BASE}/api/config?type=${encodeURIComponent(fileType)}`);
+        if (!response.ok) throw new Error('Failed to load config');
+
+        const content = await response.json();
+
+        // Show editor
+        const viewer = document.getElementById('config-viewer');
+        const title = document.getElementById('config-viewer-title');
+        const contentEl = document.getElementById('config-viewer-content');
+
+        title.textContent = `Edit ${content.name}`;
+        contentEl.contentEditable = 'true';
+        contentEl.style.border = '2px solid #6366f1';
+        contentEl.textContent = content.content;
+        contentEl.dataset.fileType = fileType;
+
+        viewer.style.display = 'block';
+        viewer.scrollIntoView({ behavior: 'smooth' });
+
+        // Add save button
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save Changes';
+        saveBtn.className = 'search-btn';
+        saveBtn.onclick = () => saveConfig(fileType);
+        viewer.insertBefore(saveBtn, viewer.lastElementChild);
+
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to load config for editing');
+      }
+    }
+
+    async function saveConfig(fileType) {
+      try {
+        const contentEl = document.getElementById('config-viewer-content');
+        const content = contentEl.textContent;
+
+        const response = await fetch(`${API_BASE}/api/config/save`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({type: fileType, content})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          alert('✅ Config saved successfully!');
+          closeConfigViewer();
+          loadConfigData();
+        } else {
+          alert(`Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Save error:', error);
+        alert('Failed to save config');
+      }
+    }
+
+    // =========================================================================
+    // MCP SERVER MANAGEMENT
+    // =========================================================================
+
+    async function loadMCPServers() {
+      try {
+        const response = await fetch(`${API_BASE}/api/mcp/list`);
+        const data = await response.json();
+        displayMCPServers(data.servers || []);
+      } catch (error) {
+        console.error('Error loading MCP servers:', error);
+      }
+    }
+
+    function displayMCPServers(servers) {
+      const list = document.getElementById('mcp-servers-list');
+
+      if (servers.length === 0) {
+        list.innerHTML = '<div class="empty">No MCP servers configured</div>';
+        return;
+      }
+
+      list.innerHTML = servers.map(server => `
+        <div class="result-item">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+              <div class="result-title">${server.name}</div>
+              <div class="result-meta">
+                <span>🔌 ${server.command}</span>
+                ${server.args.length > 0 ? `<span>📋 ${server.args.length} args</span>` : ''}
+                <span class="${server.enabled !== false ? 'config-item-enabled' : 'config-item-disabled'}">
+                  ${server.enabled !== false ? '✅ Enabled' : '❌ Disabled'}
+                </span>
+              </div>
+              ${server.args.length > 0 ? `<div class="result-preview">Args: ${JSON.stringify(server.args)}</div>` : ''}
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="filter-btn" onclick="toggleMCPServer('${server.name}', ${server.enabled === false})">
+                ${server.enabled !== false ? 'Disable' : 'Enable'}
+              </button>
+              <button class="filter-btn" style="border-color: rgba(239, 68, 68, 0.5); color: #fca5a5;"
+                      onclick="removeMCPServer('${server.name}')">Remove</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function toggleMCPServer(name, enabled) {
+      try {
+        const response = await fetch(`${API_BASE}/api/mcp/toggle`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name, enabled})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          loadMCPServers();
+        } else {
+          alert(`Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Toggle error:', error);
+        alert('Failed to toggle server');
+      }
+    }
+
+    async function removeMCPServer(name) {
+      if (!confirm(`Remove MCP server "${name}"?`)) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/mcp/remove`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          loadMCPServers();
+        } else {
+          alert(`Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Remove error:', error);
+        alert('Failed to remove server');
+      }
+    }
+
+    function showAddMCPForm() {
+      document.getElementById('add-mcp-form').style.display = 'block';
+    }
+
+    function hideAddMCPForm() {
+      document.getElementById('add-mcp-form').style.display = 'none';
+      document.getElementById('new-mcp-name').value = '';
+      document.getElementById('new-mcp-command').value = '';
+      document.getElementById('new-mcp-args').value = '';
+    }
+
+    async function addMCPServer() {
+      const name = document.getElementById('new-mcp-name').value.trim();
+      const command = document.getElementById('new-mcp-command').value.trim();
+      const argsStr = document.getElementById('new-mcp-args').value.trim();
+
+      if (!name || !command) {
+        alert('Please provide server name and command');
+        return;
+      }
+
+      let args = [];
+      if (argsStr) {
+        try {
+          args = JSON.parse(argsStr);
+        } catch (e) {
+          alert('Invalid JSON for args. Use format: ["arg1", "arg2"]');
+          return;
+        }
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/mcp/add`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name, command, args, env: {}})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          hideAddMCPForm();
+          loadMCPServers();
+        } else {
+          alert(`Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Add error:', error);
+        alert('Failed to add server');
+      }
+    }
+
+    // =========================================================================
+    // DAEMON MANAGEMENT
+    // =========================================================================
+
+    async function loadDaemons() {
+      try {
+        const response = await fetch(`${API_BASE}/api/daemons/list`);
+        const data = await response.json();
+        displayDaemons(data.daemons || []);
+      } catch (error) {
+        console.error('Error loading daemons:', error);
+      }
+    }
+
+    function displayDaemons(daemons) {
+      const list = document.getElementById('daemons-list');
+
+      list.innerHTML = daemons.map(daemon => `
+        <div class="result-item">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div style="flex: 1;">
+              <div class="result-title">${daemon.name}</div>
+              <div class="result-meta">
+                <span class="${daemon.running ? 'config-item-enabled' : 'config-item-disabled'}">
+                  ${daemon.running ? '✅ Running' : '⏸️ Stopped'}
+                </span>
+                ${daemon.pid ? `<span>PID: ${daemon.pid}</span>` : ''}
+              </div>
+              <div class="result-preview">${daemon.description}</div>
+              <div style="font-size: 0.8rem; color: #64748b; margin-top: 8px;">
+                📁 ${daemon.script}
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              ${daemon.running && daemon.id !== 'dashboard_server' ? `
+                <button class="filter-btn" onclick="stopDaemon('${daemon.id}')">Stop</button>
+                <button class="filter-btn" onclick="restartDaemon('${daemon.id}')">Restart</button>
+              ` : ''}
+              ${!daemon.running ? `
+                <button class="filter-btn" style="border-color: rgba(16, 185, 129, 0.5); color: #6ee7b7;"
+                        onclick="startDaemon('${daemon.id}')">Start</button>
+              ` : ''}
+              ${daemon.id === 'dashboard_server' ? `
+                <span style="color: #64748b; font-size: 0.85rem;">(This Server)</span>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function startDaemon(id) {
+      try {
+        const response = await fetch(`${API_BASE}/api/daemon/start`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({id})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          setTimeout(loadDaemons, 1000);
+        } else {
+          alert(`Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Start error:', error);
+        alert('Failed to start daemon');
+      }
+    }
+
+    async function stopDaemon(id) {
+      if (!confirm('Stop this daemon?')) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/daemon/stop`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({id})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          setTimeout(loadDaemons, 1000);
+        } else {
+          alert(`Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Stop error:', error);
+        alert('Failed to stop daemon');
+      }
+    }
+
+    async function restartDaemon(id) {
+      try {
+        const response = await fetch(`${API_BASE}/api/daemon/restart`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({id})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          setTimeout(loadDaemons, 2000);
+        } else {
+          alert(`Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Restart error:', error);
+        alert('Failed to restart daemon');
+      }
+    }
+
+    // =========================================================================
+    // ARSENAL MANAGEMENT
+    // =========================================================================
+
+    async function loadArsenal() {
+      try {
+        const response = await fetch(`${API_BASE}/api/arsenal/list`);
+        const data = await response.json();
+
+        // Update active preset name
+        document.getElementById('active-preset-name').textContent = data.current.name;
+
+        // Display presets
+        displayArsenalPresets(data.saved_presets || []);
+      } catch (error) {
+        console.error('Error loading arsenal:', error);
+      }
+    }
+
+    function displayArsenalPresets(presets) {
+      const list = document.getElementById('arsenal-presets-list');
+
+      if (presets.length === 0) {
+        list.innerHTML = '<div class="empty">No saved presets. Click "Save Current" to create your first preset.</div>';
+        return;
+      }
+
+      list.innerHTML = presets.map(preset => `
+        <div class="result-item">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div style="flex: 1;">
+              <div class="result-title">${preset.name}</div>
+              <div class="result-meta">
+                <span>📅 ${new Date(preset.modified).toLocaleDateString()}</span>
+                <span>💾 ${(preset.size / 1024).toFixed(1)} KB</span>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="search-btn" onclick="activatePreset('${preset.name}')">✅ Activate</button>
+              <button class="filter-btn" onclick="viewPreset('${preset.id}')">View</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function activatePreset(name) {
+      if (!confirm(`Switch to "${name}"?\n\nThis will replace your current CLAUDE.md (backup will be created).`)) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/arsenal/activate`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          alert(result.message);
+          loadArsenal();
+        } else {
+          alert(`Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Activate error:', error);
+        alert('Failed to activate preset');
+      }
+    }
+
+    async function saveCurrentAsPreset() {
+      const name = prompt('Save current CLAUDE.md as preset:', 'My Config');
+      if (!name) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/arsenal/save?name=${encodeURIComponent(name)}`);
+        const result = await response.json();
+
+        if (result.success) {
+          alert(`✅ Saved as "${name}"`);
+          loadArsenal();
+        } else {
+          alert(`Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Save error:', error);
+        alert('Failed to save preset');
+      }
+    }
+
+    function showCreatePresetForm() {
+      document.getElementById('create-preset-form').style.display = 'block';
+    }
+
+    function hideCreatePresetForm() {
+      document.getElementById('create-preset-form').style.display = 'none';
+      document.getElementById('new-preset-name').value = '';
+    }
+
+    async function createPreset() {
+      const name = document.getElementById('new-preset-name').value.trim();
+      const template = document.getElementById('new-preset-template').value;
+
+      if (!name) {
+        alert('Please provide a preset name');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/arsenal/create`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name, template})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          hideCreatePresetForm();
+          loadArsenal();
+          alert(`✅ Created "${name}"`);
+        } else {
+          alert(`Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Create error:', error);
+        alert('Failed to create preset');
+      }
+    }
+
+    async function viewPreset(id) {
+      // Open preset file in config viewer
+      const fileType = 'claude.md'; // Would need to pass actual path
+      viewConfig(fileType);
+    }
+
+    // =========================================================================
+    // HOOK MANAGEMENT
+    // =========================================================================
+
+    async function loadHooksWithStatus() {
+      try {
+        const response = await fetch(`${API_BASE}/api/hooks/list`);
+        const data = await response.json();
+        displayHooksWithToggle(data.hooks || []);
+      } catch (error) {
+        console.error('Error loading hooks:', error);
+        document.getElementById('config-hooks-list').innerHTML = '<div class="empty">Error loading hooks</div>';
+      }
+    }
+
+    function displayHooksWithToggle(hooks) {
+      const hooksList = document.getElementById('config-hooks-list');
+
+      if (hooks.length === 0) {
+        hooksList.innerHTML = '<div class="empty">No hooks found</div>';
+        return;
+      }
+
+      hooksList.innerHTML = hooks.map(hook => `
+        <div class="config-item">
+          <div class="config-item-name">${hook.name}</div>
+          <div class="config-item-meta">
+            <span>📅 ${new Date(hook.modified).toLocaleDateString()}</span>
+            <span class="${hook.enabled ? 'config-item-enabled' : 'config-item-disabled'}">
+              ${hook.enabled ? '✅ Enabled' : '⏸️ Disabled'}
+            </span>
+          </div>
+          <div style="margin-top: 8px; display: flex; gap: 8px;">
+            <button class="filter-btn" onclick="toggleHook('${hook.name}', ${!hook.enabled}); event.stopPropagation();">
+              ${hook.enabled ? 'Disable' : 'Enable'}
+            </button>
+            <button class="filter-btn" onclick="viewConfig('hook:${hook.name}'); event.stopPropagation();">View</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function toggleHook(name, enabled) {
+      try {
+        const response = await fetch(`${API_BASE}/api/hooks/toggle`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name, enabled})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          loadHooksWithStatus();
+        } else {
+          alert(`Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Toggle hook error:', error);
+        alert('Failed to toggle hook');
+      }
+    }
+
+    // =========================================================================
+    // INITIALIZATION
+    // =========================================================================
+
+    loadDashboardData();
+
+    // Refresh every 30 seconds
+    setInterval(loadDashboardData, 30000);
+  </script>
+</body>
+</html>
