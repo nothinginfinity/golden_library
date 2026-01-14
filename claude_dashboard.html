@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Claude Control Center - Dashboard</title>
   <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -405,6 +413,304 @@
       max-height: 600px;
       overflow-y: auto;
     }
+
+    /* ========================================================================= */
+    /* 3D VIEWER STYLES */
+    /* ========================================================================= */
+
+    .viewer-3d-container {
+      position: relative;
+      width: 100%;
+      height: 85vh;
+      background: #0f172a;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .canvas-3d {
+      position: absolute;
+      top: 0;
+      left: 360px;
+      right: 0;
+      bottom: 0;
+    }
+
+    .viewer-panel-3d {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(30, 41, 59, 0.95);
+      backdrop-filter: blur(12px);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 0;
+      width: 320px;
+      z-index: 10;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      max-height: calc(85vh - 40px);
+      overflow-y: auto;
+    }
+
+    .panel-header-3d {
+      padding: 12px 15px;
+      border-bottom: 1px solid #334155;
+      background: rgba(15, 23, 42, 0.9);
+    }
+
+    .panel-header-3d h3 {
+      margin: 0;
+      font-size: 13px;
+      color: #f7b731;
+      letter-spacing: 1px;
+    }
+
+    .viewer-section-3d {
+      padding: 12px 15px;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+    }
+
+    .viewer-section-3d h4 {
+      margin: 0 0 10px 0;
+      font-size: 11px;
+      color: #94a3b8;
+      letter-spacing: 0.5px;
+    }
+
+    .search-section-3d {
+      background: rgba(40, 30, 15, 0.3);
+      border: 1px solid rgba(247, 183, 49, 0.3);
+      border-radius: 8px;
+      margin: 15px;
+    }
+
+    .search-input-3d {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      font-size: 12px;
+    }
+
+    .search-options-3d {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .search-options-3d label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .search-btn-3d {
+      width: 100%;
+      background: #f7b731;
+      color: #000;
+      border: none;
+      padding: 8px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .search-btn-3d:hover {
+      background: #ffc851;
+    }
+
+    .search-status-3d {
+      font-size: 10px;
+      color: #64748b;
+      margin-top: 5px;
+      min-height: 12px;
+    }
+
+    .stats-section-3d {
+      background: rgba(25, 15, 40, 0.3);
+      border: 1px solid rgba(170, 102, 204, 0.3);
+      border-radius: 8px;
+      margin: 15px;
+    }
+
+    .stat-row-3d {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 11px;
+    }
+
+    .stat-row-3d span:first-child {
+      color: #94a3b8;
+    }
+
+    .stat-row-3d span:last-child {
+      color: #e2e8f0;
+      font-weight: bold;
+    }
+
+    .stat-highlight-3d {
+      color: #10b981 !important;
+    }
+
+    .layout-btn-3d {
+      width: 100%;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      margin: 2px 0;
+      transition: all 0.2s;
+    }
+
+    .layout-btn-3d:hover {
+      border-color: #f7b731;
+      color: #f7b731;
+    }
+
+    .layout-btn-3d.active {
+      background: #f7b731;
+      color: #000;
+      border-color: #f7b731;
+    }
+
+    .control-btn-3d {
+      width: 100%;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      margin: 2px 0;
+      transition: all 0.2s;
+    }
+
+    .control-btn-3d:hover {
+      border-color: #6366f1;
+      color: #6366f1;
+    }
+
+    .viewer-footer-3d {
+      padding: 10px 15px;
+      border-top: 1px solid #334155;
+      font-size: 10px;
+      color: #64748b;
+    }
+
+    .details-panel-3d {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 350px;
+      max-height: calc(85vh - 40px);
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      z-index: 20;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .details-content-3d {
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+      font-size: 12px;
+    }
+
+    .detail-title-3d {
+      font-size: 14px;
+      font-weight: bold;
+      color: #e2e8f0;
+      margin-bottom: 10px;
+    }
+
+    .detail-meta-3d {
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 15px;
+    }
+
+    .detail-section-3d {
+      margin-bottom: 15px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #334155;
+    }
+
+    .detail-section-3d:last-child {
+      border-bottom: none;
+    }
+
+    .detail-section-3d h4 {
+      margin: 0 0 8px 0;
+      font-size: 11px;
+      color: #94a3b8;
+      letter-spacing: 0.5px;
+    }
+
+    .detail-row-3d {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 11px;
+    }
+
+    .detail-row-3d span:first-child {
+      color: #94a3b8;
+    }
+
+    .detail-row-3d span:last-child {
+      color: #e2e8f0;
+      font-weight: bold;
+    }
+
+    .badge-3d {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      background: rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+    }
+
+    .text-green-3d {
+      color: #10b981 !important;
+    }
+
+    .detail-actions-3d {
+      display: flex;
+      gap: 8px;
+      margin-top: 15px;
+    }
+
+    .action-btn-3d {
+      flex: 1;
+      padding: 8px;
+      background: rgba(99, 102, 241, 0.3);
+      border: 1px solid rgba(99, 102, 241, 0.5);
+      color: #a5b4fc;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all 0.2s;
+    }
+
+    .action-btn-3d:hover {
+      background: rgba(99, 102, 241, 0.5);
+      border-color: #6366f1;
+    }
   </style>
 </head>
 <body>
@@ -429,6 +735,7 @@
       <button class="tab-btn" onclick="showTab('mcp')">🔌 MCP</button>
       <button class="tab-btn" onclick="showTab('daemons')">🤖 Daemons</button>
       <button class="tab-btn" onclick="showTab('charts')">📈 Charts</button>
+      <button class="tab-btn" onclick="showTab('3dview')">🌐 3D View</button>
     </div>
 
     <!-- Dashboard Tab -->
@@ -706,6 +1013,127 @@
     </div>
     </div>
     <!-- End Charts Tab -->
+
+    <!-- 3D View Tab -->
+    <div id="tab-3dview" class="tab-content">
+      <div class="viewer-3d-container">
+        <!-- Left Control Panel -->
+        <div class="viewer-panel-3d">
+          <div class="panel-header-3d">
+            <h3>🏆 GOLDEN LIBRARY 3D</h3>
+          </div>
+
+          <!-- Search Section -->
+          <div class="viewer-section-3d search-section-3d">
+            <h4>HYBRID SEARCH</h4>
+            <input type="text" id="search-3d-input" class="search-input-3d" placeholder="Search handoffs...">
+            <div class="search-options-3d">
+              <label><input type="checkbox" id="search-3d-local" checked> Local</label>
+              <label><input type="checkbox" id="search-3d-metadata" checked> Metadata</label>
+            </div>
+            <button class="search-btn-3d" onclick="performSearch3D()">Search</button>
+            <div class="search-status-3d" id="search-3d-status">Ready</div>
+          </div>
+
+          <!-- Stats Section -->
+          <div class="viewer-section-3d stats-section-3d">
+            <h4>COMPRESSION STATS</h4>
+            <div class="stat-row-3d">
+              <span>Total Handoffs:</span>
+              <span id="stat-3d-count">-</span>
+            </div>
+            <div class="stat-row-3d">
+              <span>Original Size:</span>
+              <span id="stat-3d-original">-</span>
+            </div>
+            <div class="stat-row-3d">
+              <span>Compressed Size:</span>
+              <span id="stat-3d-compressed">-</span>
+            </div>
+            <div class="stat-row-3d">
+              <span>Total Savings:</span>
+              <span id="stat-3d-savings" class="stat-highlight-3d">-</span>
+            </div>
+          </div>
+
+          <!-- View Mode Section -->
+          <div class="viewer-section-3d">
+            <h4>View Mode</h4>
+            <button class="layout-btn-3d active" onclick="changeLayout3D('globe')">Globe</button>
+            <button class="layout-btn-3d" onclick="changeLayout3D('clusters')">Clusters</button>
+            <button class="layout-btn-3d" onclick="changeLayout3D('grid')">Cubic Grid</button>
+            <button class="layout-btn-3d" onclick="changeLayout3D('helix')">Helix</button>
+            <button class="layout-btn-3d" onclick="changeLayout3D('scatter')">Scatter</button>
+          </div>
+
+          <!-- Controls Section -->
+          <div class="viewer-section-3d">
+            <h4>Controls</h4>
+            <button class="control-btn-3d" onclick="toggleAutoOrbit3D()">
+              <span id="orbit-3d-status">Auto-Orbit: OFF</span>
+            </button>
+            <button class="control-btn-3d" onclick="toggleConnections3D()">Toggle Connections</button>
+            <button class="control-btn-3d" onclick="reloadData3D()">Reload Data</button>
+          </div>
+
+          <div class="viewer-footer-3d">
+            Nodes: <span id="node-3d-count">0</span> | Links: <span id="link-3d-count">0</span>
+          </div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div id="canvas-3d" class="canvas-3d"></div>
+
+        <!-- Details Panel -->
+        <div id="details-panel-3d" class="details-panel-3d" style="display: none;">
+          <div class="panel-header-3d">
+            <h3>Handoff Details</h3>
+            <button onclick="closeDetailsPanel3D()" style="background: none; border: none; color: #888; cursor: pointer; font-size: 20px;">×</button>
+          </div>
+
+          <div class="details-content-3d">
+            <div class="detail-title-3d" id="detail-3d-filename">-</div>
+            <div class="detail-meta-3d">
+              <span>ID: <span id="detail-3d-id">-</span></span>
+            </div>
+
+            <div class="detail-section-3d">
+              <h4>COMPRESSION</h4>
+              <div class="detail-row-3d">
+                <span>Format:</span>
+                <span id="detail-3d-format" class="badge-3d">-</span>
+              </div>
+              <div class="detail-row-3d">
+                <span>Reduction:</span>
+                <span id="detail-3d-reduction">-</span>
+              </div>
+            </div>
+
+            <div class="detail-section-3d">
+              <h4>FILE SIZES</h4>
+              <div class="detail-row-3d">
+                <span>Original:</span>
+                <span id="detail-3d-original-size">-</span>
+              </div>
+              <div class="detail-row-3d">
+                <span>Compressed:</span>
+                <span id="detail-3d-compressed-size">-</span>
+              </div>
+              <div class="detail-row-3d">
+                <span>Saved:</span>
+                <span id="detail-3d-saved-size" class="text-green-3d">-</span>
+              </div>
+            </div>
+
+            <div class="detail-actions-3d">
+              <button class="action-btn-3d" onclick="decompressHandoff3D()">Decompress</button>
+              <button class="action-btn-3d" onclick="downloadHandoff3D()">Download</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- End 3D View Tab -->
   </div>
 
   <script>
@@ -1070,6 +1498,13 @@
       // Load daemon data if switching to daemons tab
       if (tabName === 'daemons') {
         loadDaemons();
+      }
+
+      // Initialize 3D viewer if switching to 3D view tab
+      if (tabName === '3dview') {
+        if (typeof window.init3DViewer === 'function') {
+          window.init3DViewer();
+        }
       }
 
       // Load arsenal data if switching to arsenal tab
@@ -1874,6 +2309,394 @@
 
     // Refresh every 30 seconds
     setInterval(loadDashboardData, 30000);
+  </script>
+
+  <!-- 3D Viewer Engine (Three.js) -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    let scene3D, camera3D, renderer3D, controls3D;
+    let nodes3D = [], links3D = [];
+    let nodeObjects3D = [], linkObjects3D = [];
+    let autoOrbit3D = false;
+    let showConnections3D = true;
+    let selectedNode3D = null;
+    let initialized3D = false;
+
+    // Initialize 3D scene
+    function init3D() {
+      if (initialized3D) return;
+
+      const container = document.getElementById('canvas-3d');
+      if (!container) return;
+
+      // Scene setup
+      scene3D = new THREE.Scene();
+      scene3D.fog = new THREE.Fog(0x0f172a, 50, 200);
+
+      // Camera
+      const containerRect = container.getBoundingClientRect();
+      camera3D = new THREE.PerspectiveCamera(
+        60,
+        containerRect.width / containerRect.height,
+        0.1,
+        1000
+      );
+      camera3D.position.set(0, 30, 80);
+
+      // Renderer
+      renderer3D = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer3D.setSize(containerRect.width, containerRect.height);
+      renderer3D.setPixelRatio(window.devicePixelRatio);
+      container.appendChild(renderer3D.domElement);
+
+      // Controls
+      controls3D = new OrbitControls(camera3D, renderer3D.domElement);
+      controls3D.enableDamping = true;
+      controls3D.dampingFactor = 0.05;
+      controls3D.minDistance = 20;
+      controls3D.maxDistance = 200;
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+      scene3D.add(ambientLight);
+
+      const pointLight1 = new THREE.PointLight(0xf7b731, 1, 100);
+      pointLight1.position.set(50, 50, 50);
+      scene3D.add(pointLight1);
+
+      const pointLight2 = new THREE.PointLight(0x6366f1, 0.8, 100);
+      pointLight2.position.set(-50, -50, -50);
+      scene3D.add(pointLight2);
+
+      // Background stars
+      createStars3D();
+
+      // Event listeners
+      window.addEventListener('resize', onWindowResize3D);
+      renderer3D.domElement.addEventListener('click', onNodeClick3D);
+
+      initialized3D = true;
+
+      // Load handoff data
+      loadHandoffs3D();
+
+      // Start animation
+      animate3D();
+    }
+
+    function createStars3D() {
+      const starsGeometry = new THREE.BufferGeometry();
+      const starCount = 1000;
+      const positions = new Float32Array(starCount * 3);
+
+      for (let i = 0; i < starCount * 3; i++) {
+        positions[i] = (Math.random() - 0.5) * 400;
+      }
+
+      starsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const starsMaterial = new THREE.PointsMaterial({ color: 0x888888, size: 0.5 });
+      const stars = new THREE.Points(starsGeometry, starsMaterial);
+      scene3D.add(stars);
+    }
+
+    async function loadHandoffs3D() {
+      try {
+        const response = await fetch('/api/3d/handoffs');
+        const data = await response.json();
+
+        if (data.ok && data.handoffs.length > 0) {
+          nodes3D = data.handoffs.map(h => ({
+            id: h.id,
+            label: h.filename || h.id,
+            format: h.compression_format,
+            originalSize: h.original_size,
+            finalSize: h.final_size,
+            reduction: h.reduction_percent,
+            created: h.created,
+            data: h
+          }));
+
+          updateStats3D();
+          createGraph3D();
+        } else {
+          // Create demo data for visualization
+          createDemoData3D();
+        }
+      } catch (error) {
+        console.error('Failed to load 3D handoffs:', error);
+        createDemoData3D();
+      }
+    }
+
+    function createDemoData3D() {
+      const formats = ['slim_only', 'slim_v4z', 'slim_fsl', 'slim_ztpcf'];
+      const count = 20;
+
+      for (let i = 0; i < count; i++) {
+        const format = formats[i % formats.length];
+        const originalSize = Math.floor(Math.random() * 100000000) + 1000000;
+        const reductions = { slim_only: 50, slim_v4z: 80, slim_fsl: 85, slim_ztpcf: 86 };
+        const reduction = reductions[format];
+        const finalSize = Math.floor(originalSize * (1 - reduction / 100));
+
+        nodes3D.push({
+          id: `handoff_${i}`,
+          label: `session_${i}.jsonl`,
+          format: format,
+          originalSize: originalSize,
+          finalSize: finalSize,
+          reduction: reduction,
+          created: new Date().toISOString()
+        });
+      }
+
+      updateStats3D();
+      createGraph3D();
+    }
+
+    function updateStats3D() {
+      const totalOriginal = nodes3D.reduce((sum, n) => sum + (n.originalSize || 0), 0);
+      const totalCompressed = nodes3D.reduce((sum, n) => sum + (n.finalSize || 0), 0);
+      const avgReduction = nodes3D.length > 0
+        ? Math.round((1 - totalCompressed / totalOriginal) * 100)
+        : 0;
+
+      document.getElementById('stat-3d-count').textContent = nodes3D.length;
+      document.getElementById('stat-3d-original').textContent = formatBytes3D(totalOriginal);
+      document.getElementById('stat-3d-compressed').textContent = formatBytes3D(totalCompressed);
+      document.getElementById('stat-3d-savings').textContent = avgReduction + '%';
+      document.getElementById('node-3d-count').textContent = nodes3D.length;
+      document.getElementById('link-3d-count').textContent = '0';
+      document.getElementById('search-3d-status').textContent = `Ready - ${nodes3D.length} handoffs loaded`;
+    }
+
+    function createGraph3D() {
+      // Clear existing objects
+      nodeObjects3D.forEach(obj => scene3D.remove(obj));
+      linkObjects3D.forEach(obj => scene3D.remove(obj));
+      nodeObjects3D = [];
+      linkObjects3D = [];
+
+      // Create nodes
+      nodes3D.forEach((node, i) => {
+        const color = getFormatColor3D(node.format);
+        const geometry = new THREE.BoxGeometry(2, 2, 2);
+        const material = new THREE.MeshStandardMaterial({
+          color: color,
+          emissive: color,
+          emissiveIntensity: 0.3,
+          roughness: 0.5,
+          metalness: 0.5
+        });
+        const cube = new THREE.Mesh(geometry, material);
+
+        // Position based on current layout
+        positionNode3D(cube, i, nodes3D.length);
+
+        cube.userData = { nodeData: node };
+        scene3D.add(cube);
+        nodeObjects3D.push(cube);
+      });
+    }
+
+    function positionNode3D(obj, index, total) {
+      // Default sphere layout
+      const phi = Math.acos(-1 + (2 * index) / total);
+      const theta = Math.sqrt(total * Math.PI) * phi;
+      const radius = 40;
+
+      obj.position.x = radius * Math.cos(theta) * Math.sin(phi);
+      obj.position.y = radius * Math.sin(theta) * Math.sin(phi);
+      obj.position.z = radius * Math.cos(phi);
+    }
+
+    function getFormatColor3D(format) {
+      const colors = {
+        slim_only: 0x6366f1,
+        slim_v4z: 0xf7b731,
+        slim_fsl: 0xaa66cc,
+        slim_ztpcf: 0x10b981
+      };
+      return colors[format] || 0x888888;
+    }
+
+    function formatBytes3D(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    function onNodeClick3D(event) {
+      const rect = renderer3D.domElement.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      );
+
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, camera3D);
+
+      const intersects = raycaster.intersectObjects(nodeObjects3D);
+
+      if (intersects.length > 0) {
+        const clickedNode = intersects[0].object.userData.nodeData;
+        showNodeDetails3D(clickedNode);
+      }
+    }
+
+    function showNodeDetails3D(node) {
+      selectedNode3D = node;
+      const panel = document.getElementById('details-panel-3d');
+
+      document.getElementById('detail-3d-filename').textContent = node.label;
+      document.getElementById('detail-3d-id').textContent = node.id;
+      document.getElementById('detail-3d-format').textContent = node.format.replace(/_/g, ' + ').toUpperCase();
+      document.getElementById('detail-3d-reduction').textContent = Math.round(node.reduction) + '%';
+      document.getElementById('detail-3d-original-size').textContent = formatBytes3D(node.originalSize);
+      document.getElementById('detail-3d-compressed-size').textContent = formatBytes3D(node.finalSize);
+      document.getElementById('detail-3d-saved-size').textContent = formatBytes3D(node.originalSize - node.finalSize);
+
+      panel.style.display = 'flex';
+    }
+
+    function animate3D() {
+      requestAnimationFrame(animate3D);
+
+      if (!initialized3D) return;
+
+      // Auto-orbit
+      if (autoOrbit3D) {
+        controls3D.autoRotate = true;
+        controls3D.autoRotateSpeed = 0.5;
+      } else {
+        controls3D.autoRotate = false;
+      }
+
+      // Rotate cubes
+      nodeObjects3D.forEach(cube => {
+        cube.rotation.x += 0.01;
+        cube.rotation.y += 0.01;
+      });
+
+      controls3D.update();
+      renderer3D.render(scene3D, camera3D);
+    }
+
+    function onWindowResize3D() {
+      if (!initialized3D) return;
+
+      const container = document.getElementById('canvas-3d');
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      camera3D.aspect = rect.width / rect.height;
+      camera3D.updateProjectionMatrix();
+      renderer3D.setSize(rect.width, rect.height);
+    }
+
+    // Global functions
+    window.closeDetailsPanel3D = function() {
+      document.getElementById('details-panel-3d').style.display = 'none';
+    };
+
+    window.toggleAutoOrbit3D = function() {
+      autoOrbit3D = !autoOrbit3D;
+      document.getElementById('orbit-3d-status').textContent = 'Auto-Orbit: ' + (autoOrbit3D ? 'ON' : 'OFF');
+    };
+
+    window.toggleConnections3D = function() {
+      showConnections3D = !showConnections3D;
+      linkObjects3D.forEach(link => link.visible = showConnections3D);
+    };
+
+    window.reloadData3D = function() {
+      loadHandoffs3D();
+    };
+
+    window.changeLayout3D = function(layout) {
+      // Update button states
+      document.querySelectorAll('.layout-btn-3d').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      // Reposition nodes based on layout
+      nodes3D.forEach((node, i) => {
+        const obj = nodeObjects3D[i];
+        if (!obj) return;
+
+        switch(layout) {
+          case 'globe':
+            positionNode3D(obj, i, nodes3D.length);
+            break;
+          case 'grid':
+            const gridSize = Math.ceil(Math.sqrt(nodes3D.length));
+            obj.position.x = (i % gridSize - gridSize/2) * 10;
+            obj.position.y = 0;
+            obj.position.z = (Math.floor(i / gridSize) - gridSize/2) * 10;
+            break;
+          case 'helix':
+            const t = i / nodes3D.length * Math.PI * 4;
+            obj.position.x = 30 * Math.cos(t);
+            obj.position.y = (i - nodes3D.length/2) * 2;
+            obj.position.z = 30 * Math.sin(t);
+            break;
+          case 'scatter':
+            obj.position.x = (Math.random() - 0.5) * 100;
+            obj.position.y = (Math.random() - 0.5) * 100;
+            obj.position.z = (Math.random() - 0.5) * 100;
+            break;
+          case 'clusters':
+            const clusters = 4;
+            const cluster = i % clusters;
+            const clusterAngle = (cluster / clusters) * Math.PI * 2;
+            const clusterRadius = 30;
+            const inCluster = Math.floor(i / clusters);
+            const localAngle = (inCluster / Math.ceil(nodes3D.length / clusters)) * Math.PI * 2;
+            obj.position.x = clusterRadius * Math.cos(clusterAngle) + 10 * Math.cos(localAngle);
+            obj.position.y = (Math.random() - 0.5) * 20;
+            obj.position.z = clusterRadius * Math.sin(clusterAngle) + 10 * Math.sin(localAngle);
+            break;
+        }
+      });
+    };
+
+    window.performSearch3D = function() {
+      const query = document.getElementById('search-3d-input').value.toLowerCase();
+      if (!query) return;
+
+      const results = nodes3D.filter(n =>
+        n.label.toLowerCase().includes(query) ||
+        n.format.toLowerCase().includes(query)
+      );
+
+      document.getElementById('search-3d-status').textContent = `Found ${results.length} results`;
+
+      if (results.length > 0) {
+        showNodeDetails3D(results[0]);
+      }
+    };
+
+    window.decompressHandoff3D = async function() {
+      if (!selectedNode3D) return;
+      alert(`Decompressing handoff: ${selectedNode3D.id}\n\nThis feature will decompress the selected handoff.`);
+    };
+
+    window.downloadHandoff3D = function() {
+      if (!selectedNode3D) return;
+      const dataStr = JSON.stringify(selectedNode3D.data || selectedNode3D, null, 2);
+      const dataBlob = new Blob([dataStr], {type: 'application/json'});
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `handoff_${selectedNode3D.id}.json`;
+      link.click();
+    };
+
+    // Initialize 3D view when tab is opened
+    window.init3DViewer = init3D;
   </script>
 </body>
 </html>

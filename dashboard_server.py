@@ -75,6 +75,12 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif path == '/api/model/current':
             self.serve_current_model()
             return
+        elif path == '/api/3d/handoffs':
+            self.serve_3d_handoffs()
+            return
+        elif path == '/api/3d/stats':
+            self.serve_3d_stats()
+            return
         elif path == '/' or path == '/index.html':
             self.serve_dashboard()
             return
@@ -132,6 +138,12 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             return
         elif path == '/api/model/set':
             self.set_model(data)
+            return
+        elif path == '/api/3d/search':
+            self.search_3d_handoffs(data)
+            return
+        elif path == '/api/3d/handoff/decompress':
+            self.decompress_3d_handoff(data)
             return
         else:
             self.send_error(404, "Not found")
@@ -1241,6 +1253,160 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             })
         except Exception as e:
             self.serve_json({'error': str(e)}, status=500)
+
+    # =========================================================================
+    # 3D Viewer Endpoints
+    # =========================================================================
+
+    def serve_3d_handoffs(self):
+        """List all compressed handoffs for 3D visualization."""
+        try:
+            stats = self.get_compression_stats()
+            conversations = stats.get('conversations', [])
+
+            # Transform to 3D viewer format
+            handoffs = []
+            for conv in conversations:
+                # Infer compression format
+                comp_format = self.infer_compression_format(conv)
+
+                handoffs.append({
+                    'id': conv.get('id', 'unknown'),
+                    'filename': Path(conv.get('file_path', '')).name if conv.get('file_path') else 'unknown',
+                    'compression_format': comp_format,
+                    'original_size': conv.get('original_tokens', 0) * 4,  # Approx bytes
+                    'final_size': conv.get('compressed_tokens', 0) * 4,
+                    'reduction_percent': ((conv.get('original_tokens', 0) - conv.get('compressed_tokens', 0)) / conv.get('original_tokens', 1)) * 100 if conv.get('original_tokens', 0) > 0 else 0,
+                    'created': conv.get('created', datetime.now().isoformat()),
+                    'project_id': conv.get('project', 'unknown'),
+                    'session_id': conv.get('id', 'unknown')
+                })
+
+            self.serve_json({
+                'ok': True,
+                'count': len(handoffs),
+                'handoffs': handoffs
+            })
+        except Exception as e:
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def serve_3d_stats(self):
+        """Overall compression statistics for 3D viewer."""
+        try:
+            stats = self.get_compression_stats()
+            conversations = stats.get('conversations', [])
+
+            # Calculate format breakdown
+            formats = {
+                'slim_only': 0,
+                'slim_v4z': 0,
+                'slim_fsl': 0,
+                'slim_ztpcf': 0
+            }
+
+            for conv in conversations:
+                comp_format = self.infer_compression_format(conv)
+                if comp_format in formats:
+                    formats[comp_format] += 1
+
+            total_original = sum(c.get('original_tokens', 0) for c in conversations) * 4
+            total_compressed = sum(c.get('compressed_tokens', 0) for c in conversations) * 4
+            avg_reduction = ((total_original - total_compressed) / total_original * 100) if total_original > 0 else 0
+
+            self.serve_json({
+                'ok': True,
+                'total_handoffs': len(conversations),
+                'total_original_bytes': total_original,
+                'total_compressed_bytes': total_compressed,
+                'avg_reduction_percent': round(avg_reduction, 1),
+                'formats': formats
+            })
+        except Exception as e:
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def search_3d_handoffs(self, data):
+        """Search handoffs for 3D viewer."""
+        try:
+            query = data.get('query', '').lower()
+            search_local = data.get('search_local', True)
+            search_metadata = data.get('search_metadata', True)
+
+            stats = self.get_compression_stats()
+            conversations = stats.get('conversations', [])
+
+            if not query:
+                # Return all
+                results = conversations[:50]  # Limit to 50
+            else:
+                # Simple search in title, id, project
+                results = []
+                for conv in conversations:
+                    if search_metadata:
+                        if (query in conv.get('title', '').lower() or
+                            query in conv.get('id', '').lower() or
+                            query in conv.get('project', '').lower()):
+                            results.append(conv)
+
+            # Transform to 3D format
+            handoffs = []
+            for conv in results:
+                comp_format = self.infer_compression_format(conv)
+                handoffs.append({
+                    'id': conv.get('id', 'unknown'),
+                    'filename': Path(conv.get('file_path', '')).name if conv.get('file_path') else 'unknown',
+                    'match_score': 0.95  # Placeholder
+                })
+
+            self.serve_json({
+                'ok': True,
+                'results': handoffs
+            })
+        except Exception as e:
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def decompress_3d_handoff(self, data):
+        """Decompress a handoff (stub for now)."""
+        try:
+            handoff_id = data.get('handoff_id')
+
+            if not handoff_id:
+                self.serve_json({'ok': False, 'error': 'Missing handoff_id'}, status=400)
+                return
+
+            # Find the conversation
+            stats = self.get_compression_stats()
+            conversations = stats.get('conversations', [])
+
+            for conv in conversations:
+                if conv.get('id') == handoff_id:
+                    # Stub: In real implementation, would decompress the file
+                    output_file = f"~/.claude/decompressed/{conv.get('title', 'unknown')}.jsonl"
+
+                    self.serve_json({
+                        'ok': True,
+                        'message': 'Decompression not yet implemented',
+                        'output_file': output_file,
+                        'size': conv.get('original_tokens', 0) * 4
+                    })
+                    return
+
+            self.serve_json({'ok': False, 'error': 'Handoff not found'}, status=404)
+        except Exception as e:
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def infer_compression_format(self, conv):
+        """Infer compression format from conversation data."""
+        filename = conv.get('file_path', '')
+        title = conv.get('title', '')
+
+        if 'v4z' in filename.lower() or 'v4z' in title.lower():
+            return 'slim_v4z'
+        elif 'fsl' in filename.lower() or 'fsl' in title.lower():
+            return 'slim_fsl'
+        elif 'ztpcf' in filename.lower() or 'ztpcf' in title.lower():
+            return 'slim_ztpcf'
+        else:
+            return 'slim_only'
 
     def log_message(self, format, *args):
         """Override to customize logging."""
