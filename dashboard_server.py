@@ -12,6 +12,12 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 import subprocess
+import asyncio
+import websockets
+import threading
+import time
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 # Paths
 HOME = Path.home()
@@ -261,32 +267,87 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         """Generate sample stats if no index exists."""
         # Check if compressed directory exists
         if COMPRESSED_DIR.exists():
-            compressed_files = list(COMPRESSED_DIR.glob('*.slim*'))
+            # Scan for compressed files in nested directories
+            compressed_files = []
+
+            # Scan root directory
+            compressed_files.extend(COMPRESSED_DIR.glob('*.slim*'))
+
+            # Scan nested directories (projects/, todos/, etc.)
+            for subdir in COMPRESSED_DIR.iterdir():
+                if subdir.is_dir():
+                    compressed_files.extend(subdir.glob('*.slim*'))
+
             conversations = []
 
-            for i, file_path in enumerate(compressed_files[:50]):  # Limit to 50
-                file_size = file_path.stat().st_size
-                created = datetime.fromtimestamp(file_path.stat().st_mtime)
+            for file_path in compressed_files:
+                try:
+                    file_size = file_path.stat().st_size
+                    created = datetime.fromtimestamp(file_path.stat().st_mtime)
 
-                # Estimate tokens (rough: 1 byte ≈ 0.25 tokens for compressed)
-                compressed_tokens = int(file_size * 0.25)
-                original_tokens = int(compressed_tokens * 2.5)  # Assume 60% compression
+                    # Estimate tokens (rough: 1 byte ≈ 0.25 tokens for compressed)
+                    compressed_tokens = int(file_size * 0.25)
+                    original_tokens = int(compressed_tokens * 2.5)  # Assume 60% compression
 
-                conversations.append({
-                    'id': file_path.stem,
-                    'title': file_path.stem.replace('_', ' ').title(),
-                    'project': 'Unknown',
-                    'created': created.isoformat(),
-                    'original_tokens': original_tokens,
-                    'compressed_tokens': compressed_tokens,
-                    'category': 'conversations',
-                    'file_path': str(file_path)
-                })
+                    # Determine category from subdirectory
+                    if file_path.parent.name == 'projects':
+                        category = 'projects'
+                        project = 'Project Handoff'
+                    elif file_path.parent.name == 'todos':
+                        category = 'todos'
+                        project = 'Todo Task'
+                    else:
+                        category = 'conversations'
+                        project = 'General'
+
+                    conversations.append({
+                        'id': file_path.stem,
+                        'title': file_path.stem.replace('_', ' ').replace('-', ' ').title()[:50],
+                        'project': project,
+                        'created': created.isoformat(),
+                        'original_tokens': original_tokens,
+                        'compressed_tokens': compressed_tokens,
+                        'category': category,
+                        'file_path': str(file_path)
+                    })
+                except Exception as e:
+                    # Skip files that cause errors
+                    print(f"Warning: Skipped {file_path}: {e}")
+                    continue
+
+            if not conversations:
+                # No valid files found
+                return {
+                    'total_conversations': 0,
+                    'total_original_tokens': 0,
+                    'total_compressed_tokens': 0,
+                    'total_saved_tokens': 0,
+                    'reduction_percent': 0,
+                    'disk_saved_mb': 0,
+                    'categories': {},
+                    'conversations': [],
+                    'last_updated': datetime.now().isoformat(),
+                    'note': 'No valid compressed files found.'
+                }
 
             total_original = sum(c['original_tokens'] for c in conversations)
             total_compressed = sum(c['compressed_tokens'] for c in conversations)
             total_saved = total_original - total_compressed
             reduction = (total_saved / total_original * 100) if total_original > 0 else 0
+
+            # Build category breakdown
+            categories = {}
+            for conv in conversations:
+                cat = conv['category']
+                if cat not in categories:
+                    categories[cat] = {
+                        'count': 0,
+                        'original_tokens': 0,
+                        'compressed_tokens': 0
+                    }
+                categories[cat]['count'] += 1
+                categories[cat]['original_tokens'] += conv['original_tokens']
+                categories[cat]['compressed_tokens'] += conv['compressed_tokens']
 
             return {
                 'total_conversations': len(conversations),
@@ -295,7 +356,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 'total_saved_tokens': total_saved,
                 'reduction_percent': round(reduction, 2),
                 'disk_saved_mb': round((total_saved * 4) / (1024 * 1024), 2),
-                'categories': {'conversations': {'count': len(conversations)}},
+                'categories': categories,
                 'conversations': conversations,
                 'last_updated': datetime.now().isoformat(),
                 'note': 'Generated from compressed files (index not found)'
@@ -1264,31 +1325,71 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             stats = self.get_compression_stats()
             conversations = stats.get('conversations', [])
 
+            # Check if we have any conversations
+            if not conversations:
+                self.serve_json({
+                    'ok': True,
+                    'count': 0,
+                    'handoffs': [],
+                    'message': 'No handoffs found. The conversation library is empty.'
+                })
+                return
+
             # Transform to 3D viewer format
             handoffs = []
+            skipped = 0
+
             for conv in conversations:
-                # Infer compression format
-                comp_format = self.infer_compression_format(conv)
+                try:
+                    # Verify file still exists
+                    file_path = conv.get('file_path')
+                    if file_path and not Path(file_path).exists():
+                        skipped += 1
+                        continue
 
-                handoffs.append({
-                    'id': conv.get('id', 'unknown'),
-                    'filename': Path(conv.get('file_path', '')).name if conv.get('file_path') else 'unknown',
-                    'compression_format': comp_format,
-                    'original_size': conv.get('original_tokens', 0) * 4,  # Approx bytes
-                    'final_size': conv.get('compressed_tokens', 0) * 4,
-                    'reduction_percent': ((conv.get('original_tokens', 0) - conv.get('compressed_tokens', 0)) / conv.get('original_tokens', 1)) * 100 if conv.get('original_tokens', 0) > 0 else 0,
-                    'created': conv.get('created', datetime.now().isoformat()),
-                    'project_id': conv.get('project', 'unknown'),
-                    'session_id': conv.get('id', 'unknown')
-                })
+                    # Infer compression format
+                    comp_format = self.infer_compression_format(conv)
 
-            self.serve_json({
+                    # Calculate reduction percentage safely
+                    original = conv.get('original_tokens', 0)
+                    compressed = conv.get('compressed_tokens', 0)
+                    reduction = ((original - compressed) / original * 100) if original > 0 else 0
+
+                    handoffs.append({
+                        'id': conv.get('id', 'unknown'),
+                        'filename': Path(file_path).name if file_path else 'unknown',
+                        'compression_format': comp_format,
+                        'original_size': original * 4,  # Approx bytes
+                        'final_size': compressed * 4,
+                        'reduction_percent': round(reduction, 1),
+                        'created': conv.get('created', datetime.now().isoformat()),
+                        'project_id': conv.get('project', 'unknown'),
+                        'session_id': conv.get('id', 'unknown'),
+                        'category': conv.get('category', 'conversations')
+                    })
+                except Exception as e:
+                    # Skip individual files that cause errors
+                    print(f"Warning: Skipped conversation {conv.get('id', 'unknown')}: {e}")
+                    skipped += 1
+                    continue
+
+            response = {
                 'ok': True,
                 'count': len(handoffs),
                 'handoffs': handoffs
-            })
+            }
+
+            # Add warning if some files were skipped
+            if skipped > 0:
+                response['warning'] = f'{skipped} handoff(s) skipped due to errors'
+
+            self.serve_json(response)
         except Exception as e:
-            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+            self.serve_json({
+                'ok': False,
+                'error': str(e),
+                'message': 'Failed to load handoffs. Check server logs for details.'
+            }, status=500)
 
     def serve_3d_stats(self):
         """Overall compression statistics for 3D viewer."""
@@ -1296,18 +1397,43 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             stats = self.get_compression_stats()
             conversations = stats.get('conversations', [])
 
+            # Check for empty data
+            if not conversations:
+                self.serve_json({
+                    'ok': True,
+                    'total_handoffs': 0,
+                    'total_original_bytes': 0,
+                    'total_compressed_bytes': 0,
+                    'avg_reduction_percent': 0,
+                    'formats': {},
+                    'categories': {},
+                    'message': 'No data available yet'
+                })
+                return
+
             # Calculate format breakdown
             formats = {
                 'slim_only': 0,
                 'slim_v4z': 0,
                 'slim_fsl': 0,
-                'slim_ztpcf': 0
+                'slim_ztpcf': 0,
+                'unknown': 0,
+                'json': 0
             }
 
+            # Calculate category breakdown
+            categories = stats.get('categories', {})
+
             for conv in conversations:
-                comp_format = self.infer_compression_format(conv)
-                if comp_format in formats:
-                    formats[comp_format] += 1
+                try:
+                    comp_format = self.infer_compression_format(conv)
+                    if comp_format in formats:
+                        formats[comp_format] += 1
+                    else:
+                        formats['unknown'] += 1
+                except Exception as e:
+                    formats['unknown'] += 1
+                    continue
 
             total_original = sum(c.get('original_tokens', 0) for c in conversations) * 4
             total_compressed = sum(c.get('compressed_tokens', 0) for c in conversations) * 4
@@ -1318,11 +1444,17 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 'total_handoffs': len(conversations),
                 'total_original_bytes': total_original,
                 'total_compressed_bytes': total_compressed,
+                'bytes_saved': total_original - total_compressed,
                 'avg_reduction_percent': round(avg_reduction, 1),
-                'formats': formats
+                'formats': formats,
+                'categories': categories
             })
         except Exception as e:
-            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+            self.serve_json({
+                'ok': False,
+                'error': str(e),
+                'message': 'Failed to calculate statistics'
+            }, status=500)
 
     def search_3d_handoffs(self, data):
         """Search handoffs for 3D viewer."""
@@ -1395,18 +1527,51 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self.serve_json({'ok': False, 'error': str(e)}, status=500)
 
     def infer_compression_format(self, conv):
-        """Infer compression format from conversation data."""
-        filename = conv.get('file_path', '')
-        title = conv.get('title', '')
+        """Infer compression format from conversation data by reading file header."""
+        file_path = conv.get('file_path', '')
 
-        if 'v4z' in filename.lower() or 'v4z' in title.lower():
+        # First try filename/title heuristics
+        filename = file_path.lower()
+        title = conv.get('title', '').lower()
+
+        # If file_path exists, read the file to detect format
+        if file_path and Path(file_path).exists():
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    # Read first 500 bytes to detect format
+                    header = f.read(500)
+
+                    # Check for SLIM format variations
+                    if '§SLIM§' in header:
+                        # Check for secondary compression layers
+                        if 'v4z' in header.lower() or 'V4Z' in header:
+                            return 'slim_v4z'
+                        elif 'fsl' in header.lower() or 'FSL' in header:
+                            return 'slim_fsl'
+                        elif 'ztpcf' in header.lower() or 'ZTPCF' in header:
+                            return 'slim_ztpcf'
+                        else:
+                            return 'slim_only'
+
+                    # Check for other formats
+                    if header.strip().startswith('{') or header.strip().startswith('['):
+                        return 'json'
+
+            except Exception as e:
+                # If file read fails, fall back to filename heuristics
+                pass
+
+        # Fallback to filename heuristics
+        if 'v4z' in filename or 'v4z' in title:
             return 'slim_v4z'
-        elif 'fsl' in filename.lower() or 'fsl' in title.lower():
+        elif 'fsl' in filename or 'fsl' in title:
             return 'slim_fsl'
-        elif 'ztpcf' in filename.lower() or 'ztpcf' in title.lower():
+        elif 'ztpcf' in filename or 'ztpcf' in title:
             return 'slim_ztpcf'
-        else:
+        elif 'slim' in filename or '.slim' in filename:
             return 'slim_only'
+        else:
+            return 'unknown'
 
     def log_message(self, format, *args):
         """Override to customize logging."""
@@ -1414,11 +1579,151 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         print(f"[{timestamp}] {format % args}")
 
 
-def run_server(port=8080):
-    """Run the dashboard server."""
+# WebSocket Support
+connected_clients = set()
+pending_notifications = []
+
+
+class HandoffWatcher(FileSystemEventHandler):
+    """Watch for new handoff files in the conversation library."""
+
+    def __init__(self):
+        super().__init__()
+        self.last_seen_files = set()
+        # Initialize with existing files
+        self._scan_existing_files()
+
+    def _scan_existing_files(self):
+        """Scan and remember existing files to avoid notifying on startup."""
+        if COMPRESSED_DIR.exists():
+            for file_path in COMPRESSED_DIR.rglob('*.indexed'):
+                self.last_seen_files.add(str(file_path))
+
+    def on_created(self, event):
+        """Handle new file creation."""
+        if event.is_directory:
+            return
+
+        file_path = Path(event.src_path)
+
+        # Only process .indexed files (completed compressions)
+        if not file_path.name.endswith('.indexed'):
+            return
+
+        # Avoid duplicate notifications
+        if str(file_path) in self.last_seen_files:
+            return
+
+        self.last_seen_files.add(str(file_path))
+
+        # Extract handoff info
+        try:
+            handoff_id = file_path.stem.replace('.slim.indexed', '.slim').replace('.indexed', '')
+            category = file_path.parent.name if file_path.parent != COMPRESSED_DIR else 'unknown'
+
+            # Read file stats
+            stats = file_path.stat()
+
+            notification = {
+                'event': 'new_handoff',
+                'data': {
+                    'id': handoff_id,
+                    'filename': file_path.name,
+                    'category': category,
+                    'created': datetime.fromtimestamp(stats.st_mtime).isoformat(),
+                    'size': stats.st_size
+                }
+            }
+
+            # Queue notification for WebSocket broadcast
+            pending_notifications.append(notification)
+            print(f"[HandoffWatcher] New handoff detected: {handoff_id}")
+
+        except Exception as e:
+            print(f"[HandoffWatcher] Error processing {file_path}: {e}")
+
+
+async def websocket_handler(websocket):
+    """Handle WebSocket connections from dashboard clients."""
+    print(f"[WebSocket] Client connected from {websocket.remote_address}")
+    connected_clients.add(websocket)
+
+    try:
+        # Send initial connection confirmation
+        await websocket.send(json.dumps({
+            'event': 'connected',
+            'message': 'WebSocket connected - listening for handoff updates'
+        }))
+
+        # Keep connection alive and handle incoming messages
+        async for message in websocket:
+            # Handle ping/pong or other client messages
+            try:
+                data = json.loads(message)
+                if data.get('type') == 'ping':
+                    await websocket.send(json.dumps({'type': 'pong'}))
+            except json.JSONDecodeError:
+                pass
+
+    except websockets.exceptions.ConnectionClosed:
+        print(f"[WebSocket] Client disconnected from {websocket.remote_address}")
+    finally:
+        connected_clients.discard(websocket)
+
+
+async def broadcast_notifications():
+    """Broadcast pending notifications to all connected clients."""
+    while True:
+        if pending_notifications and connected_clients:
+            notification = pending_notifications.pop(0)
+            disconnected = set()
+
+            for client in connected_clients:
+                try:
+                    await client.send(json.dumps(notification))
+                except Exception as e:
+                    print(f"[WebSocket] Error sending to client: {e}")
+                    disconnected.add(client)
+
+            # Remove disconnected clients
+            for client in disconnected:
+                connected_clients.discard(client)
+
+        await asyncio.sleep(0.1)
+
+
+async def run_websocket_server(port=8081):
+    """Run the WebSocket server."""
+    print(f"[WebSocket] Server starting on ws://localhost:{port}")
+
+    # Start file watcher
+    observer = Observer()
+    event_handler = HandoffWatcher()
+
+    if COMPRESSED_DIR.exists():
+        observer.schedule(event_handler, str(COMPRESSED_DIR), recursive=True)
+        observer.start()
+        print(f"[WebSocket] Watching {COMPRESSED_DIR} for new handoffs")
+    else:
+        print(f"[WebSocket] Warning: {COMPRESSED_DIR} does not exist")
+
+    # Start broadcast task
+    broadcast_task = asyncio.create_task(broadcast_notifications())
+
+    # Start WebSocket server
+    async with websockets.serve(websocket_handler, "localhost", port):
+        await asyncio.Future()  # Run forever
+
+
+def run_http_server(port=8080):
+    """Run the HTTP server in a separate thread."""
     server_address = ('', port)
     httpd = HTTPServer(server_address, DashboardHandler)
+    httpd.serve_forever()
 
+
+def run_server(port=8080, ws_port=8081):
+    """Run both HTTP and WebSocket servers."""
     print(f"""
 ╔════════════════════════════════════════════════════════════════╗
 ║                                                                ║
@@ -1426,25 +1731,38 @@ def run_server(port=8080):
 ║                                                                ║
 ╠════════════════════════════════════════════════════════════════╣
 ║                                                                ║
-║  Server running at:  http://localhost:{port}                     ║
+║  HTTP Server:       http://localhost:{port}                     ║
+║  WebSocket Server:  ws://localhost:{ws_port}                     ║
+║                                                                ║
+║  Features:                                                     ║
+║    📊 Dashboard UI with 3D visualization                       ║
+║    📡 Real-time handoff notifications via WebSocket            ║
+║    🔍 Compression statistics & search                          ║
 ║                                                                ║
 ║  Endpoints:                                                    ║
 ║    GET /                    - Dashboard UI                     ║
 ║    GET /api/stats           - Compression statistics           ║
 ║    GET /api/search?q=...    - Search conversations             ║
 ║    GET /api/daemon-status   - Check daemon status              ║
-║    GET /api/conversation?id=... - Get conversation details     ║
+║    GET /api/3d/handoffs     - 3D visualization data            ║
 ║                                                                ║
 ║  Press Ctrl+C to stop                                          ║
 ║                                                                ║
 ╚════════════════════════════════════════════════════════════════╝
     """)
 
+    # Start HTTP server in background thread
+    http_thread = threading.Thread(target=run_http_server, args=(port,), daemon=True)
+    http_thread.start()
+    print(f"✅ HTTP server started on port {port}")
+
+    # Run WebSocket server in main thread with asyncio
     try:
-        httpd.serve_forever()
+        asyncio.run(run_websocket_server(ws_port))
     except KeyboardInterrupt:
         print("\n\n👋 Shutting down dashboard server...")
-        httpd.shutdown()
+    except Exception as e:
+        print(f"\n❌ Server error: {e}")
 
 
 if __name__ == '__main__':

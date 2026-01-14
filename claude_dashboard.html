@@ -711,6 +711,29 @@
       background: rgba(99, 102, 241, 0.5);
       border-color: #6366f1;
     }
+
+    /* Toast notification animations */
+    @keyframes slideInRight {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideOutRight {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1077,7 +1100,7 @@
           </div>
 
           <div class="viewer-footer-3d">
-            Nodes: <span id="node-3d-count">0</span> | Links: <span id="link-3d-count">0</span>
+            Nodes: <span id="node-3d-count">0</span> | Links: <span id="link-3d-count">0</span> | FPS: <span id="fps-3d-count">--</span> | Frame: <span id="frame-time-3d">--</span>ms
           </div>
         </div>
 
@@ -2324,6 +2347,21 @@
     let selectedNode3D = null;
     let initialized3D = false;
 
+    // Performance tracking
+    let lastFrameTime = performance.now();
+    let frameCount = 0;
+    let fpsUpdateTime = performance.now();
+    let currentFPS = 0;
+
+    // Geometries for LOD
+    let highDetailGeometry, lowDetailGeometry;
+
+    // WebSocket for real-time updates
+    let ws3D = null;
+    let wsReconnectAttempts = 0;
+    const wsMaxReconnectAttempts = 5;
+    const wsReconnectDelay = 3000;
+
     // Initialize 3D scene
     function init3D() {
       if (initialized3D) return;
@@ -2382,6 +2420,9 @@
       // Load handoff data
       loadHandoffs3D();
 
+      // Connect to WebSocket for real-time updates
+      connectWebSocket3D();
+
       // Start animation
       animate3D();
     }
@@ -2415,21 +2456,42 @@
             finalSize: h.final_size,
             reduction: h.reduction_percent,
             created: h.created,
+            category: h.category || 'unknown',
             data: h
           }));
 
           updateStats3D();
           createGraph3D();
+
+          // Show warning if some files were skipped
+          if (data.warning) {
+            console.warn('3D Viewer:', data.warning);
+          }
         } else {
-          // Create demo data for visualization
-          createDemoData3D();
+          // No handoffs found - show empty state
+          showEmptyState3D(data.message || 'No handoffs found in the conversation library.');
         }
       } catch (error) {
         console.error('Failed to load 3D handoffs:', error);
-        createDemoData3D();
+        showEmptyState3D('Failed to load handoffs. Check that the dashboard server is running.');
       }
     }
 
+    function showEmptyState3D(message) {
+      // Clear any existing nodes
+      nodes3D = [];
+      updateStats3D();
+
+      // Show message in the search status area
+      document.getElementById('search-3d-status').textContent = message;
+      document.getElementById('search-3d-status').style.color = '#888';
+
+      // Don't create demo data - show empty 3D space
+      createGraph3D();
+    }
+
+    // Demo data function (disabled - uncomment to enable demo mode for testing)
+    /*
     function createDemoData3D() {
       const formats = ['slim_only', 'slim_v4z', 'slim_fsl', 'slim_ztpcf'];
       const count = 20;
@@ -2455,6 +2517,7 @@
       updateStats3D();
       createGraph3D();
     }
+    */
 
     function updateStats3D() {
       const totalOriginal = nodes3D.reduce((sum, n) => sum + (n.originalSize || 0), 0);
@@ -2479,10 +2542,13 @@
       nodeObjects3D = [];
       linkObjects3D = [];
 
+      // Create shared geometries for LOD
+      highDetailGeometry = new THREE.BoxGeometry(2, 2, 2);
+      lowDetailGeometry = new THREE.BoxGeometry(1, 1, 1);
+
       // Create nodes
       nodes3D.forEach((node, i) => {
         const color = getFormatColor3D(node.format);
-        const geometry = new THREE.BoxGeometry(2, 2, 2);
         const material = new THREE.MeshStandardMaterial({
           color: color,
           emissive: color,
@@ -2490,12 +2556,16 @@
           roughness: 0.5,
           metalness: 0.5
         });
-        const cube = new THREE.Mesh(geometry, material);
+        const cube = new THREE.Mesh(highDetailGeometry, material);
 
         // Position based on current layout
         positionNode3D(cube, i, nodes3D.length);
 
-        cube.userData = { nodeData: node };
+        cube.userData = {
+          nodeData: node,
+          isHighDetail: true,
+          isVisible: true
+        };
         scene3D.add(cube);
         nodeObjects3D.push(cube);
       });
@@ -2528,6 +2598,153 @@
       const sizes = ['B', 'KB', 'MB', 'GB'];
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    function connectWebSocket3D() {
+      if (ws3D && ws3D.readyState === WebSocket.OPEN) return;
+
+      try {
+        ws3D = new WebSocket('ws://localhost:8081');
+
+        ws3D.onopen = () => {
+          console.log('[3D WebSocket] Connected to handoff notification service');
+          wsReconnectAttempts = 0;
+          showToast3D('🔗 Connected to live updates', 'success');
+        };
+
+        ws3D.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            handleWebSocketMessage3D(message);
+          } catch (error) {
+            console.error('[3D WebSocket] Error parsing message:', error);
+          }
+        };
+
+        ws3D.onerror = (error) => {
+          console.error('[3D WebSocket] Error:', error);
+        };
+
+        ws3D.onclose = () => {
+          console.log('[3D WebSocket] Connection closed');
+          ws3D = null;
+
+          // Attempt reconnection
+          if (wsReconnectAttempts < wsMaxReconnectAttempts) {
+            wsReconnectAttempts++;
+            console.log(`[3D WebSocket] Reconnecting... (attempt ${wsReconnectAttempts}/${wsMaxReconnectAttempts})`);
+            setTimeout(connectWebSocket3D, wsReconnectDelay);
+          } else {
+            showToast3D('⚠️ Live updates disconnected', 'warning');
+          }
+        };
+
+      } catch (error) {
+        console.error('[3D WebSocket] Connection error:', error);
+      }
+    }
+
+    function handleWebSocketMessage3D(message) {
+      if (message.event === 'connected') {
+        console.log('[3D WebSocket]', message.message);
+      } else if (message.event === 'new_handoff') {
+        console.log('[3D WebSocket] New handoff detected:', message.data);
+        addNewHandoff3D(message.data);
+        showToast3D(`✨ New handoff: ${message.data.filename}`, 'info');
+      }
+    }
+
+    function addNewHandoff3D(handoffData) {
+      // Reload full data to get compression stats
+      fetch('/api/3d/handoffs')
+        .then(res => res.json())
+        .then(data => {
+          if (data.ok && data.handoffs.length > 0) {
+            // Find the new handoff
+            const newHandoff = data.handoffs.find(h => h.id === handoffData.id);
+            if (newHandoff && !nodes3D.find(n => n.id === newHandoff.id)) {
+              // Add to nodes array
+              const newNode = {
+                id: newHandoff.id,
+                label: newHandoff.filename || newHandoff.id,
+                format: newHandoff.compression_format,
+                originalSize: newHandoff.original_size,
+                finalSize: newHandoff.final_size,
+                reduction: newHandoff.reduction_percent,
+                created: newHandoff.created,
+                category: newHandoff.category || 'unknown',
+                data: newHandoff
+              };
+
+              nodes3D.push(newNode);
+
+              // Create 3D object with animation
+              const color = getFormatColor3D(newNode.format);
+              const material = new THREE.MeshStandardMaterial({
+                color: color,
+                emissive: color,
+                emissiveIntensity: 0.8, // Start brighter for glow effect
+                roughness: 0.5,
+                metalness: 0.5,
+                transparent: true,
+                opacity: 0 // Start invisible for fade-in
+              });
+              const cube = new THREE.Mesh(highDetailGeometry, material);
+
+              // Position based on current layout
+              positionNode3D(cube, nodes3D.length - 1, nodes3D.length);
+
+              cube.userData = {
+                nodeData: newNode,
+                isHighDetail: true,
+                isVisible: true,
+                isNew: true, // Mark for animation
+                animationProgress: 0
+              };
+
+              scene3D.add(cube);
+              nodeObjects3D.push(cube);
+
+              // Update stats
+              updateStats3D();
+
+              console.log('[3D] Added new node:', newNode.id);
+            }
+          }
+        })
+        .catch(error => {
+          console.error('[3D] Error reloading handoffs:', error);
+        });
+    }
+
+    function showToast3D(message, type = 'info') {
+      // Create toast element
+      const toast = document.createElement('div');
+      toast.className = `toast-3d toast-${type}`;
+      toast.textContent = message;
+      toast.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: ${type === 'success' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#3b82f6'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10000;
+        font-family: 'Monaco', monospace;
+        font-size: 13px;
+        animation: slideInRight 0.3s ease-out;
+        max-width: 300px;
+      `;
+
+      document.body.appendChild(toast);
+
+      // Remove after 3 seconds
+      setTimeout(() => {
+        toast.style.animation = 'slideOutRight 0.3s ease-out';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
     }
 
     function onNodeClick3D(event) {
@@ -2568,6 +2785,21 @@
 
       if (!initialized3D) return;
 
+      // FPS tracking
+      const currentTime = performance.now();
+      const deltaTime = currentTime - lastFrameTime;
+      lastFrameTime = currentTime;
+      frameCount++;
+
+      // Update FPS display every 500ms
+      if (currentTime - fpsUpdateTime >= 500) {
+        currentFPS = Math.round((frameCount * 1000) / (currentTime - fpsUpdateTime));
+        document.getElementById('fps-3d-count').textContent = currentFPS;
+        document.getElementById('frame-time-3d').textContent = deltaTime.toFixed(1);
+        frameCount = 0;
+        fpsUpdateTime = currentTime;
+      }
+
       // Auto-orbit
       if (autoOrbit3D) {
         controls3D.autoRotate = true;
@@ -2576,10 +2808,62 @@
         controls3D.autoRotate = false;
       }
 
-      // Rotate cubes
+      // Update camera frustum for culling
+      camera3D.updateMatrixWorld();
+      const frustum = new THREE.Frustum();
+      const projScreenMatrix = new THREE.Matrix4();
+      projScreenMatrix.multiplyMatrices(camera3D.projectionMatrix, camera3D.matrixWorldInverse);
+      frustum.setFromProjectionMatrix(projScreenMatrix);
+
+      // Optimize each node: LOD + frustum culling + conditional rotation + new node animation
       nodeObjects3D.forEach(cube => {
-        cube.rotation.x += 0.01;
-        cube.rotation.y += 0.01;
+        const distance = camera3D.position.distanceTo(cube.position);
+
+        // Animate new nodes (fade in + glow)
+        if (cube.userData.isNew) {
+          cube.userData.animationProgress += 0.02; // Fade in over ~50 frames
+
+          if (cube.userData.animationProgress <= 1) {
+            // Fade in opacity
+            cube.material.opacity = Math.min(1, cube.userData.animationProgress);
+
+            // Pulse emissive intensity for glow effect
+            const glowIntensity = 0.8 * (1 - cube.userData.animationProgress);
+            cube.material.emissiveIntensity = 0.3 + glowIntensity;
+
+            // Gentle scale pulse
+            const scale = 1 + (0.3 * (1 - cube.userData.animationProgress));
+            cube.scale.set(scale, scale, scale);
+          } else {
+            // Animation complete - reset to normal state
+            cube.material.opacity = 1;
+            cube.material.emissiveIntensity = 0.3;
+            cube.scale.set(1, 1, 1);
+            cube.userData.isNew = false;
+          }
+        }
+
+        // LOD: Switch geometry based on distance
+        if (distance > 100 && cube.userData.isHighDetail) {
+          cube.geometry = lowDetailGeometry;
+          cube.userData.isHighDetail = false;
+        } else if (distance <= 100 && !cube.userData.isHighDetail) {
+          cube.geometry = highDetailGeometry;
+          cube.userData.isHighDetail = true;
+        }
+
+        // Frustum culling: Hide nodes outside camera view
+        const isVisible = frustum.intersectsObject(cube);
+        if (isVisible !== cube.userData.isVisible) {
+          cube.visible = isVisible;
+          cube.userData.isVisible = isVisible;
+        }
+
+        // Only rotate visible nodes
+        if (isVisible) {
+          cube.rotation.x += 0.01;
+          cube.rotation.y += 0.01;
+        }
       });
 
       controls3D.update();
