@@ -498,6 +498,35 @@
 
     <!-- Config Tab -->
     <div id="tab-config" class="tab-content">
+      <!-- Model Selection -->
+      <div class="chart-container" style="margin-bottom: 24px;">
+        <div class="chart-title">🤖 Model Selection</div>
+        <div style="display: grid; grid-template-columns: 1fr; gap: 16px;">
+          <div>
+            <div style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 12px;">
+              Current Model: <span id="current-model-name" style="color: #a5b4fc; font-weight: 600;">Loading...</span>
+            </div>
+            <select id="model-selector" class="search-input" style="width: 100%;" onchange="changeModel(this.value)">
+              <option value="">Loading models...</option>
+            </select>
+            <div id="model-description" style="margin-top: 12px; padding: 12px; background: rgba(99, 102, 241, 0.1); border-radius: 6px; font-size: 0.85rem; color: #94a3b8;">
+              Select a model to see details
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Config Templates -->
+      <div class="chart-container" style="margin-bottom: 24px;">
+        <div class="chart-title">📋 Config Templates</div>
+        <div style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 16px;">
+          Quick-load pre-configured setups for different tasks
+        </div>
+        <div id="templates-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px;">
+          <div class="loading">Loading templates...</div>
+        </div>
+      </div>
+
       <div class="chart-container">
         <div class="chart-title">Claude Configuration</div>
 
@@ -1029,6 +1058,8 @@
       // Load config data if switching to config tab
       if (tabName === 'config') {
         loadConfigData();
+        loadModelSelection();
+        loadTemplates();
       }
 
       // Load MCP data if switching to MCP tab
@@ -1392,6 +1423,137 @@
       } catch (error) {
         console.error('Add error:', error);
         alert('Failed to add server');
+      }
+    }
+
+    // =========================================================================
+    // MODEL SELECTION & TEMPLATES
+    // =========================================================================
+
+    async function loadModelSelection() {
+      try {
+        const response = await fetch(`${API_BASE}/api/model/current`);
+        const data = await response.json();
+
+        // Update current model name
+        document.getElementById('current-model-name').textContent =
+          data.available_models.find(m => m.id === data.current_model)?.name || data.current_model;
+
+        // Populate model selector
+        const selector = document.getElementById('model-selector');
+        selector.innerHTML = data.available_models.map(model => `
+          <option value="${model.id}" ${model.id === data.current_model ? 'selected' : ''}>
+            ${model.name} - ${model.description}
+          </option>
+        `).join('');
+
+        // Store model data for description updates
+        window.modelData = data.available_models;
+
+        // Show initial description
+        const currentModel = data.available_models.find(m => m.id === data.current_model);
+        updateModelDescription(currentModel);
+      } catch (error) {
+        console.error('Error loading models:', error);
+      }
+    }
+
+    function updateModelDescription(model) {
+      if (!model) return;
+      const descDiv = document.getElementById('model-description');
+      descDiv.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 8px;">${model.name}</div>
+        <div style="margin-bottom: 8px;">${model.description}</div>
+        <div style="display: flex; gap: 16px; font-size: 0.8rem;">
+          <span>⚡ Speed: ${model.speed}</span>
+          <span>💰 Cost: ${model.cost}</span>
+        </div>
+        <div style="margin-top: 8px; font-size: 0.8rem;">
+          <strong>Recommended for:</strong> ${model.recommended_for.join(', ')}
+        </div>
+      `;
+    }
+
+    async function changeModel(modelId) {
+      if (!modelId) return;
+
+      // Update description
+      const model = window.modelData?.find(m => m.id === modelId);
+      if (model) {
+        updateModelDescription(model);
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/model/set`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({model_id: modelId})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          document.getElementById('current-model-name').textContent =
+            window.modelData?.find(m => m.id === modelId)?.name || modelId;
+          alert(`✅ Model changed to ${modelId}. Restart Claude Code to apply.`);
+        } else {
+          alert(`Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error changing model:', error);
+        alert('Failed to change model');
+      }
+    }
+
+    async function loadTemplates() {
+      try {
+        const response = await fetch(`${API_BASE}/api/templates/list`);
+        const data = await response.json();
+
+        const list = document.getElementById('templates-list');
+        if (data.templates && data.templates.length > 0) {
+          list.innerHTML = data.templates.map(template => `
+            <div class="result-item" style="cursor: pointer;" onclick="loadTemplate('${template.id}')">
+              <div class="result-title">${template.name}</div>
+              <div class="result-preview" style="font-size: 0.85rem; color: #94a3b8;">
+                ${template.description}
+              </div>
+              <div style="margin-top: 8px;">
+                <button class="search-btn" style="width: 100%; padding: 8px;" onclick="loadTemplate('${template.id}'); event.stopPropagation();">
+                  Load Template
+                </button>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          list.innerHTML = '<div class="empty">No templates found</div>';
+        }
+      } catch (error) {
+        console.error('Error loading templates:', error);
+      }
+    }
+
+    async function loadTemplate(templateId) {
+      if (!confirm(`Load "${templateId.replace(/_/g, ' ')}" template? This will replace your current CLAUDE.md (backup will be created).`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/templates/load`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({template_id: templateId})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          alert(`✅ ${result.message}. Restart Claude Code to apply changes.`);
+          loadConfigData(); // Refresh config view
+        } else {
+          alert(`Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error loading template:', error);
+        alert('Failed to load template');
       }
     }
 

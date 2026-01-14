@@ -78,11 +78,11 @@ class ConversationWatcher(FileSystemEventHandler):
         # Load existing index
         self.index = self._load_index()
 
-        print(f"🤖 Auto-Compress Daemon Started")
-        print(f"   Watching: {self.session_dir}")
-        print(f"   Library: {self.library_dir}")
-        print(f"   Min interval: {self.min_interval}s")
-        print()
+        print(f"🤖 Auto-Compress Daemon Started", flush=True)
+        print(f"   Watching: {self.session_dir}", flush=True)
+        print(f"   Library: {self.library_dir}", flush=True)
+        print(f"   Min interval: {self.min_interval}s", flush=True)
+        print(flush=True)
 
     def on_modified(self, event):
         """Handle file modification events."""
@@ -136,7 +136,7 @@ class ConversationWatcher(FileSystemEventHandler):
             return True
 
         except Exception as e:
-            print(f"⚠️  Error checking {file_path.name}: {e}")
+            print(f"⚠️  Error checking {file_path.name}: {e}", flush=True)
             return False
 
     def _is_conversation_file(self, file_path: Path) -> bool:
@@ -161,7 +161,7 @@ class ConversationWatcher(FileSystemEventHandler):
     def _compress_conversation(self, file_path: Path):
         """Compress a conversation file."""
         try:
-            print(f"📦 Compressing: {file_path.name}")
+            print(f"📦 Compressing: {file_path.name}", flush=True)
 
             # Read conversation
             with open(file_path, 'r') as f:
@@ -212,13 +212,13 @@ class ConversationWatcher(FileSystemEventHandler):
             # Mark as compressed
             self.last_compressed[str(file_path)] = time.time()
 
-            print(f"   ✅ {result.original_tokens:,} → {result.final_tokens:,} tokens ({result.total_reduction}% reduction)")
-            print(f"   💾 Saved to: {output_file.name}")
-            print()
+            print(f"   ✅ {result.original_tokens:,} → {result.final_tokens:,} tokens ({result.total_reduction}% reduction)", flush=True)
+            print(f"   💾 Saved to: {output_file.name}", flush=True)
+            print(flush=True)
 
         except Exception as e:
-            print(f"   ❌ Error: {e}")
-            print()
+            print(f"   ❌ Error: {e}", flush=True)
+            print(flush=True)
 
     def _infer_project(self, file_path: Path) -> str:
         """Infer project from file path or name."""
@@ -344,9 +344,9 @@ def main():
     )
     observer.start()
 
-    print("👀 Watching for conversation updates...")
-    print("   Press Ctrl+C to stop")
-    print()
+    print("👀 Watching for conversation updates...", flush=True)
+    print("   Press Ctrl+C to stop", flush=True)
+    print(flush=True)
 
     try:
         while True:
@@ -356,14 +356,14 @@ def main():
             if stats['total_conversations'] > 0:
                 print(f"📊 Stats: {stats['total_conversations']} conversations, "
                       f"{stats['tokens_saved']:,} tokens saved "
-                      f"({stats['average_reduction']}% avg reduction)")
+                      f"({stats['average_reduction']}% avg reduction)", flush=True)
 
     except KeyboardInterrupt:
-        print("\n🛑 Stopping daemon...")
+        print("\n🛑 Stopping daemon...", flush=True)
         observer.stop()
 
     observer.join()
-    print("✅ Daemon stopped")
+    print("✅ Daemon stopped", flush=True)
 
 
 if __name__ == "__main__":

@@ -56,6 +56,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif path == '/api/daemons/list':
             self.serve_daemons_list()
             return
+        elif path == '/api/universal-watcher/stats':
+            self.serve_universal_watcher_stats()
+            return
         elif path == '/api/arsenal/list':
             self.serve_arsenal_list()
             return
@@ -65,6 +68,12 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             return
         elif path == '/api/hooks/list':
             self.serve_hooks_list()
+            return
+        elif path == '/api/templates/list':
+            self.serve_templates_list()
+            return
+        elif path == '/api/model/current':
+            self.serve_current_model()
             return
         elif path == '/' or path == '/index.html':
             self.serve_dashboard()
@@ -117,6 +126,12 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             return
         elif path == '/api/hooks/toggle':
             self.toggle_hook(data)
+            return
+        elif path == '/api/templates/load':
+            self.load_template(data)
+            return
+        elif path == '/api/model/set':
+            self.set_model(data)
             return
         else:
             self.send_error(404, "Not found")
@@ -726,6 +741,30 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 'script': str(HOME / 'ztgi' / 'golden_library' / 'dashboard_server.py')
             })
 
+            # Universal watcher daemon
+            universal_watcher_pid_file = HOME / ".claude" / "universal_watcher.pid"
+            if universal_watcher_pid_file.exists():
+                with open(universal_watcher_pid_file, 'r') as f:
+                    pid = int(f.read().strip())
+                try:
+                    os.kill(pid, 0)
+                    running = True
+                except:
+                    running = False
+            else:
+                pid = None
+                running = False
+
+            daemons.append({
+                'id': 'universal_watcher',
+                'name': 'Universal Watcher',
+                'description': 'Watches all 15+ Claude storage locations for compression',
+                'pid': pid,
+                'running': running,
+                'pid_file': str(universal_watcher_pid_file),
+                'script': str(HOME / 'ztgi' / 'golden_library' / 'daemons' / 'universal_watcher.py')
+            })
+
             self.serve_json({'daemons': daemons})
         except Exception as e:
             self.serve_json({'error': str(e)}, status=500)
@@ -774,6 +813,75 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             import time
             time.sleep(1)
             self.start_daemon(data)
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    # =========================================================================
+    # Universal Watcher Stats
+    # =========================================================================
+
+    def serve_universal_watcher_stats(self):
+        """Get detailed stats from universal watcher."""
+        try:
+            # Check if universal watcher config exists
+            config_path = HOME / ".claude" / "universal_watcher_config.json"
+
+            if not config_path.exists():
+                self.serve_json({
+                    'enabled': False,
+                    'message': 'Universal watcher not configured'
+                })
+                return
+
+            # Load config
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+
+            locations = config.get('locations', [])
+
+            # Check if stats file exists (would be created by running watcher)
+            stats_file = LIBRARY_DIR / "stats" / "location_stats.json"
+            location_stats = {}
+
+            if stats_file.exists():
+                with open(stats_file, 'r') as f:
+                    location_stats = json.load(f)
+
+            # Build response
+            response = {
+                'enabled': True,
+                'total_locations': len(locations),
+                'active_locations': sum(1 for loc in locations if loc.get('enabled', True)),
+                'locations': []
+            }
+
+            for loc in locations:
+                loc_id = loc.get('id')
+                stats = location_stats.get(loc_id, {
+                    'processed': 0,
+                    'failed': 0,
+                    'original_tokens': 0,
+                    'compressed_tokens': 0,
+                    'bytes_saved': 0
+                })
+
+                response['locations'].append({
+                    'id': loc_id,
+                    'name': loc.get('id').replace('_', ' ').title(),
+                    'path': loc.get('path'),
+                    'enabled': loc.get('enabled', True),
+                    'priority': loc.get('priority', 1),
+                    'strategy': loc.get('strategy', 'real-time-incremental'),
+                    'processed': stats.get('processed', 0),
+                    'failed': stats.get('failed', 0),
+                    'original_tokens': stats.get('original_tokens', 0),
+                    'compressed_tokens': stats.get('compressed_tokens', 0),
+                    'tokens_saved': stats.get('original_tokens', 0) - stats.get('compressed_tokens', 0),
+                    'bytes_saved': stats.get('bytes_saved', 0),
+                    'last_compression': stats.get('last_compression')
+                })
+
+            self.serve_json(response)
         except Exception as e:
             self.serve_json({'error': str(e)}, status=500)
 
@@ -971,6 +1079,166 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 message = f'⏸️ Disabled {hook_name}'
 
             self.serve_json({'success': True, 'message': message})
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    # =========================================================================
+    # Config Templates Management
+    # =========================================================================
+
+    def serve_templates_list(self):
+        """List available config templates."""
+        try:
+            templates_dir = ARSENAL_LIBRARY / "claude_md"
+            templates = []
+
+            if templates_dir.exists():
+                for template_file in templates_dir.glob("*.md"):
+                    # Skip files that aren't templates
+                    name = template_file.stem
+
+                    # Read first line for description
+                    description = ""
+                    try:
+                        with open(template_file, 'r') as f:
+                            first_line = f.readline().strip()
+                            if first_line.startswith('#'):
+                                description = first_line.lstrip('# ').strip()
+                    except:
+                        pass
+
+                    templates.append({
+                        'id': name,
+                        'name': name.replace('_', ' ').title(),
+                        'file': template_file.name,
+                        'description': description,
+                        'path': str(template_file),
+                        'size': template_file.stat().st_size
+                    })
+
+            self.serve_json({'templates': templates})
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def load_template(self, data):
+        """Load a template as the active CLAUDE.md."""
+        try:
+            template_id = data.get('template_id')
+            if not template_id:
+                self.serve_json({'error': 'Template ID required'}, status=400)
+                return
+
+            template_path = ARSENAL_LIBRARY / "claude_md" / f"{template_id}.md"
+
+            if not template_path.exists():
+                self.serve_json({'error': f'Template {template_id} not found'}, status=404)
+                return
+
+            # Backup current CLAUDE.md
+            claude_md_path = HOME / "CLAUDE.md"
+            if claude_md_path.exists():
+                backup_dir = HOME / ".claude" / "backups"
+                backup_dir.mkdir(exist_ok=True)
+                backup_path = backup_dir / f"CLAUDE.md.{datetime.now().strftime('%Y%m%d_%H%M%S')}.bak"
+                import shutil
+                shutil.copy2(claude_md_path, backup_path)
+
+            # Copy template to CLAUDE.md
+            import shutil
+            shutil.copy2(template_path, claude_md_path)
+
+            self.serve_json({
+                'success': True,
+                'message': f'Loaded template: {template_id}',
+                'template': template_id
+            })
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    # =========================================================================
+    # Model Selection Management
+    # =========================================================================
+
+    def serve_current_model(self):
+        """Get the current Claude model selection."""
+        try:
+            settings_path = HOME / ".claude" / "settings.local.json"
+
+            # Default model
+            current_model = "claude-sonnet-4.5"
+
+            if settings_path.exists():
+                with open(settings_path, 'r') as f:
+                    settings = json.load(f)
+                    current_model = settings.get('defaultModel', current_model)
+
+            available_models = [
+                {
+                    'id': 'claude-opus-4.5',
+                    'name': 'Claude Opus 4.5',
+                    'description': 'Most capable model - best for complex reasoning, architecture, and analysis',
+                    'speed': 'Slower',
+                    'cost': 'Highest',
+                    'recommended_for': ['Architecture', 'Code Review', 'Strategy']
+                },
+                {
+                    'id': 'claude-sonnet-4.5',
+                    'name': 'Claude Sonnet 4.5',
+                    'description': 'Balanced model - great for most tasks with good speed and capability',
+                    'speed': 'Medium',
+                    'cost': 'Medium',
+                    'recommended_for': ['Building', 'Debugging', 'General Use']
+                },
+                {
+                    'id': 'claude-haiku-4',
+                    'name': 'Claude Haiku 4',
+                    'description': 'Fastest model - ideal for quick tasks and high-volume operations',
+                    'speed': 'Fastest',
+                    'cost': 'Lowest',
+                    'recommended_for': ['Quick fixes', 'Simple tasks', 'Batch operations']
+                }
+            ]
+
+            self.serve_json({
+                'current_model': current_model,
+                'available_models': available_models
+            })
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def set_model(self, data):
+        """Set the default Claude model."""
+        try:
+            model_id = data.get('model_id')
+            if not model_id:
+                self.serve_json({'error': 'Model ID required'}, status=400)
+                return
+
+            valid_models = ['claude-opus-4.5', 'claude-sonnet-4.5', 'claude-haiku-4']
+            if model_id not in valid_models:
+                self.serve_json({'error': f'Invalid model: {model_id}'}, status=400)
+                return
+
+            settings_path = HOME / ".claude" / "settings.local.json"
+
+            # Load existing settings or create new
+            settings = {}
+            if settings_path.exists():
+                with open(settings_path, 'r') as f:
+                    settings = json.load(f)
+
+            # Update model
+            settings['defaultModel'] = model_id
+
+            # Save settings
+            with open(settings_path, 'w') as f:
+                json.dump(settings, f, indent=2)
+
+            self.serve_json({
+                'success': True,
+                'message': f'Set default model to {model_id}',
+                'model': model_id
+            })
         except Exception as e:
             self.serve_json({'error': str(e)}, status=500)
 
