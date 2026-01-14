@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "repository": "/Users/kanelawaccount/ztgi/golden_library",
+  "created": "2026-01-14T12:20:00.476356",
+  "handoffs": [
+    {
+      "handoff_id": "1ba7855834e1",
+      "original_file": "CURRENT_PLAN.md",
+      "original_size": 9236,
+      "compressed_size": 9193,
+      "reduction_percent": 0.5,
+      "created": "2026-01-14T12:20:00.477474",
+      "compression_format": "markdown_slim",
+      "title": "Golden Library - Current Plan",
+      "file_type": "md",
+      "filename": "CURRENT_PLAN.md"
+    },
+    {
+      "handoff_id": "ac193bbe76f0",
+      "original_file": "PRD_3D_VIEWER_INTEGRATION.md",
+      "original_size": 23627,
+      "compressed_size": 23627,
+      "reduction_percent": 0.0,
+      "created": "2026-01-14T12:21:20.110184",
+      "compression_format": "markdown_slim",
+      "title": "PRD: Golden Library 3D Viewer Integration",
+      "file_type": "md",
+      "filename": "PRD_3D_VIEWER_INTEGRATION.md"
+    }
+  ],
+  "last_updated": "2026-01-14T12:21:20.110313"
+}
