@@ -3,393 +3,302 @@
 ---
 **Metadata:**
 - **Project:** golden_library
-- **Phase:** 4
-- **Phase Name:** 3D Viewer Enhancement & Real-time Integration
+- **Phase:** 4.5
+- **Phase Name:** Compression System Enhancement
 - **Started:** 2026-01-14
-- **Estimated Duration:** 3-5 days
+- **Estimated Duration:** 3-4 days
 - **Status:** active
-- **Previous Handoff:** 731a228 (3D Viewer MVP Integration)
+- **Previous Handoff:** 5a4d5ca (Phase 4: 3D Viewer Performance & Real-time)
 - **Dependencies:**
-  - dashboard_server.py
-  - universal_watcher daemon
-  - compression pipeline
+  - dashboard_server.py (3D viewer)
+  - compression pipeline (existing)
+  - git hooks system
 - **Related Work:**
-  - prax-chat: Tab-based UI pattern
-  - phi_proxy: Real-time updates architecture
+  - Phase 4: 3D viewer with WebSocket updates
+  - Existing SLIM compression format
+  - handoff:// protocol foundation
 ---
 
 ## Context from Previous Phase
 
-**Phase 3: 3D Viewer MVP** (handoff://731a228)
-- ✅ Integrated standalone 3D viewer into Control Center dashboard
-- ✅ Added 4 backend API endpoints (`/api/3d/*`)
-- ✅ Implemented 5 layout modes (Globe, Clusters, Grid, Helix, Scatter)
-- ✅ Node interaction with details panel
-- ✅ Matched dashboard dark theme styling
-- ✅ 60 FPS performance with demo data (20 nodes)
+**Phase 4: 3D Viewer Enhancement & Real-time Integration** (handoff://5a4d5ca)
+- ✅ Integrated real data from conversation library (99 handoffs)
+- ✅ Performance optimization: LOD, frustum culling, 60 FPS with 100+ nodes
+- ✅ WebSocket live updates with fade-in animations
+- ✅ Toast notifications for new compressions
+- ✅ FPS counter and performance monitoring
 
 **What's Working:**
-- Three.js rendering engine
-- Tab integration
-- Demo data visualization
-- Basic controls
+- 3D visualization of compressed handoffs
+- Real-time updates when new compressions happen
+- Smooth 60 FPS performance with 100+ nodes
+- WebSocket server broadcasting file system events
 
 **What's Missing:**
-- Real handoff data (currently shows mock data)
-- Live updates
-- Performance at scale (100+ nodes)
-- Advanced features (timeline, export, comparison)
+- Effective compression (current: 0-0.5% reduction)
+- Automated archival and handoff ID generation
+- Cross-repository handoff indexing
+- Pattern library for reusable solutions
 
 ---
 
-## Phase 4 Goals
+## Phase 4.5 Goals
 
-Transform the 3D viewer from MVP demo to production-ready feature with:
-1. Real data pipeline
-2. Live updates
-3. Optimized performance
-4. Foundation for advanced visualizations
+**Priority:** HIGH - Foundation for all future phases
+
+Transform compression system from basic format detection to production-ready token-efficient handoff:// protocol with:
+1. Advanced compression (80%+ reduction vs current 0-0.5%)
+2. Automated workflows (git hooks, archival)
+3. 3D visualization integration
+4. Cross-repo pattern library
+
+**Why This Matters:**
+- Current: 100KB PRD = ~25,000 tokens
+- Target: 100KB PRD → 20KB compressed = ~5,000 tokens (80% savings)
+- Makes handoff:// protocol actually useful for token efficiency
+- Foundation for Timeline Mode (Phase 5) and advanced features
 
 ---
 
 ## Active Tasks - Immediate (This Phase)
 
-### 🔴 Priority 1: Real Data Integration
+### 🔴 Priority 1: Advanced Compression
 **Status:** Not Started
 **Owner:** Koda
-**Estimated:** 4-6 hours
+**Estimated:** 1-2 days
 
-**Objective:** Replace demo data with actual compressed handoffs from the conversation library.
+**Objective:** Implement SLIM vocabulary and V4Z compression for 80%+ reduction on large PRDs.
 
 **Tasks:**
-- [ ] Verify `~/.claude/conversation_library/` structure
-- [ ] Test `/api/3d/handoffs` endpoint with real data
-- [ ] Update `infer_compression_format()` to detect formats accurately
-- [ ] Add error handling for missing/corrupted files
-- [ ] Test with 0 handoffs, 1 handoff, 50+ handoffs
-- [ ] Update stats calculations for real data
-- [ ] Remove demo data fallback (or make it optional)
+- [ ] Analyze existing compression formats (SLIM, V4Z, FSL, ZTPCF)
+- [ ] Design SLIM vocabulary for markdown
+  - Common markdown patterns → tokens
+  - Task list syntax compression
+  - Code block header optimization
+  - Repeated phrases dictionary
+- [ ] Implement V4Z compression layer
+  - Zstandard-based compression
+  - Dictionary training on PRD corpus
+  - Backward compatible decompression
+- [ ] Build compression benchmark suite
+  - Test with CURRENT_PLAN.md (~11KB)
+  - Test with large PRDs (100KB+)
+  - Measure: ratio, speed, token savings
+- [ ] Optimize decompression speed
+  - Target: <100ms for 100KB file
+  - Cache decompressed results
 
 **Acceptance Criteria:**
-- Viewer loads real handoffs from disk
-- Stats panel shows accurate compression metrics
-- Graceful handling when no data exists
-- Format colors match actual compression types
+- 80%+ compression on repetitive content
+- Backward compatible with existing formats
+- Decompression < 100ms
+- No data loss on round-trip
 
-**Files to Modify:**
-- `dashboard_server.py` (serve_3d_handoffs, infer_compression_format)
-- `claude_dashboard.html` (loadHandoffs3D function)
+**Files to Create/Modify:**
+- `src/qastone_compressor.py` (already exists, enhance)
+- `src/qastone_types.py` (already exists, enhance)
+- `src/slim_vocabulary.py` (new)
+- `src/v4z_compressor.py` (new)
+- `tests/test_compression_benchmarks.py` (new)
+
+**Technical Notes:**
+- Use Zstandard (zstd) for V4Z base compression
+- Train dictionary on corpus of PRDs for better ratios
+- SLIM vocabulary should be human-readable for debugging
+- Consider: LZ4 for speed vs zstd for ratio tradeoff
 
 ---
 
-### 🟡 Priority 2: Performance Optimization
+### 🟡 Priority 2: Automation & Git Hooks
 **Status:** Not Started
 **Owner:** Koda
-**Estimated:** 3-4 hours
+**Estimated:** 1 day
 
-**Objective:** Ensure smooth 60 FPS with 100+ nodes, implement Level of Detail (LOD).
+**Objective:** Automate compression on git commit and phase archival.
 
 **Tasks:**
-- [ ] Benchmark current performance (10, 50, 100, 200 nodes)
-- [ ] Implement LOD system (simplified geometry for distant nodes)
-- [ ] Add frustum culling (hide off-screen nodes)
-- [ ] Optimize node rotation (update only visible nodes)
-- [ ] Implement pagination for 500+ handoffs
-- [ ] Add loading spinner for initial data fetch
-- [ ] Test memory usage over time (check for leaks)
-- [ ] Profile render loop with Chrome DevTools
+- [ ] Create git pre-commit hook
+  - Detect changes to CURRENT_PLAN.md
+  - Auto-compress to `.golden_library/compressed/`
+  - Generate handoff ID (first 8 chars of hash)
+  - Update `previous_handoff` references
+  - Validate handoff:// references resolve
+- [ ] Build archive-phase.sh script
+  - Move CURRENT_PLAN.md to archive/plans/YYYY-MM-DD_phaseN_name.md
+  - Compress archived plan
+  - Generate index entry
+  - Create stub for next phase
+  - Git commit with proper message
+- [ ] Add unarchive/decompress utilities
+  - `unarchive-phase.sh <handoff_id>` → restore to working dir
+  - `decompress.py <handoff_id>` → stdout decompressed content
 
 **Acceptance Criteria:**
-- 60 FPS maintained with 100 nodes
-- 30+ FPS with 200 nodes
-- Memory stable over 5 minutes
-- Smooth camera controls with any node count
+- Pre-commit hook runs automatically
+- archive-phase.sh works without manual steps
+- Handoff IDs are stable and unique
+- Can restore any previous phase
 
-**Files to Modify:**
-- `claude_dashboard.html` (animate3D, createGraph3D)
-- Consider: Three.js InstancedMesh for repeated geometries
+**Files to Create:**
+- `.git/hooks/pre-commit` (or `.githooks/pre-commit`)
+- `scripts/archive-phase.sh`
+- `scripts/unarchive-phase.sh`
+- `src/decompress.py`
 
 **Technical Notes:**
-- LOD: Switch from BoxGeometry(2,2,2) to BoxGeometry(1,1,1) when distance > 100
-- Frustum culling: Use `camera.frustum.intersectsObject()`
-- Rotation: Only rotate nodes within camera view
+- Hook should fail gracefully if compression errors
+- Store handoff ID in commit message for traceability
+- Archive script should update `.golden_library/index.json`
 
 ---
 
-### 🟢 Priority 3: WebSocket Live Updates
+### 🟢 Priority 3: 3D Viewer Integration
 **Status:** Not Started
 **Owner:** Koda
-**Estimated:** 5-6 hours
+**Estimated:** 1 day
 
-**Objective:** Show new compressions in real-time as Universal Watcher processes them.
+**Objective:** Visualize compressed handoffs in 3D viewer, click to decompress and view.
 
 **Tasks:**
-- [ ] Add WebSocket server to `dashboard_server.py`
-- [ ] Emit event when new handoff compressed
-- [ ] Client subscribes to WebSocket on 3D tab open
-- [ ] Animate new node appearance (fade in + glow effect)
-- [ ] Update stats panel in real-time
-- [ ] Add toast notification "New handoff: session_X.jsonl"
-- [ ] Handle reconnection on disconnect
-- [ ] Test with Universal Watcher running
+- [ ] Add `.golden_library/index.json` format
+  - Schema: handoff_id, phase, date, size_original, size_compressed, tags
+- [ ] Update `/api/3d/handoffs` to include archived handoffs
+  - Current: only conversation_library handoffs
+  - New: merge with .golden_library handoffs
+  - Color by type: conversation (blue), plan (green)
+- [ ] Add click handler for plan handoffs
+  - Show decompressed content in modal
+  - Display metadata: phase, date, reduction %
+  - Add "Restore to CURRENT_PLAN.md" button
+- [ ] Implement timeline layout mode
+  - Position nodes chronologically on timeline
+  - X-axis = time, Y-axis = compression ratio
+  - Scrubber to navigate time range
 
 **Acceptance Criteria:**
-- New compressions appear within 1 second
-- Stats update automatically
-- Smooth animation for new nodes
-- No performance degradation
-- Works across tab switches
+- Archived plans appear in 3D viewer
+- Click → modal shows decompressed content
+- Timeline mode shows project evolution
+- Can restore archived plan to working directory
 
 **Files to Modify:**
-- `dashboard_server.py` (add websocket_handler)
-- `claude_dashboard.html` (add WebSocket client)
-- Integration with Universal Watcher
+- `dashboard_server.py` (add index.json read, merge handoffs)
+- `claude_dashboard.html` (timeline layout, modal)
+- `.golden_library/index.json` (new)
 
 **Technical Notes:**
-```python
-# dashboard_server.py
-import asyncio
-from websockets import serve
+- Timeline X-axis: `Date.parse(created)`
+- Timeline Y-axis: `100 - reduction_percent`
+- Use different node shapes: sphere=conversation, cube=plan
 
-async def handoff_notifier(websocket):
-    # Watch for new files in compressed/
-    # Emit: {"event": "new_handoff", "data": {...}}
-```
+---
 
-```javascript
-// claude_dashboard.html
-const ws = new WebSocket('ws://localhost:8080/ws');
-ws.onmessage = (event) => {
-  const {event, data} = JSON.parse(event.data);
-  if (event === 'new_handoff') addNode3D(data);
-};
-```
+### 🟣 Priority 4: Cross-Repo Pattern Library
+**Status:** Not Started
+**Owner:** Koda
+**Estimated:** 1 day
+
+**Objective:** Build searchable pattern library across multiple repositories.
+
+**Tasks:**
+- [ ] Design pattern extraction system
+  - Scan handoffs for common solutions
+  - Tag by category: auth, websocket, 3D, database, etc.
+  - Extract code snippets + context
+- [ ] Build cross-repo index
+  - Script: `scan-repos.py --repos ~/ztgi/*`
+  - Output: `~/.golden_library/cross_repo_index.json`
+  - Schema: repo, handoff_id, pattern_tags, snippet
+- [ ] Add pattern search API
+  - `/api/patterns/search?q=websocket+auth`
+  - Return: matching handoffs with context
+- [ ] UI for pattern browser
+  - New tab in dashboard: "Patterns"
+  - Tag cloud for categories
+  - Click tag → show matching patterns
+  - Click pattern → view full handoff
+
+**Acceptance Criteria:**
+- Can search across 5+ repos
+- Pattern extraction finds 10+ reusable patterns
+- Search returns relevant results
+- UI makes patterns discoverable
+
+**Files to Create:**
+- `scripts/scan-repos.py`
+- `scripts/extract-patterns.py`
+- Add pattern search to `dashboard_server.py`
+- Add Patterns tab to `claude_dashboard.html`
+
+**Technical Notes:**
+- Use simple keyword matching for v1
+- Later: embeddings + semantic search
+- Store snippets with ±10 lines context
+- Dedup similar patterns across repos
 
 ---
 
 ## Backlog - Future Phases
 
-### Phase 4.5: Compression System Enhancement
-**Estimated:** 3-4 days
-**Priority:** HIGH (Foundation for all future phases)
-
-Enhance PRD compression system for production-ready handoff:// protocol.
-
-**Tasks:**
-
-**Part 1: Advanced Compression (1-2 days)**
-- [ ] Implement SLIM vocabulary for markdown
-  - Common phrases → tokens
-  - Task list compression
-  - Code block optimization
-- [ ] Add V4Z compression for large PRDs
-  - 80%+ reduction on repetitive content
-  - Backward compatible with current format
-- [ ] Benchmark compression on real PRDs
-  - Test with 100KB+ plans
-  - Measure token savings
-  - Optimize decompression speed
-
-**Part 2: Automation (1 day)**
-- [ ] Create git pre-commit hook
-  - Auto-compress CURRENT_PLAN.md on commit
-  - Update handoff IDs automatically
-  - Validate handoff references
-- [ ] Add archive script
-  - `archive-phase.sh` - Archive current phase, create next
-  - Auto-update previous_handoff references
-  - Commit with proper message
-
-**Part 3: Integration (1 day)**
-- [ ] Visualize handoffs in 3D viewer
-  - Load from `.golden_library/index.json`
-  - Each handoff = node in 3D space
-  - Color by phase, click → decompress
-- [ ] Timeline layout mode
-  - Chronological arrangement
-  - Show project evolution
-  - Scrubber to navigate time
-
-**Part 4: Cross-Repo (1 day)**
-- [ ] Cross-repo index builder
-  - Scan multiple repos for `.golden_library/`
-  - Build unified index
-  - Search across all projects
-- [ ] Pattern library foundation
-  - Extract common solutions
-  - Tag by category (auth, websocket, 3D, etc.)
-  - AI-suggested context based on task
-
-**Acceptance Criteria:**
-- ✅ 80%+ compression on large PRDs
-- ✅ Auto-compress on git commit working
-- ✅ Handoffs visible in 3D viewer
-- ✅ Cross-repo search functional
-- ✅ Pattern library has 10+ entries
-
-**Why This Matters:**
-- Current compression: 0-0.5% reduction
-- Target: 80%+ reduction with V4Z
-- Makes handoff:// protocol truly token-efficient
-- Foundation for Phases 5-8
-
-**Use Cases:**
-- New instance loads 100KB PRD: 2,000 tokens → 400 tokens (80% savings)
-- Search across 5 repos for "websocket auth pattern"
-- Visualize 6-month project evolution in 3D timeline
-- Auto-archive phases without manual compression
-
----
-
 ### Phase 5: Timeline Mode (Q1 2026)
 **Estimated:** 2-3 days
 
-Chronological visualization of handoffs over time (builds on Phase 4.5).
+Chronological visualization of handoffs (builds on 4.5 timeline layout).
 
 **Tasks:**
-- [ ] Add date-based positioning algorithm
-- [ ] Timeline scrubber UI (play/pause/seek)
-- [ ] Filter by date range
+- [ ] Enhanced timeline with play/pause/seek
+- [ ] Filter by date range, repo, category
 - [ ] Show compression trends over time
-- [ ] Animate project evolution (time-lapse mode)
-
-**Use Cases:**
-- "Show me all handoffs from last week"
-- "Replay project development chronologically"
-- "Find when we hit 80% compression rate"
+- [ ] Animate project evolution (time-lapse)
 
 ---
 
 ### Phase 6: Export Visualization
 **Estimated:** 1-2 days
 
-Save 3D view as image or animated GIF.
+Save 3D views as images/GIFs for documentation.
 
 **Tasks:**
-- [ ] Add "Export PNG" button
-- [ ] Add "Export GIF" (rotating view)
-- [ ] Canvas.toDataURL() for static export
-- [ ] CCapture.js for animated export
+- [ ] Export PNG (static snapshot)
+- [ ] Export GIF (rotating view)
 - [ ] Export stats as JSON/CSV
-
-**Use Cases:**
-- Documentation screenshots
-- Progress reports
-- Presentations
 
 ---
 
 ### Phase 7: Comparison Mode
 **Estimated:** 2-3 days
 
-Side-by-side comparison of two handoffs or time periods.
-
-**Tasks:**
-- [ ] Split-screen 3D view
-- [ ] Diff visualization (added/removed nodes)
-- [ ] Compression metric comparison table
-- [ ] "Before vs After" optimization view
-
-**Use Cases:**
-- "Compare compression before/after algorithm change"
-- "Show impact of new compression format"
-- "Diff two project states"
+Side-by-side diff of two handoffs or time periods.
 
 ---
 
-### Phase 8: VR Mode (Q3 2026)
+### Phase 8: VR Mode
 **Estimated:** 5-7 days
 
-Immersive VR visualization using WebXR.
-
-**Tasks:**
-- [ ] Add WebXR support
-- [ ] VR controller integration
-- [ ] Teleport navigation
-- [ ] Hand-tracking node selection
-- [ ] VR UI panels
-- [ ] Test on Quest 2/3, Vision Pro
-
-**Use Cases:**
-- Immersive data exploration
-- Presentations in VR
-- Remote collaboration in 3D space
-
----
-
-## PRD Management System Integration
-
-### Current Phase Archive Plan
-
-When Phase 4 completes:
-```bash
-# Compress current plan
-python3 -m golden_library.compress CURRENT_PLAN.md
-# Output: handoff://a3f8e92c
-
-# Archive
-mv CURRENT_PLAN.md archive/plans/2026-01-14_phase4_realtime.md
-
-# Create Phase 5 plan
-cat > CURRENT_PLAN.md <<EOF
----
-phase: 5
-previous_handoff: a3f8e92c
-...
-EOF
-```
-
-### Decision Log (Compressed)
-
-**Why Three.js over Babylon.js?**
-- Lighter (580KB vs 2MB)
-- Better documentation
-- Faster startup
-- Community size
-
-→ Compress as handoff, reference in future 3D decisions
-
-**Why WebSocket over polling?**
-- Lower latency (<100ms vs 1-5s)
-- Less server load
-- Native browser support
-- Better UX for real-time
-
-→ Archive: handoff://future_websocket_decision
-
----
-
-## Cross-Repository Context
-
-**Related Patterns:**
-- `prax-chat`: Tab-based UI (similar structure)
-- `phi_proxy`: Real-time updates via WebSocket
-- `terminal_library_search`: Hybrid search implementation
-
-**Reusable Components:**
-- WebSocket setup (from phi_proxy)
-- Loading states (from dashboard tabs)
-- Error handling (from arsenal tab)
+Immersive VR visualization (WebXR).
 
 ---
 
 ## Success Metrics
 
-**Phase 4 Complete When:**
-- ✅ Real data loads from conversation library
-- ✅ 60 FPS with 100+ nodes
-- ✅ Live updates working with Universal Watcher
-- ✅ No console errors
-- ✅ Commits pushed with handoff ID
-- ✅ CURRENT_PLAN.md archived
+**Phase 4.5 Complete When:**
+- ✅ 80%+ compression ratio on large PRDs
+- ✅ Git pre-commit hook auto-compresses plans
+- ✅ Archived handoffs visible in 3D viewer
+- ✅ Cross-repo pattern search functional
+- ✅ Timeline mode shows project evolution
+- ✅ Pattern library has 10+ entries
+- ✅ Commits pushed with handoff references
+- ✅ CURRENT_PLAN.md archived for Phase 5
 - ✅ Phase 5 plan created
 
 **Definition of Done:**
-- Manual testing checklist passed
-- Performance benchmarks met
-- Real-world usage validated
-- User feedback incorporated
+- Compression benchmarks pass
+- Git hooks tested on real commits
+- 3D viewer loads archived plans
+- Pattern search returns relevant results
 - Documentation updated
+- User can navigate project history in 3D
 
 ---
 
@@ -397,40 +306,59 @@ EOF
 
 **Quick Start:**
 1. Read this file
-2. Check previous handoff: `git show 731a228`
-3. Start with Priority 1 (Real Data Integration)
-4. Test at http://localhost:8080 (3D View tab)
+2. Check previous handoff: `git show 5a4d5ca`
+3. Start with Priority 1 (Advanced Compression)
+4. Benchmark current compression vs target
 5. Commit progress, check off tasks
 6. When stuck: Review backlog or ask for clarification
 
 **Key Files:**
-- `dashboard_server.py` - Backend API
-- `claude_dashboard.html` - Frontend (line 2307+ for 3D code)
-- `PRD_3D_VIEWER_INTEGRATION.md` - Original MVP spec
+- `src/qastone_compressor.py` - Main compression logic
+- `src/qastone_types.py` - Type definitions
+- `dashboard_server.py` - Backend API (includes 3D viewer)
+- `claude_dashboard.html` - Frontend UI
+- `.golden_library/` - Compressed handoff storage
 
 **Testing:**
 ```bash
-# Start server
-cd ~/ztgi/golden_library
-python3 dashboard_server.py 8080
+# Benchmark compression
+python3 -m pytest tests/test_compression_benchmarks.py -v
 
-# Open browser
-open http://localhost:8080
+# Test git hook
+git add CURRENT_PLAN.md
+git commit -m "test: verify pre-commit hook"
 
-# Click: 🌐 3D View tab
+# View in 3D
+open http://localhost:8080 → 3D View tab
+
+# Search patterns
+curl http://localhost:8080/api/patterns/search?q=websocket
 ```
 
 ---
 
 ## Notes & Decisions
 
-**2026-01-14:** MVP completed ahead of schedule (30min target, 28min actual)
-- User feedback: "works pretty good, love it"
-- Performance: Smooth with demo data
-- Next: Focus on real data integration
+**2026-01-14:** Phase 4 completed successfully
+- 3D viewer with real-time updates working
+- 60 FPS performance confirmed
+- WebSocket infrastructure ready
+- Ready for compression enhancement
+
+**Current Compression Status:**
+- SLIM only: ~60% reduction (mostly whitespace)
+- Need: 80%+ reduction on actual content
+- Problem: Repetitive markdown patterns not compressed
+- Solution: SLIM vocabulary + V4Z layer
+
+**Architecture Decision: Why V4Z?**
+- Zstandard provides 70-80% compression on text
+- Dictionary training learns project-specific patterns
+- Faster decompression than gzip/bzip2
+- Widely supported, battle-tested
 
 ---
 
 **Last Updated:** 2026-01-14
-**Next Review:** When Priority 1 complete
+**Next Review:** After Priority 1 complete
 **Questions/Blockers:** None currently
