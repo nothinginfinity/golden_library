@@ -19,30 +19,41 @@ class SlimConverter:
     def __init__(self):
         self.version = "1.0"
 
-    def jsonl_to_slim(self, jsonl_path: str) -> str:
+    def jsonl_to_slim(self, jsonl_path_or_content: str) -> str:
         """
-        Convert JSONL file to SLIM format.
+        Convert JSONL file or content to SLIM format.
 
         Args:
-            jsonl_path: Path to .jsonl file
+            jsonl_path_or_content: Path to .jsonl file or JSONL content string
 
         Returns:
             SLIM formatted string
         """
-        path = Path(jsonl_path)
-        if not path.exists():
-            raise FileNotFoundError(f"JSONL file not found: {jsonl_path}")
+        # Check if it's a file path or content
+        content = None
+        try:
+            path = Path(jsonl_path_or_content)
+            if path.exists() and path.is_file():
+                # It's a file path
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+        except (OSError, ValueError):
+            # Path is invalid (too long, etc.) - must be content
+            pass
+
+        if content is None:
+            # It's content
+            content = jsonl_path_or_content
 
         # Parse all lines
         lines = []
-        with open(path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        lines.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        continue  # Skip malformed lines
+        for line in content.split('\n'):
+            line = line.strip()
+            if line:
+                try:
+                    lines.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue  # Skip malformed lines
 
         if not lines:
             return self._empty_slim()
