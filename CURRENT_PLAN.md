@@ -169,10 +169,82 @@ ws.onmessage = (event) => {
 
 ## Backlog - Future Phases
 
+### Phase 4.5: Compression System Enhancement
+**Estimated:** 3-4 days
+**Priority:** HIGH (Foundation for all future phases)
+
+Enhance PRD compression system for production-ready handoff:// protocol.
+
+**Tasks:**
+
+**Part 1: Advanced Compression (1-2 days)**
+- [ ] Implement SLIM vocabulary for markdown
+  - Common phrases → tokens
+  - Task list compression
+  - Code block optimization
+- [ ] Add V4Z compression for large PRDs
+  - 80%+ reduction on repetitive content
+  - Backward compatible with current format
+- [ ] Benchmark compression on real PRDs
+  - Test with 100KB+ plans
+  - Measure token savings
+  - Optimize decompression speed
+
+**Part 2: Automation (1 day)**
+- [ ] Create git pre-commit hook
+  - Auto-compress CURRENT_PLAN.md on commit
+  - Update handoff IDs automatically
+  - Validate handoff references
+- [ ] Add archive script
+  - `archive-phase.sh` - Archive current phase, create next
+  - Auto-update previous_handoff references
+  - Commit with proper message
+
+**Part 3: Integration (1 day)**
+- [ ] Visualize handoffs in 3D viewer
+  - Load from `.golden_library/index.json`
+  - Each handoff = node in 3D space
+  - Color by phase, click → decompress
+- [ ] Timeline layout mode
+  - Chronological arrangement
+  - Show project evolution
+  - Scrubber to navigate time
+
+**Part 4: Cross-Repo (1 day)**
+- [ ] Cross-repo index builder
+  - Scan multiple repos for `.golden_library/`
+  - Build unified index
+  - Search across all projects
+- [ ] Pattern library foundation
+  - Extract common solutions
+  - Tag by category (auth, websocket, 3D, etc.)
+  - AI-suggested context based on task
+
+**Acceptance Criteria:**
+- ✅ 80%+ compression on large PRDs
+- ✅ Auto-compress on git commit working
+- ✅ Handoffs visible in 3D viewer
+- ✅ Cross-repo search functional
+- ✅ Pattern library has 10+ entries
+
+**Why This Matters:**
+- Current compression: 0-0.5% reduction
+- Target: 80%+ reduction with V4Z
+- Makes handoff:// protocol truly token-efficient
+- Foundation for Phases 5-8
+
+**Use Cases:**
+- New instance loads 100KB PRD: 2,000 tokens → 400 tokens (80% savings)
+- Search across 5 repos for "websocket auth pattern"
+- Visualize 6-month project evolution in 3D timeline
+- Auto-archive phases without manual compression
+
+---
+
 ### Phase 5: Timeline Mode (Q1 2026)
 **Estimated:** 2-3 days
 
-Chronological visualization of handoffs over time.
+Chronological visualization of handoffs over time (builds on Phase 4.5).
 
 **Tasks:**
 - [ ] Add date-based positioning algorithm
