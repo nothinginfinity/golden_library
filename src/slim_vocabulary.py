@@ -89,11 +89,11 @@ class SlimVocabulary:
             'Tasks': 'Ⓣ',
             'Requirements': 'Ⓡ',
 
-            # Time/Dates
-            'days': 'd',
-            'hours': 'h',
-            'weeks': 'w',
-            'months': 'm',
+            # Time/Dates (use multi-char tokens to avoid collisions)
+            ' days': '·d',
+            ' hours': '·h',
+            ' weeks': '·w',
+            ' months': '·m',
 
             # Common actions
             'Implement': 'impl',
@@ -135,11 +135,11 @@ class SlimVocabulary:
             'performance': 'perf',
             'Performance': 'Perf',
 
-            # File extensions
+            # File extensions (keep as-is, these are safe with the dot prefix)
             '.py': '.ᵖʸ',
             '.js': '.ʲˢ',
             '.ts': '.ᵗˢ',
-            '.md': '.ᵐᵈ',
+            # '.md': '.ᵐᵈ',  # Skip .md to avoid corrupting markdown
             '.json': '.ʲˢⁿ',
             '.yaml': '.ʸᵐˡ',
             '.sh': '.ˢʰ',
