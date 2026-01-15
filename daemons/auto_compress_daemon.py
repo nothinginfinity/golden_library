@@ -36,7 +36,7 @@ from watchdog.events import FileSystemEventHandler
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from unified_pipeline import UnifiedCompressionPipeline
+from v4z_compressor import V4ZCompressor
 
 
 class ConversationWatcher(FileSystemEventHandler):
@@ -72,8 +72,8 @@ class ConversationWatcher(FileSystemEventHandler):
         # Track file hashes to avoid recompressing unchanged files
         self.file_hashes: Dict[str, str] = {}
 
-        # Compression pipeline
-        self.pipeline = UnifiedCompressionPipeline()
+        # V4Z Compressor
+        self.compressor = V4ZCompressor()
 
         # Load existing index
         self.index = self._load_index()
@@ -171,18 +171,13 @@ class ConversationWatcher(FileSystemEventHandler):
             session_id = f"session_{file_path.stem}"
             project_id = self._infer_project(file_path)
 
-            # Compress
-            result = self.pipeline.compress(
-                content,
-                level="balanced",
-                session_id=session_id,
-                project_id=project_id
-            )
+            # Compress with V4Z
+            result = self.compressor.compress(content, add_header=True)
 
             # Save compressed output
-            output_file = self.compressed_dir / f"{file_path.stem}.slim.indexed"
+            output_file = self.compressed_dir / f"{file_path.stem}.v4z"
             with open(output_file, 'w') as f:
-                f.write(result.compressed_content)
+                f.write(result.compressed_base64)
 
             # Extract title
             title = self._extract_title(content)
@@ -193,17 +188,12 @@ class ConversationWatcher(FileSystemEventHandler):
                 "compressed_file": str(output_file),
                 "title": title,
                 "original_tokens": result.original_tokens,
-                "compressed_tokens": result.final_tokens,
-                "reduction_percent": result.total_reduction,
+                "compressed_tokens": result.compressed_tokens,
+                "reduction_percent": result.token_reduction_percent,
                 "session_id": session_id,
                 "project_id": project_id,
                 "compressed_at": datetime.now().isoformat(),
-                "auto_compressed": True,
-                "indexes": {
-                    "hot": f"{session_id}_hot.json",
-                    "warm": f"{project_id}_warm.json",
-                    "cold": "global_cold.json"
-                }
+                "auto_compressed": True
             }
 
             # Update index
@@ -212,7 +202,7 @@ class ConversationWatcher(FileSystemEventHandler):
             # Mark as compressed
             self.last_compressed[str(file_path)] = time.time()
 
-            print(f"   ✅ {result.original_tokens:,} → {result.final_tokens:,} tokens ({result.total_reduction}% reduction)", flush=True)
+            print(f"   ✅ {result.original_tokens:,} → {result.compressed_tokens:,} tokens ({result.token_reduction_percent}% reduction)", flush=True)
             print(f"   💾 Saved to: {output_file.name}", flush=True)
             print(flush=True)
 

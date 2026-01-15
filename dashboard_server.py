@@ -1750,27 +1750,42 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                         print(f"SLIM decompression failed: {e}")
                         traceback.print_exc()
 
-                # Try with common extensions
-                for ext in ['', '.indexed', '.slim', '.slim.indexed']:
+                # Try with common extensions (V4Z first, then old SLIM formats)
+                for ext in ['.v4z', '', '.indexed', '.slim', '.slim.indexed']:
                     test_path = conv_dir / f'{handoff_id}{ext}'
                     print(f"[_decompress_handoff] Trying with extension '{ext}': {test_path}")
                     if test_path.exists():
                         print(f"[_decompress_handoff] Found with extension '{ext}'!")
                         try:
-                            from slim_converter import SlimConverter
-                            converter = SlimConverter()
-                            print(f"[_decompress_handoff] SlimConverter loaded")
+                            # V4Z format
+                            if ext == '.v4z':
+                                from v4z_compressor import V4ZCompressor
+                                compressor = V4ZCompressor()
+                                print(f"[_decompress_handoff] V4ZCompressor loaded")
 
-                            with open(test_path, 'r', encoding='utf-8') as f:
-                                slim_content = f.read()
-                            print(f"[_decompress_handoff] Read {len(slim_content)} bytes")
+                                with open(test_path, 'r', encoding='utf-8') as f:
+                                    compressed_content = f.read()
+                                print(f"[_decompress_handoff] Read {len(compressed_content)} bytes")
 
-                            result = converter.slim_to_jsonl(slim_content)
-                            print(f"[_decompress_handoff] Conversion successful, {len(result)} bytes")
-                            return result
+                                result = compressor.decompress(compressed_content)
+                                print(f"[_decompress_handoff] Decompression successful, {len(result)} bytes")
+                                return result
+                            # SLIM format
+                            else:
+                                from slim_converter import SlimConverter
+                                converter = SlimConverter()
+                                print(f"[_decompress_handoff] SlimConverter loaded")
+
+                                with open(test_path, 'r', encoding='utf-8') as f:
+                                    slim_content = f.read()
+                                print(f"[_decompress_handoff] Read {len(slim_content)} bytes")
+
+                                result = converter.slim_to_jsonl(slim_content)
+                                print(f"[_decompress_handoff] Conversion successful, {len(result)} bytes")
+                                return result
                         except Exception as e:
                             import traceback
-                            print(f"SLIM decompression failed: {e}")
+                            print(f"Decompression failed: {e}")
                             traceback.print_exc()
 
             print(f"[_decompress_handoff] Failed to find handoff: {handoff_id}")
@@ -2079,29 +2094,49 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                         self.serve_json({'ok': False, 'error': f'SLIM decompression failed: {str(e)}'}, status=500)
                         return
 
-                # Try with common extensions
-                for ext in ['', '.indexed', '.slim', '.slim.indexed']:
+                # Try with common extensions (V4Z first, then old SLIM formats)
+                for ext in ['.v4z', '', '.indexed', '.slim', '.slim.indexed']:
                     test_path = conv_dir / f'{handoff_id}{ext}'
                     if test_path.exists():
                         try:
-                            from slim_converter import SlimConverter
-                            converter = SlimConverter()
+                            # V4Z format
+                            if ext == '.v4z':
+                                from v4z_compressor import V4ZCompressor
+                                compressor = V4ZCompressor()
 
-                            with open(test_path, 'r', encoding='utf-8') as f:
-                                slim_content = f.read()
+                                with open(test_path, 'r', encoding='utf-8') as f:
+                                    compressed_content = f.read()
 
-                            jsonl_content = converter.slim_to_jsonl(slim_content)
+                                jsonl_content = compressor.decompress(compressed_content)
 
-                            self.serve_json({
-                                'ok': True,
-                                'content': jsonl_content,
-                                'handoff_id': handoff_id,
-                                'source': 'conversation_library',
-                                'format': 'slim'
-                            })
-                            return
+                                self.serve_json({
+                                    'ok': True,
+                                    'content': jsonl_content,
+                                    'handoff_id': handoff_id,
+                                    'source': 'conversation_library',
+                                    'format': 'v4z'
+                                })
+                                return
+                            # SLIM format
+                            else:
+                                from slim_converter import SlimConverter
+                                converter = SlimConverter()
+
+                                with open(test_path, 'r', encoding='utf-8') as f:
+                                    slim_content = f.read()
+
+                                jsonl_content = converter.slim_to_jsonl(slim_content)
+
+                                self.serve_json({
+                                    'ok': True,
+                                    'content': jsonl_content,
+                                    'handoff_id': handoff_id,
+                                    'source': 'conversation_library',
+                                    'format': 'slim'
+                                })
+                                return
                         except Exception as e:
-                            self.serve_json({'ok': False, 'error': f'SLIM decompression failed: {str(e)}'}, status=500)
+                            self.serve_json({'ok': False, 'error': f'Decompression failed: {str(e)}'}, status=500)
                             return
 
             self.serve_json({'ok': False, 'error': 'Handoff not found'}, status=404)

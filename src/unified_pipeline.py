@@ -3,13 +3,11 @@
 Unified Token Compression Pipeline
 
 Combines multiple compression strategies:
-1. SLIM Format - Schema-once conversation format (22-40% token reduction)
-2. Index Extraction - Pattern deduplication (3-20% additional)
-3. De-tokenization - Multi-token → single-token symbols (10-20% additional) [OPTIONAL]
-4. Vault Deduplication - Pattern → $token references (15-30% additional) [OPTIONAL]
-5. V4 Dash-Codex - Ultra-compression with dash codes (20-30% additional) [OPTIONAL]
+1. V4Z Compression - SLIM vocabulary + Zstandard (75-85% token reduction)
+2. Index Extraction - Pattern deduplication (3-5% additional) [OPTIONAL]
+3. De-tokenization - Multi-token → single-token symbols (5-10% additional) [OPTIONAL]
 
-Total Expected Reduction: 30-70% depending on level
+Total Expected Reduction: 75-90% depending on level
 """
 
 import json
@@ -25,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from slim_converter import SlimConverter
 from index_extractor import IndexExtractor
 from token_analyzer import TokenAnalyzer
+from v4z_compressor import V4ZCompressor
 
 
 @dataclass
@@ -57,9 +56,9 @@ class UnifiedCompressionPipeline:
     Multi-stage token reduction pipeline.
 
     Compression Levels:
-    - "minimal": SLIM only (fast, ~30% reduction)
-    - "balanced": SLIM + Index (moderate, ~40-50% reduction)
-    - "maximum": SLIM + Index + CairnESL + V4 (slow, ~60-70% reduction)
+    - "minimal": V4Z only (fast, ~75-85% reduction)
+    - "balanced": V4Z + Index (moderate, ~80% reduction)
+    - "maximum": V4Z + Index + CairnESL (slow, ~85% reduction)
     """
 
     def __init__(self, level: str = "balanced"):
@@ -76,6 +75,7 @@ class UnifiedCompressionPipeline:
         self.slim_converter = SlimConverter()
         self.index_extractor = IndexExtractor()
         self.token_analyzer = TokenAnalyzer()
+        self.v4z_compressor = V4ZCompressor()  # Always available
 
         # Optional integrations
         self.cairn_esl = None
@@ -161,12 +161,12 @@ class UnifiedCompressionPipeline:
         current_tokens = original_tokens
         indexes_created = {}
 
-        # Stage 1: SLIM Format (always runs)
-        print("\n📦 Stage 1: SLIM Format Conversion")
-        slim_result = self._stage_slim(current_content, current_tokens)
-        stages.append(slim_result)
-        current_content = slim_result.content
-        current_tokens = slim_result.tokens_after
+        # Stage 1: V4Z Compression (always runs)
+        print("\n📦 Stage 1: V4Z Compression (SLIM + Zstandard)")
+        v4z_result = self._stage_v4z(current_content, current_tokens)
+        stages.append(v4z_result)
+        current_content = v4z_result.content
+        current_tokens = v4z_result.tokens_after
 
         # Stage 2: Index Extraction (balanced and maximum levels)
         if self.level in ["balanced", "maximum"]:
@@ -208,9 +208,9 @@ class UnifiedCompressionPipeline:
 
         # Write output
         output_suffix = {
-            "minimal": ".slim",
-            "balanced": ".slim.indexed",
-            "maximum": ".v4.slim.fsl"
+            "minimal": ".v4z",
+            "balanced": ".v4z",
+            "maximum": ".v4z"
         }
         output_path = output_dir / f"{input_path.stem}{output_suffix[self.level]}"
 
@@ -239,23 +239,24 @@ class UnifiedCompressionPipeline:
 
         return result
 
-    def _stage_slim(self, content: str, current_tokens: int) -> CompressionStageResult:
-        """Stage 1: Convert to SLIM format."""
-        # Convert to SLIM
-        slim_content = self.slim_converter.jsonl_to_slim(content)
+    def _stage_v4z(self, content: str, current_tokens: int) -> CompressionStageResult:
+        """Stage 1: Compress with V4Z (SLIM + Zstandard)."""
+        # Compress with V4Z
+        result = self.v4z_compressor.compress(content, add_header=True)
 
-        # Count tokens
-        slim_tokens = self.token_analyzer.count_tokens(slim_content)
-        reduction = round((1 - slim_tokens / current_tokens) * 100, 1) if current_tokens > 0 else 0
+        # V4Z result includes token estimation
+        v4z_tokens = result.compressed_tokens
+        reduction = result.token_reduction_percent
 
-        print(f"   Tokens after SLIM: {slim_tokens:,} ({reduction}% reduction)")
+        print(f"   Tokens after V4Z: {v4z_tokens:,} ({reduction}% reduction)")
+        print(f"   Size: {result.original_size_bytes:,} → {result.compressed_size_bytes:,} bytes")
 
         return CompressionStageResult(
-            stage_name="SLIM Format",
+            stage_name="V4Z Compression",
             tokens_before=current_tokens,
-            tokens_after=slim_tokens,
+            tokens_after=v4z_tokens,
             reduction_percent=reduction,
-            content=slim_content
+            content=result.compressed_base64
         )
 
     def _stage_index(
