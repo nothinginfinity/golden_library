@@ -1789,19 +1789,66 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 except Exception as e:
                     print(f"Warning: Failed to check golden library: {e}")
 
-            # Check conversation library (stub for now)
-            stats = self.get_compression_stats()
-            conversations = stats.get('conversations', [])
+            # Check conversation library
+            # Try projects and todos subdirectories
+            conv_compressed_dirs = [
+                COMPRESSED_DIR / 'projects',
+                COMPRESSED_DIR / 'todos'
+            ]
 
-            for conv in conversations:
-                if conv.get('id') == handoff_id:
-                    # Conversation library decompression not implemented yet
-                    self.serve_json({
-                        'ok': False,
-                        'error': 'Conversation library decompression not yet implemented',
-                        'message': 'Only golden library handoffs can be decompressed currently'
-                    }, status=501)
-                    return
+            for conv_dir in conv_compressed_dirs:
+                if not conv_dir.exists():
+                    continue
+
+                # Try exact match
+                slim_path = conv_dir / handoff_id
+                if slim_path.exists():
+                    try:
+                        from slim_converter import SlimConverter
+                        converter = SlimConverter()
+
+                        with open(slim_path, 'r', encoding='utf-8') as f:
+                            slim_content = f.read()
+
+                        # Convert SLIM to JSONL
+                        jsonl_content = converter.slim_to_jsonl(slim_content)
+
+                        self.serve_json({
+                            'ok': True,
+                            'content': jsonl_content,
+                            'handoff_id': handoff_id,
+                            'source': 'conversation_library',
+                            'format': 'slim'
+                        })
+                        return
+                    except Exception as e:
+                        self.serve_json({'ok': False, 'error': f'SLIM decompression failed: {str(e)}'}, status=500)
+                        return
+
+                # Try with common extensions
+                for ext in ['', '.indexed', '.slim', '.slim.indexed']:
+                    test_path = conv_dir / f'{handoff_id}{ext}'
+                    if test_path.exists():
+                        try:
+                            from slim_converter import SlimConverter
+                            converter = SlimConverter()
+
+                            with open(test_path, 'r', encoding='utf-8') as f:
+                                slim_content = f.read()
+
+                            jsonl_content = converter.slim_to_jsonl(slim_content)
+
+                            self.serve_json({
+                                'ok': True,
+                                'content': jsonl_content,
+                                'handoff_id': handoff_id,
+                                'source': 'conversation_library',
+                                'format': 'slim'
+                            })
+                            return
+                        except Exception as e:
+                            self.serve_json({'ok': False, 'error': f'SLIM decompression failed: {str(e)}'}, status=500)
+                            return
 
             self.serve_json({'ok': False, 'error': 'Handoff not found'}, status=404)
         except Exception as e:
