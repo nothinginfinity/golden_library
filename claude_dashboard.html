@@ -3563,62 +3563,117 @@
       const container = document.getElementById('canvas-3d');
       if (!container) return;
 
-      // Scene setup
-      scene3D = new THREE.Scene();
-      scene3D.fog = new THREE.Fog(0x0f172a, 50, 200);
+      try {
+        // Scene setup
+        scene3D = new THREE.Scene();
+        scene3D.fog = new THREE.Fog(0x0f172a, 50, 200);
 
-      // Camera
-      const containerRect = container.getBoundingClientRect();
-      camera3D = new THREE.PerspectiveCamera(
-        60,
-        containerRect.width / containerRect.height,
-        0.1,
-        1000
-      );
-      camera3D.position.set(0, 30, 80);
+        // Camera
+        const containerRect = container.getBoundingClientRect();
+        camera3D = new THREE.PerspectiveCamera(
+          60,
+          containerRect.width / containerRect.height,
+          0.1,
+          1000
+        );
+        camera3D.position.set(0, 30, 80);
 
-      // Renderer
-      renderer3D = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer3D.setSize(containerRect.width, containerRect.height);
-      renderer3D.setPixelRatio(window.devicePixelRatio);
-      container.appendChild(renderer3D.domElement);
+        // Renderer with WebGL error handling
+        try {
+          renderer3D = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        } catch (e) {
+          console.error('WebGL initialization failed:', e);
+          showWebGLError(container);
+          return;
+        }
 
-      // Controls
-      controls3D = new OrbitControls(camera3D, renderer3D.domElement);
-      controls3D.enableDamping = true;
-      controls3D.dampingFactor = 0.05;
-      controls3D.minDistance = 20;
-      controls3D.maxDistance = 200;
+        // Check if WebGL context was actually created
+        const gl = renderer3D.getContext();
+        if (!gl) {
+          console.error('WebGL context is null');
+          showWebGLError(container);
+          return;
+        }
 
-      // Lighting
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-      scene3D.add(ambientLight);
+        renderer3D.setSize(containerRect.width, containerRect.height);
+        renderer3D.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer3D.domElement);
 
-      const pointLight1 = new THREE.PointLight(0xf7b731, 1, 100);
-      pointLight1.position.set(50, 50, 50);
-      scene3D.add(pointLight1);
+        // Controls
+        controls3D = new OrbitControls(camera3D, renderer3D.domElement);
+        controls3D.enableDamping = true;
+        controls3D.dampingFactor = 0.05;
+        controls3D.minDistance = 20;
+        controls3D.maxDistance = 200;
 
-      const pointLight2 = new THREE.PointLight(0x6366f1, 0.8, 100);
-      pointLight2.position.set(-50, -50, -50);
-      scene3D.add(pointLight2);
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene3D.add(ambientLight);
 
-      // Background stars
-      createStars3D();
+        const pointLight1 = new THREE.PointLight(0xf7b731, 1, 100);
+        pointLight1.position.set(50, 50, 50);
+        scene3D.add(pointLight1);
 
-      // Event listeners
-      window.addEventListener('resize', onWindowResize3D);
-      renderer3D.domElement.addEventListener('click', onNodeClick3D);
+        const pointLight2 = new THREE.PointLight(0x6366f1, 0.8, 100);
+        pointLight2.position.set(-50, -50, -50);
+        scene3D.add(pointLight2);
 
-      initialized3D = true;
+        // Background stars
+        createStars3D();
 
-      // Load handoff data
-      loadHandoffs3D();
+        // Event listeners
+        window.addEventListener('resize', onWindowResize3D);
+        renderer3D.domElement.addEventListener('click', onNodeClick3D);
 
-      // Connect to WebSocket for real-time updates
-      connectWebSocket3D();
+        initialized3D = true;
 
-      // Start animation
-      animate3D();
+        // Load handoff data
+        loadHandoffs3D();
+
+        // Connect to WebSocket for real-time updates
+        connectWebSocket3D();
+
+        // Start animation
+        animate3D();
+
+      } catch (error) {
+        console.error('3D viewer initialization failed:', error);
+        showWebGLError(container);
+      }
+    }
+
+    function showWebGLError(container) {
+      container.innerHTML = `
+        <div style="
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          padding: 40px;
+          text-align: center;
+          color: #94a3b8;
+          background: rgba(15, 23, 42, 0.9);
+        ">
+          <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+          <h2 style="color: #ef4444; margin-bottom: 16px; font-size: 1.5rem;">WebGL Not Available</h2>
+          <p style="margin-bottom: 12px; max-width: 500px; line-height: 1.6;">
+            The 3D viewer requires WebGL, which is not available in your browser.
+          </p>
+          <p style="margin-bottom: 20px; max-width: 500px; line-height: 1.6; font-size: 0.9rem;">
+            <strong>Possible solutions:</strong>
+          </p>
+          <ul style="text-align: left; max-width: 500px; line-height: 1.8; font-size: 0.9rem;">
+            <li>Enable WebGL in your browser settings</li>
+            <li>Update your graphics drivers</li>
+            <li>Try a different browser (Chrome, Firefox, Edge)</li>
+            <li>Check if hardware acceleration is enabled</li>
+          </ul>
+          <p style="margin-top: 20px; font-size: 0.85rem; color: #64748b;">
+            Other dashboard features (Search, Config, Patterns) are still available.
+          </p>
+        </div>
+      `;
     }
 
     function createStars3D() {
@@ -4300,12 +4355,18 @@
         }
       });
 
-      controls3D.update();
-      renderer3D.render(scene3D, camera3D);
+      // Safety checks before rendering
+      if (controls3D) {
+        controls3D.update();
+      }
+
+      if (renderer3D && scene3D && camera3D) {
+        renderer3D.render(scene3D, camera3D);
+      }
     }
 
     function onWindowResize3D() {
-      if (!initialized3D) return;
+      if (!initialized3D || !renderer3D || !camera3D) return;
 
       const container = document.getElementById('canvas-3d');
       if (!container) return;
