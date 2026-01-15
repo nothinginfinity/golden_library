@@ -17087,6 +17087,21 @@
       "compressed_tokens": 369,
       "format": "v4z",
       "compression_level": 15
+    },
+    {
+      "handoff_id": "ac8fbb6cae2d",
+      "created": "2026-01-14T18:55:08.745372",
+      "source_file": "CURRENT_PLAN.md",
+      "compressed_file": ".golden_library/compressed/ac8fbb6cae2d.v4z",
+      "phase": "unknown",
+      "phase_name": "",
+      "original_size_bytes": 10882,
+      "compressed_size_bytes": 5727,
+      "reduction_percent": 47.4,
+      "original_tokens": 2658,
+      "compressed_tokens": 1718,
+      "format": "v4z",
+      "compression_level": 15
     }
   ],
   "last_updated": "2026-01-14T18:01:46.949916"
