@@ -6473,17 +6473,22 @@
     let selectedHandoffA = null;
     let selectedHandoffB = null;
 
-    // Load handoffs for comparison (golden library only - SLIM JSONL format is broken)
+    // Load handoffs for comparison (all libraries - V4Z migration complete)
     async function loadComparisonHandoffs() {
       if (comparisonHandoffs.length > 0) return; // Already loaded
 
       try {
-        const response = await fetch('/api/golden/handoffs');
+        const response = await fetch('/api/3d/handoffs');
         const data = await response.json();
 
         if (data.ok && data.handoffs) {
           comparisonHandoffs = data.handoffs;
-          console.log(`Loaded ${comparisonHandoffs.length} golden library handoffs for comparison`);
+          console.log(`Loaded ${comparisonHandoffs.length} handoffs for comparison`);
+          console.log('Formats:', data.handoffs.reduce((acc, h) => {
+            const fmt = h.compression_format || 'unknown';
+            acc[fmt] = (acc[fmt] || 0) + 1;
+            return acc;
+          }, {}));
         }
       } catch (error) {
         console.error('Failed to load handoffs for comparison:', error);
