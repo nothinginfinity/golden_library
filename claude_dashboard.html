@@ -1092,6 +1092,91 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
 
+    /* ========================================================================= */
+    /* TIMELINE EXPORT PANEL */
+    /* ========================================================================= */
+
+    .timeline-export-3d {
+      display: none;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+
+    .timeline-export-3d.active {
+      display: block;
+    }
+
+    .timeline-export-3d h4 {
+      color: #f59e0b;
+      margin-bottom: 12px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .export-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .export-btn {
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      color: #a5b4fc;
+      padding: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all 0.2s;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    .export-btn:hover {
+      background: rgba(99, 102, 241, 0.3);
+      border-color: rgba(99, 102, 241, 0.6);
+      transform: translateY(-1px);
+    }
+
+    .export-btn:active {
+      transform: translateY(0);
+    }
+
+    .export-btn-primary {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #6ee7b7;
+    }
+
+    .export-btn-primary:hover {
+      background: rgba(16, 185, 129, 0.3);
+      border-color: rgba(16, 185, 129, 0.6);
+    }
+
+    .export-btn-secondary {
+      background: rgba(245, 158, 11, 0.2);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: #fbbf24;
+    }
+
+    .export-btn-secondary:hover {
+      background: rgba(245, 158, 11, 0.3);
+      border-color: rgba(245, 158, 11, 0.6);
+    }
+
+    .export-info {
+      font-size: 9px;
+      color: #64748b;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(100, 116, 139, 0.2);
+      text-align: center;
+    }
+
     .viewer-footer-3d {
       padding: 10px 15px;
       border-top: 1px solid #334155;
@@ -2115,6 +2200,30 @@
 
             <!-- Tooltip for charts -->
             <div id="trends-tooltip" class="trends-tooltip" style="display: none;"></div>
+          </div>
+
+          <!-- Timeline Export (shown only in timeline mode) -->
+          <div id="timeline-export-panel" class="timeline-export-3d">
+            <h4>📦 Export</h4>
+
+            <div class="export-buttons">
+              <button class="export-btn export-btn-primary" onclick="exportTimelinePNG()">
+                📸 PNG Snapshot
+              </button>
+              <button class="export-btn export-btn-secondary" onclick="exportTimelineStatsJSON()">
+                📊 Stats (JSON)
+              </button>
+              <button class="export-btn export-btn-secondary" onclick="exportTimelineStatsCSV()">
+                📋 Stats (CSV)
+              </button>
+              <button class="export-btn" onclick="exportCurrentView()">
+                💾 Current View
+              </button>
+            </div>
+
+            <div class="export-info">
+              Exports respect active filters • High-res PNG • Timestamped files
+            </div>
           </div>
 
           <div class="viewer-footer-3d">
@@ -3665,14 +3774,16 @@
       });
       event.target.classList.add('active');
 
-      // Show/hide timeline controls, filters, and trends
+      // Show/hide timeline controls, filters, trends, and export
       const timelinePanel = document.getElementById('timeline-controls-panel');
       const filtersPanel = document.getElementById('timeline-filters-panel');
       const trendsPanel = document.getElementById('timeline-trends-panel');
+      const exportPanel = document.getElementById('timeline-export-panel');
       if (layout === 'timeline') {
         timelinePanel.classList.add('active');
         filtersPanel.classList.add('active');
         trendsPanel.classList.add('active');
+        exportPanel.classList.add('active');
         initializeTimeline();
         initializeTimelineFilters();
         initializeTimelineTrends();
@@ -3680,6 +3791,7 @@
         timelinePanel.classList.remove('active');
         filtersPanel.classList.remove('active');
         trendsPanel.classList.remove('active');
+        exportPanel.classList.remove('active');
         stopTimelinePlayback();
       }
 
@@ -5557,6 +5669,270 @@
     window.clearTimelineFilters = clearTimelineFilters;
     window.applyFilterPreset = applyFilterPreset;
     window.initializeTimelineTrends = initializeTimelineTrends;
+
+    /* ========================================================================= */
+    /* TIMELINE EXPORT - PRIORITY 4 */
+    /* ========================================================================= */
+
+    function downloadFile(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function getTimestamp() {
+      const now = new Date();
+      return now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    }
+
+    function exportTimelinePNG() {
+      if (!renderer3D) {
+        showToast3D('3D renderer not initialized', 'error');
+        return;
+      }
+
+      try {
+        // Render the current frame to ensure it's up to date
+        renderer3D.render(scene3D, camera3D);
+
+        // Get the canvas as data URL (high-res PNG)
+        const dataURL = renderer3D.domElement.toDataURL('image/png');
+
+        // Convert data URL to blob
+        fetch(dataURL)
+          .then(res => res.blob())
+          .then(blob => {
+            const filename = `golden-library-timeline-${getTimestamp()}.png`;
+            downloadFile(blob, filename);
+            showToast3D(`Exported PNG: ${filename}`, 'success');
+          })
+          .catch(err => {
+            console.error('PNG export error:', err);
+            showToast3D('PNG export failed', 'error');
+          });
+      } catch (err) {
+        console.error('PNG export error:', err);
+        showToast3D('PNG export failed', 'error');
+      }
+    }
+
+    function getFilteredHandoffs() {
+      // Get visible handoffs based on current filters
+      return nodes3D.filter(node => {
+        let visible = true;
+
+        // Date range filter
+        if (timelineFilters.dateStart) {
+          const startDate = new Date(timelineFilters.dateStart).getTime();
+          const nodeDate = new Date(node.created).getTime();
+          if (nodeDate < startDate) visible = false;
+        }
+
+        if (timelineFilters.dateEnd) {
+          const endDate = new Date(timelineFilters.dateEnd).getTime() + 24 * 60 * 60 * 1000;
+          const nodeDate = new Date(node.created).getTime();
+          if (nodeDate > endDate) visible = false;
+        }
+
+        // Category filter
+        if (!timelineFilters.categories.includes(node.category)) {
+          visible = false;
+        }
+
+        // Compression filter
+        const ratio = node.compression_ratio || 0;
+        if (ratio < timelineFilters.compressionMin) {
+          visible = false;
+        }
+
+        return visible;
+      });
+    }
+
+    function exportTimelineStatsJSON() {
+      try {
+        const filteredHandoffs = getFilteredHandoffs();
+
+        // Calculate stats
+        const compressionRatios = filteredHandoffs.map(n => n.compression_ratio || 0);
+        const avgCompression = compressionRatios.length > 0
+          ? compressionRatios.reduce((a, b) => a + b, 0) / compressionRatios.length
+          : 0;
+        const bestRatio = compressionRatios.length > 0 ? Math.max(...compressionRatios) : 0;
+        const worstRatio = compressionRatios.length > 0 ? Math.min(...compressionRatios) : 0;
+
+        const totalSaved = filteredHandoffs.reduce((sum, n) => {
+          const original = n.original_size || 0;
+          const compressed = n.compressed_size || 0;
+          return sum + (original - compressed);
+        }, 0);
+
+        const totalOriginal = filteredHandoffs.reduce((sum, n) => sum + (n.original_size || 0), 0);
+        const totalCompressed = filteredHandoffs.reduce((sum, n) => sum + (n.compressed_size || 0), 0);
+
+        const planCount = filteredHandoffs.filter(n => n.category === 'plan').length;
+        const conversationCount = filteredHandoffs.filter(n => n.category === 'conversation').length;
+
+        const exportData = {
+          metadata: {
+            exported_at: new Date().toISOString(),
+            total_handoffs: filteredHandoffs.length,
+            filters_applied: {
+              date_start: timelineFilters.dateStart,
+              date_end: timelineFilters.dateEnd,
+              categories: timelineFilters.categories,
+              compression_min: timelineFilters.compressionMin,
+              preset: timelineFilters.activePreset
+            }
+          },
+          statistics: {
+            compression: {
+              average_ratio: parseFloat(avgCompression.toFixed(2)),
+              best_ratio: parseFloat(bestRatio.toFixed(2)),
+              worst_ratio: parseFloat(worstRatio.toFixed(2)),
+              total_bytes_saved: totalSaved,
+              total_original_bytes: totalOriginal,
+              total_compressed_bytes: totalCompressed
+            },
+            categories: {
+              plans: planCount,
+              conversations: conversationCount
+            },
+            formats: {
+              slim_only: filteredHandoffs.filter(n => n.compression_format === 'slim_only').length,
+              v4z: filteredHandoffs.filter(n => n.compression_format === 'v4z').length,
+              slim_v4z: filteredHandoffs.filter(n => n.compression_format === 'slim_v4z').length
+            }
+          },
+          handoffs: filteredHandoffs.map(node => ({
+            id: node.id,
+            filename: node.label,
+            category: node.category,
+            compression_format: node.compression_format,
+            compression_ratio: node.compression_ratio,
+            original_size: node.original_size,
+            compressed_size: node.compressed_size,
+            bytes_saved: (node.original_size || 0) - (node.compressed_size || 0),
+            created: node.created,
+            project_id: node.project_id,
+            session_id: node.session_id
+          }))
+        };
+
+        const jsonString = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const filename = `golden-library-stats-${getTimestamp()}.json`;
+
+        downloadFile(blob, filename);
+        showToast3D(`Exported JSON: ${filename}`, 'success');
+      } catch (err) {
+        console.error('JSON export error:', err);
+        showToast3D('JSON export failed', 'error');
+      }
+    }
+
+    function exportTimelineStatsCSV() {
+      try {
+        const filteredHandoffs = getFilteredHandoffs();
+
+        // CSV header
+        const headers = [
+          'ID',
+          'Filename',
+          'Category',
+          'Format',
+          'Compression %',
+          'Original Bytes',
+          'Compressed Bytes',
+          'Bytes Saved',
+          'Created',
+          'Project',
+          'Session'
+        ];
+
+        // CSV rows
+        const rows = filteredHandoffs.map(node => [
+          node.id,
+          node.label,
+          node.category,
+          node.compression_format,
+          (node.compression_ratio || 0).toFixed(2),
+          node.original_size || 0,
+          node.compressed_size || 0,
+          (node.original_size || 0) - (node.compressed_size || 0),
+          node.created,
+          node.project_id || '',
+          node.session_id || ''
+        ]);
+
+        // Build CSV string
+        const csvLines = [headers, ...rows];
+        const csvString = csvLines.map(row =>
+          row.map(cell => {
+            // Escape quotes and wrap in quotes if contains comma, quote, or newline
+            const cellStr = String(cell);
+            if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+              return `"${cellStr.replace(/"/g, '""')}"`;
+            }
+            return cellStr;
+          }).join(',')
+        ).join('\n');
+
+        const blob = new Blob([csvString], { type: 'text/csv' });
+        const filename = `golden-library-stats-${getTimestamp()}.csv`;
+
+        downloadFile(blob, filename);
+        showToast3D(`Exported CSV: ${filename} (${filteredHandoffs.length} rows)`, 'success');
+      } catch (err) {
+        console.error('CSV export error:', err);
+        showToast3D('CSV export failed', 'error');
+      }
+    }
+
+    function exportCurrentView() {
+      try {
+        const exportData = {
+          metadata: {
+            exported_at: new Date().toISOString(),
+            layout: currentLayout3D,
+            camera_position: {
+              x: camera3D.position.x,
+              y: camera3D.position.y,
+              z: camera3D.position.z
+            }
+          },
+          timeline_state: currentLayout3D === 'timeline' ? {
+            playing: timelineState.isPlaying,
+            speed: timelineState.speed,
+            current_time: timelineState.currentTime,
+            visible_count: document.getElementById('timeline-visible-count')?.textContent || '0'
+          } : null,
+          filters: timelineFilters,
+          visible_handoffs: getFilteredHandoffs().map(n => n.id)
+        };
+
+        const jsonString = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const filename = `golden-library-view-${getTimestamp()}.json`;
+
+        downloadFile(blob, filename);
+        showToast3D(`Exported current view: ${filename}`, 'success');
+      } catch (err) {
+        console.error('View export error:', err);
+        showToast3D('View export failed', 'error');
+      }
+    }
+
+    // Make export functions globally accessible
+    window.exportTimelinePNG = exportTimelinePNG;
+    window.exportTimelineStatsJSON = exportTimelineStatsJSON;
+    window.exportTimelineStatsCSV = exportTimelineStatsCSV;
+    window.exportCurrentView = exportCurrentView;
 
   </script>
 </body>
