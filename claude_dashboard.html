@@ -761,6 +761,202 @@
       border-left: 2px solid #f7b731;
     }
 
+    /* Timeline Filters */
+    .timeline-filters-3d {
+      display: none;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+
+    .timeline-filters-3d.active {
+      display: block;
+    }
+
+    .timeline-filters-3d h4 {
+      color: #6366f1;
+      margin-bottom: 12px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .filter-row {
+      margin-bottom: 12px;
+    }
+
+    .filter-label {
+      font-size: 10px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+      display: block;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .filter-date-inputs {
+      display: flex;
+      gap: 8px;
+    }
+
+    .filter-date-input {
+      flex: 1;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 11px;
+    }
+
+    .filter-date-input:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+
+    .filter-checkboxes {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .filter-checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #94a3b8;
+      cursor: pointer;
+    }
+
+    .filter-checkbox-item input[type="checkbox"] {
+      cursor: pointer;
+      accent-color: #10b981;
+    }
+
+    .filter-checkbox-item:has(input:checked) {
+      color: #10b981;
+    }
+
+    .filter-slider {
+      width: 100%;
+      height: 6px;
+      background: rgba(30, 41, 59, 0.8);
+      border-radius: 3px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .filter-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #6366f1;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    .filter-slider::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: #6366f1;
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+    }
+
+    .filter-range-display {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .filter-presets {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .filter-preset-btn {
+      flex: 1;
+      min-width: 80px;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 10px;
+      transition: all 0.2s;
+    }
+
+    .filter-preset-btn:hover {
+      border-color: #6366f1;
+      color: #6366f1;
+    }
+
+    .filter-preset-btn.active {
+      background: #6366f1;
+      color: #fff;
+      border-color: #6366f1;
+    }
+
+    .filter-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #334155;
+    }
+
+    .filter-clear-btn {
+      flex: 1;
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid #ef4444;
+      color: #ef4444;
+      padding: 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all 0.2s;
+    }
+
+    .filter-clear-btn:hover {
+      background: rgba(239, 68, 68, 0.3);
+    }
+
+    .filter-apply-btn {
+      flex: 1;
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid #10b981;
+      color: #10b981;
+      padding: 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all 0.2s;
+    }
+
+    .filter-apply-btn:hover {
+      background: rgba(16, 185, 129, 0.3);
+    }
+
+    .filter-status {
+      font-size: 10px;
+      color: #64748b;
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    .filter-status.active {
+      color: #10b981;
+    }
+
     .viewer-footer-3d {
       padding: 10px 15px;
       border-top: 1px solid #334155;
@@ -1680,6 +1876,69 @@
             <!-- Keyboard Shortcuts Hint -->
             <div class="timeline-shortcuts-hint">
               <strong>Shortcuts:</strong> Space=Play/Pause | ←→=Seek | +-=Speed | Home/End=Start/End
+            </div>
+          </div>
+
+          <!-- Timeline Filters (shown only in timeline mode) -->
+          <div id="timeline-filters-panel" class="timeline-filters-3d">
+            <h4>🔍 Filters</h4>
+
+            <!-- Date Range -->
+            <div class="filter-row">
+              <label class="filter-label">Date Range</label>
+              <div class="filter-date-inputs">
+                <input type="date" id="filter-date-start" class="filter-date-input" placeholder="Start Date">
+                <input type="date" id="filter-date-end" class="filter-date-input" placeholder="End Date">
+              </div>
+            </div>
+
+            <!-- Category Filters -->
+            <div class="filter-row">
+              <label class="filter-label">Categories</label>
+              <div class="filter-checkboxes">
+                <label class="filter-checkbox-item">
+                  <input type="checkbox" id="filter-cat-plan" value="plan" checked>
+                  <span>Plans</span>
+                </label>
+                <label class="filter-checkbox-item">
+                  <input type="checkbox" id="filter-cat-conversation" value="conversation" checked>
+                  <span>Conversations</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Compression Ratio Slider -->
+            <div class="filter-row">
+              <label class="filter-label">Compression Ratio</label>
+              <input type="range" id="filter-compression-min" class="filter-slider" min="0" max="100" value="0">
+              <div class="filter-range-display">
+                <span>Min: <span id="filter-compression-min-value">0</span>%</span>
+                <span>Any ratio</span>
+              </div>
+            </div>
+
+            <!-- Filter Presets -->
+            <div class="filter-row">
+              <label class="filter-label">Quick Presets</label>
+              <div class="filter-presets">
+                <button class="filter-preset-btn" onclick="applyFilterPreset('last7days')">Last 7 Days</button>
+                <button class="filter-preset-btn" onclick="applyFilterPreset('last30days')">Last 30 Days</button>
+                <button class="filter-preset-btn" onclick="applyFilterPreset('last90days')">Last 90 Days</button>
+                <button class="filter-preset-btn" onclick="applyFilterPreset('highcompression')">High Compression</button>
+                <button class="filter-preset-btn" onclick="applyFilterPreset('plansonly')">Plans Only</button>
+                <button class="filter-preset-btn" onclick="applyFilterPreset('conversationsonly')">Conversations Only</button>
+              </div>
+            </div>
+
+            <!-- Filter Actions -->
+            <div class="filter-actions">
+              <button class="filter-clear-btn" onclick="clearTimelineFilters()">Clear All</button>
+              <button class="filter-apply-btn" onclick="applyTimelineFilters()">Apply Filters</button>
+            </div>
+
+            <!-- Filter Status -->
+            <div id="filter-status" class="filter-status">
+              No filters active
             </div>
           </div>
 
@@ -3231,13 +3490,17 @@
       });
       event.target.classList.add('active');
 
-      // Show/hide timeline controls
+      // Show/hide timeline controls and filters
       const timelinePanel = document.getElementById('timeline-controls-panel');
+      const filtersPanel = document.getElementById('timeline-filters-panel');
       if (layout === 'timeline') {
         timelinePanel.classList.add('active');
+        filtersPanel.classList.add('active');
         initializeTimeline();
+        initializeTimelineFilters();
       } else {
         timelinePanel.classList.remove('active');
+        filtersPanel.classList.remove('active');
         stopTimelinePlayback();
       }
 
@@ -4416,6 +4679,300 @@
     // Make functions globally accessible
     window.toggleTimelinePlayback = toggleTimelinePlayback;
     window.setTimelineSpeed = setTimelineSpeed;
+
+    // =========================================================================
+    // TIMELINE FILTERS
+    // =========================================================================
+
+    let timelineFilters = {
+      dateStart: null,
+      dateEnd: null,
+      categories: ['plan', 'conversation'],
+      compressionMin: 0,
+      activePreset: null
+    };
+
+    function initializeTimelineFilters() {
+      if (!nodes3D || nodes3D.length === 0) return;
+
+      // Load saved filters from localStorage
+      const saved = localStorage.getItem('timeline-filters-state');
+      if (saved) {
+        try {
+          const savedFilters = JSON.parse(saved);
+          timelineFilters = { ...timelineFilters, ...savedFilters };
+
+          // Apply saved filters to UI
+          if (timelineFilters.dateStart) {
+            document.getElementById('filter-date-start').value = timelineFilters.dateStart;
+          }
+          if (timelineFilters.dateEnd) {
+            document.getElementById('filter-date-end').value = timelineFilters.dateEnd;
+          }
+          document.getElementById('filter-compression-min').value = timelineFilters.compressionMin;
+          document.getElementById('filter-compression-min-value').textContent = timelineFilters.compressionMin;
+
+          // Update checkboxes
+          document.getElementById('filter-cat-plan').checked = timelineFilters.categories.includes('plan');
+          document.getElementById('filter-cat-conversation').checked = timelineFilters.categories.includes('conversation');
+
+        } catch (e) {
+          console.warn('Failed to load saved filters:', e);
+        }
+      }
+
+      // Set up event listeners
+      document.getElementById('filter-compression-min').addEventListener('input', (e) => {
+        document.getElementById('filter-compression-min-value').textContent = e.target.value;
+      });
+
+      // Calculate and set date range defaults from data
+      const dates = nodes3D.map(n => new Date(n.created));
+      const minDate = new Date(Math.min(...dates));
+      const maxDate = new Date(Math.max(...dates));
+
+      const startInput = document.getElementById('filter-date-start');
+      const endInput = document.getElementById('filter-date-end');
+
+      startInput.min = minDate.toISOString().split('T')[0];
+      startInput.max = maxDate.toISOString().split('T')[0];
+      endInput.min = minDate.toISOString().split('T')[0];
+      endInput.max = maxDate.toISOString().split('T')[0];
+
+      console.log('Filters initialized');
+    }
+
+    function applyTimelineFilters() {
+      // Collect filter values
+      const dateStart = document.getElementById('filter-date-start').value;
+      const dateEnd = document.getElementById('filter-date-end').value;
+      const compressionMin = parseInt(document.getElementById('filter-compression-min').value);
+
+      const categories = [];
+      if (document.getElementById('filter-cat-plan').checked) categories.push('plan');
+      if (document.getElementById('filter-cat-conversation').checked) categories.push('conversation');
+
+      // Update filter state
+      timelineFilters.dateStart = dateStart || null;
+      timelineFilters.dateEnd = dateEnd || null;
+      timelineFilters.compressionMin = compressionMin;
+      timelineFilters.categories = categories;
+      timelineFilters.activePreset = null;  // Clear preset when manually applying
+
+      // Apply filters to nodes
+      filterTimelineNodes();
+
+      // Update UI
+      updateFilterStatus();
+
+      // Save to localStorage
+      saveTimelineFilters();
+
+      // Show toast
+      showToast3D('Filters applied', 'success');
+    }
+
+    function filterTimelineNodes() {
+      if (!nodeObjects3D || nodeObjects3D.length === 0) return;
+
+      let visibleCount = 0;
+      const now = timelineState.currentTime || Date.now();
+
+      nodeObjects3D.forEach(obj => {
+        const node = obj.userData.nodeData;
+        let shouldBeVisible = true;
+
+        // Date range filter
+        if (timelineFilters.dateStart) {
+          const startDate = new Date(timelineFilters.dateStart).getTime();
+          const nodeDate = new Date(node.created).getTime();
+          if (nodeDate < startDate) shouldBeVisible = false;
+        }
+
+        if (timelineFilters.dateEnd) {
+          const endDate = new Date(timelineFilters.dateEnd).getTime() + 24 * 60 * 60 * 1000;  // End of day
+          const nodeDate = new Date(node.created).getTime();
+          if (nodeDate > endDate) shouldBeVisible = false;
+        }
+
+        // Category filter
+        if (!timelineFilters.categories.includes(node.category || 'conversation')) {
+          shouldBeVisible = false;
+        }
+
+        // Compression ratio filter
+        const reduction = node.reduction || 0;
+        if (reduction < timelineFilters.compressionMin) {
+          shouldBeVisible = false;
+        }
+
+        // Timeline playback filter (only show nodes up to current time)
+        if (currentLayout3D === 'timeline' && timelineState.playing) {
+          const nodeDate = new Date(node.created).getTime();
+          if (nodeDate > now) shouldBeVisible = false;
+        }
+
+        // Apply visibility
+        if (shouldBeVisible) {
+          visibleCount++;
+          if (!obj.visible) {
+            obj.visible = true;
+            obj.material.opacity = 0;
+            obj.material.transparent = true;
+
+            // Fade in
+            const fadeIn = () => {
+              if (obj.material.opacity < 1) {
+                obj.material.opacity = Math.min(1, obj.material.opacity + 0.05);
+                requestAnimationFrame(fadeIn);
+              } else {
+                obj.material.transparent = false;
+              }
+            };
+            fadeIn();
+          }
+        } else {
+          obj.visible = false;
+          obj.material.opacity = 0;
+        }
+      });
+
+      // Update visible count
+      document.getElementById('timeline-visible-count').textContent = visibleCount;
+    }
+
+    function updateFilterStatus() {
+      const statusEl = document.getElementById('filter-status');
+      const hasFilters = timelineFilters.dateStart ||
+                        timelineFilters.dateEnd ||
+                        timelineFilters.compressionMin > 0 ||
+                        timelineFilters.categories.length < 2;
+
+      if (hasFilters) {
+        const parts = [];
+        if (timelineFilters.dateStart || timelineFilters.dateEnd) {
+          parts.push('Date range');
+        }
+        if (timelineFilters.categories.length === 1) {
+          parts.push(timelineFilters.categories[0] === 'plan' ? 'Plans only' : 'Conversations only');
+        }
+        if (timelineFilters.compressionMin > 0) {
+          parts.push(`≥${timelineFilters.compressionMin}% compression`);
+        }
+
+        statusEl.textContent = `Active: ${parts.join(', ')}`;
+        statusEl.classList.add('active');
+      } else {
+        statusEl.textContent = 'No filters active';
+        statusEl.classList.remove('active');
+      }
+    }
+
+    function clearTimelineFilters() {
+      // Reset UI
+      document.getElementById('filter-date-start').value = '';
+      document.getElementById('filter-date-end').value = '';
+      document.getElementById('filter-compression-min').value = 0;
+      document.getElementById('filter-compression-min-value').textContent = '0';
+      document.getElementById('filter-cat-plan').checked = true;
+      document.getElementById('filter-cat-conversation').checked = true;
+
+      // Clear all preset buttons
+      document.querySelectorAll('.filter-preset-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+
+      // Reset filter state
+      timelineFilters = {
+        dateStart: null,
+        dateEnd: null,
+        categories: ['plan', 'conversation'],
+        compressionMin: 0,
+        activePreset: null
+      };
+
+      // Reset all nodes to visible
+      nodeObjects3D.forEach(obj => {
+        obj.visible = true;
+        obj.material.opacity = 1;
+        obj.material.transparent = false;
+      });
+
+      // Update UI
+      updateFilterStatus();
+      document.getElementById('timeline-visible-count').textContent = nodes3D.length;
+
+      // Save to localStorage
+      saveTimelineFilters();
+
+      // Show toast
+      showToast3D('Filters cleared', 'success');
+    }
+
+    function applyFilterPreset(presetName) {
+      // Clear existing filters first
+      document.getElementById('filter-date-start').value = '';
+      document.getElementById('filter-date-end').value = '';
+      document.getElementById('filter-compression-min').value = 0;
+      document.getElementById('filter-compression-min-value').textContent = '0';
+      document.getElementById('filter-cat-plan').checked = true;
+      document.getElementById('filter-cat-conversation').checked = true;
+
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+
+      switch (presetName) {
+        case 'last7days':
+          const last7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          document.getElementById('filter-date-start').value = last7.toISOString().split('T')[0];
+          document.getElementById('filter-date-end').value = today;
+          break;
+
+        case 'last30days':
+          const last30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          document.getElementById('filter-date-start').value = last30.toISOString().split('T')[0];
+          document.getElementById('filter-date-end').value = today;
+          break;
+
+        case 'last90days':
+          const last90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+          document.getElementById('filter-date-start').value = last90.toISOString().split('T')[0];
+          document.getElementById('filter-date-end').value = today;
+          break;
+
+        case 'highcompression':
+          document.getElementById('filter-compression-min').value = 50;
+          document.getElementById('filter-compression-min-value').textContent = '50';
+          break;
+
+        case 'plansonly':
+          document.getElementById('filter-cat-conversation').checked = false;
+          break;
+
+        case 'conversationsonly':
+          document.getElementById('filter-cat-plan').checked = false;
+          break;
+      }
+
+      // Update preset button states
+      document.querySelectorAll('.filter-preset-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      event.target.classList.add('active');
+
+      // Apply filters
+      timelineFilters.activePreset = presetName;
+      applyTimelineFilters();
+    }
+
+    function saveTimelineFilters() {
+      localStorage.setItem('timeline-filters-state', JSON.stringify(timelineFilters));
+    }
+
+    // Make functions globally accessible
+    window.applyTimelineFilters = applyTimelineFilters;
+    window.clearTimelineFilters = clearTimelineFilters;
+    window.applyFilterPreset = applyFilterPreset;
 
   </script>
 </body>
