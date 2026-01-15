@@ -865,6 +865,255 @@
         opacity: 0;
       }
     }
+
+    /* Pattern Library Styles */
+    .patterns-header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .patterns-header h2 {
+      font-size: 2rem;
+      color: #a5b4fc;
+      margin-bottom: 8px;
+    }
+
+    .patterns-header p {
+      color: #94a3b8;
+      font-size: 0.95rem;
+    }
+
+    .pattern-search-container {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 32px;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .pattern-search-container input {
+      flex: 1;
+      padding: 12px 20px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 0.95rem;
+    }
+
+    .pattern-search-container input:focus {
+      outline: none;
+      border-color: rgba(99, 102, 241, 0.6);
+    }
+
+    .pattern-search-container button {
+      padding: 12px 24px;
+      background: rgba(99, 102, 241, 0.3);
+      border: 1px solid rgba(99, 102, 241, 0.5);
+      border-radius: 8px;
+      color: #a5b4fc;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .pattern-search-container button:hover {
+      background: rgba(99, 102, 241, 0.5);
+    }
+
+    .pattern-categories-section,
+    .pattern-tags-section {
+      margin-bottom: 32px;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 24px;
+      border-radius: 12px;
+      border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    .pattern-categories-section h3,
+    .pattern-tags-section h3 {
+      color: #a5b4fc;
+      margin-bottom: 16px;
+      font-size: 1.1rem;
+    }
+
+    .tag-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tag {
+      padding: 8px 16px;
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      border-radius: 20px;
+      color: #a5b4fc;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tag:hover {
+      background: rgba(99, 102, 241, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .tag.category-tag {
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .tag .count {
+      opacity: 0.7;
+      margin-left: 6px;
+      font-size: 0.8rem;
+    }
+
+    .pattern-results-section {
+      margin-top: 32px;
+    }
+
+    .pattern-results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    .pattern-results-header h3 {
+      color: #a5b4fc;
+      font-size: 1.2rem;
+    }
+
+    #pattern-results-count {
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    .pattern-results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 20px;
+    }
+
+    .pattern-card {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+      transition: all 0.3s ease;
+    }
+
+    .pattern-card:hover {
+      border-color: rgba(99, 102, 241, 0.6);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .pattern-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 12px;
+    }
+
+    .pattern-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-bottom: 4px;
+    }
+
+    .pattern-category-badge {
+      padding: 4px 12px;
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 12px;
+      font-size: 0.75rem;
+      color: #6ee7b7;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    .pattern-description {
+      color: #94a3b8;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      margin-bottom: 12px;
+      max-height: 60px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pattern-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .pattern-tag {
+      padding: 4px 10px;
+      background: rgba(139, 92, 246, 0.2);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      border-radius: 10px;
+      font-size: 0.75rem;
+      color: #c4b5fd;
+    }
+
+    .pattern-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 12px;
+      border-top: 1px solid rgba(99, 102, 241, 0.2);
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+
+    .pattern-repo {
+      font-family: 'SF Mono', monospace;
+      color: #94a3b8;
+    }
+
+    .pattern-snippet {
+      margin-top: 12px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 6px;
+      border-left: 3px solid rgba(99, 102, 241, 0.5);
+    }
+
+    .pattern-snippet-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+
+    .pattern-snippet-code {
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      white-space: pre;
+      overflow-x: auto;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .loading {
+      text-align: center;
+      color: #64748b;
+      padding: 40px;
+      font-size: 0.9rem;
+    }
   </style>
 </head>
 <body>
@@ -890,6 +1139,7 @@
       <button class="tab-btn" onclick="showTab('daemons')">🤖 Daemons</button>
       <button class="tab-btn" onclick="showTab('charts')">📈 Charts</button>
       <button class="tab-btn" onclick="showTab('3dview')">🌐 3D View</button>
+      <button class="tab-btn" onclick="showTab('patterns')">🔍 Patterns</button>
     </div>
 
     <!-- Dashboard Tab -->
@@ -1312,6 +1562,49 @@
       </div>
     </div>
     <!-- End 3D View Tab -->
+
+    <!-- Patterns Tab -->
+    <div id="tab-patterns" class="tab-content">
+      <div class="patterns-header">
+        <h2>🔍 Pattern Library</h2>
+        <p>Searchable cross-repository patterns from 3869 handoffs across all projects</p>
+      </div>
+
+      <!-- Search and Filters -->
+      <div class="pattern-search-container">
+        <input type="text" id="pattern-search-input" placeholder="Search patterns (e.g., websocket, authentication, 3d)..." />
+        <button onclick="searchPatterns()">Search</button>
+        <button onclick="loadPatternCategories()">Reset</button>
+      </div>
+
+      <!-- Category Tag Cloud -->
+      <div class="pattern-categories-section">
+        <h3>Categories</h3>
+        <div id="pattern-category-cloud" class="tag-cloud">
+          <div class="loading">Loading categories...</div>
+        </div>
+      </div>
+
+      <!-- Top Tags -->
+      <div class="pattern-tags-section">
+        <h3>Popular Tags</h3>
+        <div id="pattern-tag-cloud" class="tag-cloud">
+          <div class="loading">Loading tags...</div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="pattern-results-section">
+        <div class="pattern-results-header">
+          <h3>Results</h3>
+          <span id="pattern-results-count">0 patterns</span>
+        </div>
+        <div id="pattern-results" class="pattern-results-grid">
+          <div class="loading">Search or select a category to browse patterns</div>
+        </div>
+      </div>
+    </div>
+    <!-- End Patterns Tab -->
   </div>
 
   <script>
@@ -3356,6 +3649,236 @@
 
     // Initialize 3D view when tab is opened
     window.init3DViewer = init3D;
+
+    // =========================================================================
+    // PATTERN LIBRARY
+    // =========================================================================
+
+    let patternCategories = null;
+    let allPatterns = [];
+
+    // Load pattern categories on page load
+    async function loadPatternCategories() {
+      try {
+        const response = await fetch('/api/patterns/categories');
+        const data = await response.json();
+
+        if (!data.ok) {
+          console.error('Failed to load categories:', data.error);
+          return;
+        }
+
+        patternCategories = data;
+        renderPatternCategories(data.categories);
+        renderPatternTags(data.top_tags);
+
+        // Update header count
+        const header = document.querySelector('.patterns-header p');
+        if (header) {
+          header.textContent = `Searchable cross-repository patterns from ${data.total_patterns} handoffs across all projects`;
+        }
+      } catch (error) {
+        console.error('Error loading pattern categories:', error);
+      }
+    }
+
+    function renderPatternCategories(categories) {
+      const cloud = document.getElementById('pattern-category-cloud');
+      cloud.innerHTML = '';
+
+      categories.forEach(cat => {
+        const tag = document.createElement('div');
+        tag.className = 'tag category-tag';
+        tag.innerHTML = `${cat.name}<span class="count">(${cat.count})</span>`;
+        tag.onclick = () => searchPatternsByCategory(cat.name);
+        cloud.appendChild(tag);
+      });
+    }
+
+    function renderPatternTags(tags) {
+      const cloud = document.getElementById('pattern-tag-cloud');
+      cloud.innerHTML = '';
+
+      tags.slice(0, 30).forEach(tag => {
+        const tagEl = document.createElement('div');
+        tagEl.className = 'tag';
+        tagEl.innerHTML = `${tag.name}<span class="count">(${tag.count})</span>`;
+        tagEl.onclick = () => {
+          document.getElementById('pattern-search-input').value = tag.name;
+          searchPatterns();
+        };
+        cloud.appendChild(tagEl);
+      });
+    }
+
+    async function searchPatterns() {
+      const query = document.getElementById('pattern-search-input').value;
+
+      try {
+        const response = await fetch(`/api/patterns/search?q=${encodeURIComponent(query)}&limit=50`);
+        const data = await response.json();
+
+        if (!data.ok) {
+          console.error('Pattern search failed:', data.error);
+          return;
+        }
+
+        allPatterns = data.patterns;
+        renderPatternResults(data.patterns, data.count, data.total_patterns);
+      } catch (error) {
+        console.error('Error searching patterns:', error);
+      }
+    }
+
+    async function searchPatternsByCategory(category) {
+      try {
+        const response = await fetch(`/api/patterns/by-category?category=${encodeURIComponent(category)}&limit=100`);
+        const data = await response.json();
+
+        if (!data.ok) {
+          console.error('Category search failed:', data.error);
+          return;
+        }
+
+        allPatterns = data.patterns;
+        renderPatternResults(data.patterns, data.count, data.total_in_category);
+      } catch (error) {
+        console.error('Error searching by category:', error);
+      }
+    }
+
+    function renderPatternResults(patterns, count, total) {
+      const resultsDiv = document.getElementById('pattern-results');
+      const countSpan = document.getElementById('pattern-results-count');
+
+      countSpan.textContent = `${count} patterns (of ${total} total)`;
+
+      if (patterns.length === 0) {
+        resultsDiv.innerHTML = '<div class="loading">No patterns found</div>';
+        return;
+      }
+
+      resultsDiv.innerHTML = '';
+
+      patterns.forEach(pattern => {
+        const card = createPatternCard(pattern);
+        resultsDiv.appendChild(card);
+      });
+    }
+
+    function createPatternCard(pattern) {
+      const card = document.createElement('div');
+      card.className = 'pattern-card';
+
+      // Header with title and category badge
+      const header = document.createElement('div');
+      header.className = 'pattern-card-header';
+
+      const titleDiv = document.createElement('div');
+      const title = document.createElement('div');
+      title.className = 'pattern-title';
+      title.textContent = pattern.title;
+      titleDiv.appendChild(title);
+
+      const badge = document.createElement('div');
+      badge.className = 'pattern-category-badge';
+      badge.textContent = pattern.category;
+      header.appendChild(titleDiv);
+      header.appendChild(badge);
+      card.appendChild(header);
+
+      // Description
+      if (pattern.description) {
+        const desc = document.createElement('div');
+        desc.className = 'pattern-description';
+        desc.textContent = pattern.description;
+        card.appendChild(desc);
+      }
+
+      // Tags
+      if (pattern.tags && pattern.tags.length > 0) {
+        const tagsDiv = document.createElement('div');
+        tagsDiv.className = 'pattern-tags';
+
+        pattern.tags.slice(0, 5).forEach(tag => {
+          const tagEl = document.createElement('span');
+          tagEl.className = 'pattern-tag';
+          tagEl.textContent = tag;
+          tagsDiv.appendChild(tagEl);
+        });
+
+        card.appendChild(tagsDiv);
+      }
+
+      // Code snippet
+      if (pattern.snippet && pattern.snippet.content) {
+        const snippetDiv = document.createElement('div');
+        snippetDiv.className = 'pattern-snippet';
+
+        const snippetHeader = document.createElement('div');
+        snippetHeader.className = 'pattern-snippet-header';
+        snippetHeader.innerHTML = `
+          <span>📝 ${pattern.snippet.language || 'code'}</span>
+          <span>Lines ${pattern.snippet.start_line}-${pattern.snippet.end_line}</span>
+        `;
+        snippetDiv.appendChild(snippetHeader);
+
+        const code = document.createElement('pre');
+        code.className = 'pattern-snippet-code';
+        // Limit snippet to first 10 lines
+        const lines = pattern.snippet.content.split('\n').slice(0, 10);
+        code.textContent = lines.join('\n');
+        if (pattern.snippet.content.split('\n').length > 10) {
+          code.textContent += '\n...';
+        }
+        snippetDiv.appendChild(code);
+
+        card.appendChild(snippetDiv);
+      }
+
+      // Meta info (repo, file, date)
+      const meta = document.createElement('div');
+      meta.className = 'pattern-meta';
+
+      const repo = document.createElement('span');
+      repo.className = 'pattern-repo';
+      repo.textContent = pattern.repo || 'unknown';
+
+      const file = document.createElement('span');
+      file.textContent = pattern.file_path || '';
+      file.style.fontSize = '0.75rem';
+      file.style.color = '#64748b';
+
+      meta.appendChild(repo);
+      meta.appendChild(file);
+      card.appendChild(meta);
+
+      return card;
+    }
+
+    // Enter key handler for pattern search
+    document.addEventListener('DOMContentLoaded', () => {
+      const searchInput = document.getElementById('pattern-search-input');
+      if (searchInput) {
+        searchInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            searchPatterns();
+          }
+        });
+      }
+    });
+
+    // Load categories when patterns tab is opened
+    window.addEventListener('load', () => {
+      const patternsTab = document.querySelector('[onclick*="patterns"]');
+      if (patternsTab) {
+        patternsTab.addEventListener('click', () => {
+          if (!patternCategories) {
+            loadPatternCategories();
+          }
+        });
+      }
+    });
   </script>
 </body>
 </html>

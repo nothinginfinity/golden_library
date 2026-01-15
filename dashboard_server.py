@@ -93,6 +93,15 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif path == '/api/3d/stats':
             self.serve_3d_stats()
             return
+        elif path == '/api/patterns/search':
+            self.serve_pattern_search(parsed_path.query)
+            return
+        elif path == '/api/patterns/categories':
+            self.serve_pattern_categories()
+            return
+        elif path == '/api/patterns/by-category':
+            self.serve_patterns_by_category(parsed_path.query)
+            return
         elif path == '/' or path == '/index.html':
             self.serve_dashboard()
             return
@@ -1515,6 +1524,163 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 'ok': False,
                 'error': str(e),
                 'message': 'Failed to calculate statistics'
+            }, status=500)
+
+    # =========================================================================
+    # Pattern Library API
+    # =========================================================================
+
+    def load_pattern_index(self):
+        """Load the cross-repo pattern index."""
+        pattern_index_file = GOLDEN_LIBRARY_DIR / "cross_repo_index.json"
+        if not pattern_index_file.exists():
+            return {"version": "1.0", "patterns": [], "categories": []}
+
+        with open(pattern_index_file, 'r') as f:
+            return json.load(f)
+
+    def serve_pattern_search(self, query_string):
+        """Search patterns by query string."""
+        try:
+            params = parse_qs(query_string)
+            query = params.get('q', [''])[0].lower()
+            category = params.get('category', [None])[0]
+            limit = int(params.get('limit', ['50'])[0])
+
+            # Load pattern index
+            pattern_index = self.load_pattern_index()
+            all_patterns = pattern_index.get('patterns', [])
+
+            if not all_patterns:
+                self.serve_json({
+                    'ok': True,
+                    'count': 0,
+                    'patterns': [],
+                    'message': 'No patterns indexed yet. Run scripts/scan-repos.py to build the index.'
+                })
+                return
+
+            # Filter patterns
+            results = []
+
+            for pattern in all_patterns:
+                # Category filter
+                if category and pattern.get('category') != category:
+                    continue
+
+                # Query filter (search in title, description, tags, category)
+                if query:
+                    searchable_text = ' '.join([
+                        pattern.get('title', ''),
+                        pattern.get('description', ''),
+                        pattern.get('category', ''),
+                        ' '.join(pattern.get('tags', [])),
+                        pattern.get('repo', ''),
+                        pattern.get('file_path', '')
+                    ]).lower()
+
+                    if query not in searchable_text:
+                        continue
+
+                results.append(pattern)
+
+            # Limit results
+            results = results[:limit]
+
+            self.serve_json({
+                'ok': True,
+                'count': len(results),
+                'total_patterns': len(all_patterns),
+                'query': query,
+                'category': category,
+                'patterns': results
+            })
+
+        except Exception as e:
+            self.serve_json({
+                'ok': False,
+                'error': str(e),
+                'message': 'Pattern search failed'
+            }, status=500)
+
+    def serve_pattern_categories(self):
+        """List all pattern categories with counts."""
+        try:
+            pattern_index = self.load_pattern_index()
+            all_patterns = pattern_index.get('patterns', [])
+
+            # Count patterns by category
+            category_counts = {}
+            tag_counts = {}
+
+            for pattern in all_patterns:
+                category = pattern.get('category', 'unknown')
+                category_counts[category] = category_counts.get(category, 0) + 1
+
+                # Count tags
+                for tag in pattern.get('tags', []):
+                    tag_counts[tag] = tag_counts.get(tag, 0) + 1
+
+            # Sort by count
+            categories = [
+                {'name': cat, 'count': count}
+                for cat, count in sorted(category_counts.items(), key=lambda x: -x[1])
+            ]
+
+            # Top tags
+            top_tags = [
+                {'name': tag, 'count': count}
+                for tag, count in sorted(tag_counts.items(), key=lambda x: -x[1])[:50]
+            ]
+
+            self.serve_json({
+                'ok': True,
+                'total_patterns': len(all_patterns),
+                'categories': categories,
+                'top_tags': top_tags,
+                'category_definitions': pattern_index.get('categories', [])
+            })
+
+        except Exception as e:
+            self.serve_json({
+                'ok': False,
+                'error': str(e),
+                'message': 'Failed to load categories'
+            }, status=500)
+
+    def serve_patterns_by_category(self, query_string):
+        """Get all patterns for a specific category."""
+        try:
+            params = parse_qs(query_string)
+            category = params.get('category', [''])[0]
+            limit = int(params.get('limit', ['100'])[0])
+
+            if not category:
+                self.serve_json({'error': 'Category parameter required'}, status=400)
+                return
+
+            pattern_index = self.load_pattern_index()
+            all_patterns = pattern_index.get('patterns', [])
+
+            # Filter by category
+            category_patterns = [
+                p for p in all_patterns
+                if p.get('category') == category
+            ][:limit]
+
+            self.serve_json({
+                'ok': True,
+                'category': category,
+                'count': len(category_patterns),
+                'total_in_category': len([p for p in all_patterns if p.get('category') == category]),
+                'patterns': category_patterns
+            })
+
+        except Exception as e:
+            self.serve_json({
+                'ok': False,
+                'error': str(e),
+                'message': 'Failed to get patterns by category'
             }, status=500)
 
     def search_3d_handoffs(self, data):
