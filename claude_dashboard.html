@@ -3860,6 +3860,9 @@
       showToast3D(`Layout changed to: ${layout}`, 'success');
     }
 
+    // Make changeLayout3D globally accessible
+    window.changeLayout3D = changeLayout3D;
+
     function positionNode3D(obj, index, total, layout = 'globe', nodeData = null) {
       const radius = 40;
 
@@ -4396,51 +4399,7 @@
       loadHandoffs3D();
     };
 
-    window.changeLayout3D = function(layout) {
-      // Update button states
-      document.querySelectorAll('.layout-btn-3d').forEach(btn => btn.classList.remove('active'));
-      event.target.classList.add('active');
-
-      // Reposition nodes based on layout
-      nodes3D.forEach((node, i) => {
-        const obj = nodeObjects3D[i];
-        if (!obj) return;
-
-        switch(layout) {
-          case 'globe':
-            positionNode3D(obj, i, nodes3D.length);
-            break;
-          case 'grid':
-            const gridSize = Math.ceil(Math.sqrt(nodes3D.length));
-            obj.position.x = (i % gridSize - gridSize/2) * 10;
-            obj.position.y = 0;
-            obj.position.z = (Math.floor(i / gridSize) - gridSize/2) * 10;
-            break;
-          case 'helix':
-            const t = i / nodes3D.length * Math.PI * 4;
-            obj.position.x = 30 * Math.cos(t);
-            obj.position.y = (i - nodes3D.length/2) * 2;
-            obj.position.z = 30 * Math.sin(t);
-            break;
-          case 'scatter':
-            obj.position.x = (Math.random() - 0.5) * 100;
-            obj.position.y = (Math.random() - 0.5) * 100;
-            obj.position.z = (Math.random() - 0.5) * 100;
-            break;
-          case 'clusters':
-            const clusters = 4;
-            const cluster = i % clusters;
-            const clusterAngle = (cluster / clusters) * Math.PI * 2;
-            const clusterRadius = 30;
-            const inCluster = Math.floor(i / clusters);
-            const localAngle = (inCluster / Math.ceil(nodes3D.length / clusters)) * Math.PI * 2;
-            obj.position.x = clusterRadius * Math.cos(clusterAngle) + 10 * Math.cos(localAngle);
-            obj.position.y = (Math.random() - 0.5) * 20;
-            obj.position.z = clusterRadius * Math.sin(clusterAngle) + 10 * Math.sin(localAngle);
-            break;
-        }
-      });
-    };
+    // changeLayout3D is defined earlier and exposed globally below
 
     window.performSearch3D = function() {
       const query = document.getElementById('search-3d-input').value.toLowerCase();
