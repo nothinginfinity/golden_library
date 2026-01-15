@@ -3,458 +3,78 @@
 ---
 **Metadata:**
 - **Project:** golden_library
-- **Phase:** 4.5
-- **Phase Name:** Compression System Enhancement
+- **Phase:** 5
+- **Phase Name:** Timeline Mode & Advanced Visualization
 - **Started:** 2026-01-14
-- **Estimated Duration:** 3-4 days
+- **Estimated Duration:** TBD
 - **Status:** active
-- **Previous Handoff:** 5a4d5ca (Phase 4: 3D Viewer Performance & Real-time)
+- **Previous Handoff:** 055034a4293f (Phase unknown: unnamed)
 - **Dependencies:**
-  - dashboard_server.py (3D viewer)
-  - compression pipeline (existing)
-  - git hooks system
+  - TBD
 - **Related Work:**
-  - Phase 4: 3D viewer with WebSocket updates
-  - Existing SLIM compression format
-  - handoff:// protocol foundation
+  - Previous phase work
 ---
 
 ## Context from Previous Phase
 
-**Phase 4: 3D Viewer Enhancement & Real-time Integration** (handoff://5a4d5ca)
-- ✅ Integrated real data from conversation library (99 handoffs)
-- ✅ Performance optimization: LOD, frustum culling, 60 FPS with 100+ nodes
-- ✅ WebSocket live updates with fade-in animations
-- ✅ Toast notifications for new compressions
-- ✅ FPS counter and performance monitoring
+**Phase unknown: unnamed** (handoff://055034a4293f)
+- ✅ [Summary of what was completed]
+- ✅ [Key achievements]
+- ✅ [Major features delivered]
 
 **What's Working:**
-- 3D visualization of compressed handoffs
-- Real-time updates when new compressions happen
-- Smooth 60 FPS performance with 100+ nodes
-- WebSocket server broadcasting file system events
+- [List working features]
 
 **What's Missing:**
-- Effective compression (current: 0-0.5% reduction)
-- Automated archival and handoff ID generation
-- Cross-repository handoff indexing
-- Pattern library for reusable solutions
+- [List gaps or future work]
 
 ---
 
-## Phase 4.5 Goals
+## Phase 5 Goals
 
-**Priority:** HIGH - Foundation for all future phases
-
-Transform compression system from basic format detection to production-ready token-efficient handoff:// protocol with:
-1. Advanced compression (80%+ reduction vs current 0-0.5%)
-2. Automated workflows (git hooks, archival)
-3. 3D visualization integration
-4. Cross-repo pattern library
-
-**Why This Matters:**
-- Current: 100KB PRD = ~25,000 tokens
-- Target: 100KB PRD → 20KB compressed = ~5,000 tokens (80% savings)
-- Makes handoff:// protocol actually useful for token efficiency
-- Foundation for Timeline Mode (Phase 5) and advanced features
+[Describe overall goals and objectives for this phase]
 
 ---
 
 ## Active Tasks - Immediate (This Phase)
 
-### 🔴 Priority 1: Advanced Compression
-**Status:** ⚠️  PARTIAL - Token Collision Bug Blocking
+### 🔴 Priority 1: [Task Name]
+**Status:** Not Started
 **Owner:** Koda
-**Estimated:** 1-2 days
+**Estimated:** [Duration]
 
-**Objective:** Implement SLIM vocabulary and V4Z compression for 80%+ reduction on large PRDs.
+**Objective:** [What needs to be done]
 
 **Tasks:**
-- [x] Analyze existing compression formats (SLIM, V4Z, FSL, ZTPCF)
-- [x] Design SLIM vocabulary for markdown
-  - Common markdown patterns → tokens
-  - Task list syntax compression
-  - Code block header optimization
-  - Repeated phrases dictionary
-- [x] Implement V4Z compression layer
-  - Zstandard-based compression
-  - Dictionary training on PRD corpus (skipped - too small corpus)
-  - Backward compatible decompression
-- [x] Build compression benchmark suite
-  - Test with CURRENT_PLAN.md (~11KB)
-  - Test with large PRDs (100KB+)
-  - Measure: ratio, speed, token savings
-- [x] Optimize decompression speed
-  - Target: <100ms for 100KB file
-  - Cache decompressed results
-
-**🔴 BLOCKER: SLIM Vocabulary Token Collision**
-
-**Problem:** SLIM vocabulary tokens overlap, causing corruption during decompression.
-- Tokens like `¤-¤`, `¤t¤`, `¤x¤` share the `¤` character
-- Simple string replacement causes wrong substitutions
-- Example: `¤-¤` gets partially replaced by `¤t¤` → corruption
-
-**Current Implementation:**
-- `src/slim_vocabulary.py` uses string `.replace()` for compression/decompression
-- Order-dependent replacement (longer patterns first) not sufficient
-
-**Solution Options:**
-1. **Redesign tokens** - Use non-overlapping tokens (recommended)
-   - Replace `¤-¤`, `¤t¤`, `¤x¤` with unique sequences like `¤D¤`, `¤T¤`, `¤X¤`
-   - OR use delimited format: `<T>`, `<X>`, `<D>`
-   - OR use escape sequences: `\t`, `\x`, `\d`
-
-2. **Implement proper tokenizer** - Parse tokens with boundaries
-   - Regex-based tokenization
-   - Token state machine
-   - More complex but robust
+- [ ] Task 1
+- [ ] Task 2
+- [ ] Task 3
 
 **Acceptance Criteria:**
-- ✅ 80%+ compression on repetitive content (achieved: 97.2%)
-- ✅ Backward compatible with existing formats
-- ✅ Decompression < 100ms
-- ❌ No data loss on round-trip (FAILING - token collision bug)
-
-**Current Results:**
-- Large repetitive PRDs: 97.2% reduction (EXCEEDS 80% target)
-- CURRENT_PLAN.md: 45.8% reduction (Zstandard only, SLIM disabled due to bug)
-- Round-trip: ❌ FAILING due to token collision
-
-**Next Steps for Fix:**
-1. Redesign SLIM vocabulary with unique, non-overlapping tokens
-2. Update tests to verify round-trip on all document types
-3. Re-benchmark after fix
-4. Commit fixed version
+- Criterion 1
+- Criterion 2
 
 **Files to Create/Modify:**
-- `src/qastone_compressor.py` (already exists, enhance)
-- `src/qastone_types.py` (already exists, enhance)
-- `src/slim_vocabulary.py` (new)
-- `src/v4z_compressor.py` (new)
-- `tests/test_compression_benchmarks.py` (new)
-
-**Technical Notes:**
-- Use Zstandard (zstd) for V4Z base compression
-- Train dictionary on corpus of PRDs for better ratios
-- SLIM vocabulary should be human-readable for debugging
-- Consider: LZ4 for speed vs zstd for ratio tradeoff
-
----
-
-### 🟡 Priority 2: Automation & Git Hooks
-**Status:** ✅ COMPLETE
-**Owner:** Koda
-**Estimated:** 1 day
-
-**Objective:** Automate compression on git commit and phase archival.
-
-**Tasks:**
-- [x] Create git pre-commit hook
-  - Detect changes to CURRENT_PLAN.md
-  - Auto-compress to `.golden_library/compressed/`
-  - Generate handoff ID (first 12 chars of SHA-256 hash)
-  - Update `.golden_library/index.json`
-  - Non-blocking (warns but doesn't fail commit)
-- [x] Build archive-phase.sh script
-  - Move CURRENT_PLAN.md to archive/plans/YYYY-MM-DD_phaseN_name.md
-  - Compress archived plan with V4Z
-  - Generate index entry
-  - Create stub for next phase
-  - Git commit with proper message
-- [x] Add unarchive/decompress utilities
-  - `unarchive-phase.sh <handoff_id>` → restore to working dir
-  - `decompress.py <handoff_id>` → stdout decompressed content
-
-**Acceptance Criteria:**
-- ✅ Pre-commit hook runs automatically
-- ✅ archive-phase.sh works without manual steps
-- ✅ Handoff IDs are stable and unique (SHA-256 based)
-- ✅ Can restore any previous phase
-
-**Completed:**
-- `.git/hooks/pre-commit`: Auto-compresses CURRENT_PLAN.md on commit (tested: handoff://688e1fc648a5)
-- `scripts/archive-phase.sh`: Archives phase and creates next phase stub
-- `scripts/unarchive-phase.sh`: Restores archived phases (supports --list)
-- `src/decompress.py`: CLI utility for V4Z decompression
-
-**Note:** Pre-commit hook currently uses V4Z with Zstandard only (SLIM disabled due to token collision bug). After Priority 1 fix, full SLIM+V4Z will be used.
-
-**Files to Create:**
-- `.git/hooks/pre-commit` (or `.githooks/pre-commit`)
-- `scripts/archive-phase.sh`
-- `scripts/unarchive-phase.sh`
-- `src/decompress.py`
-
-**Technical Notes:**
-- Hook should fail gracefully if compression errors
-- Store handoff ID in commit message for traceability
-- Archive script should update `.golden_library/index.json`
-
----
-
-### 🟢 Priority 3: 3D Viewer Integration
-**Status:** ✅ COMPLETE
-**Owner:** Koda
-**Estimated:** 1 day
-
-**Objective:** Visualize compressed handoffs in 3D viewer, click to decompress and view.
-
-**Tasks:**
-- [x] Add `.golden_library/index.json` format
-  - Schema: handoff_id, phase, date, size_original, size_compressed, tags
-- [x] Update `/api/3d/handoffs` to include archived handoffs
-  - Merged conversation_library + golden_library handoffs
-  - Color by type: conversation (blue), plan (green)
-- [x] Add click handler for plan handoffs
-  - Modal shows decompressed V4Z content
-  - Displays metadata: phase, date, reduction %
-  - "Restore to CURRENT_PLAN.md" button implemented
-- [x] Implement timeline layout mode
-  - 6 layouts: globe, clusters, grid, helix, scatter, timeline
-  - Timeline: X=date, Y=compression ratio, Z=random offset
-  - Layout switcher with active state
-
-**Completed Features:**
-- ✅ Category-based coloring (green=plan, blue=conversation)
-- ✅ Legacy format support (.md files + .v4z files)
-- ✅ Modal with decompression API
-- ✅ Restore functionality via unarchive script
-- ✅ Timeline chronological layout
-- ✅ 127 handoffs visible (22 plans + 105 conversations)
-
-**Bug Fixes:**
-- Fixed modal close handlers (exposed to window scope)
-- Fixed legacy .md file decompression
-- Added event handling for overlay clicks
-- Fixed V4ZCompressionResult usage in import scripts
-
-**Files Modified:**
-- `dashboard_server.py` (+180 lines) - Merged golden/conversation indexes, legacy format support, decompress/restore APIs
-- `claude_dashboard.html` (+350 lines) - Modal UI, timeline layout, color coding, click handlers
-- `.golden_library/index.json` (22 entries)
-
-**Technical Notes:**
-- Timeline X-axis: `Date.parse(created)` normalized to -40 to +40
-- Timeline Y-axis: `reduction_percent / 100 * 40 - 20`
-- Modal uses `window.closePlanModal` for onclick compatibility
-- Legacy files fallback to .golden_library/compressed/<id>.md
-
----
-
-### 🔵 Priority 3.5: Content Unification & Import Tools
-**Status:** ✅ COMPLETE
-**Owner:** Koda
-**Estimated:** 2-3 hours
-
-**Objective:** Create import tools to unify ALL Claude content (plans, conversations, terminals) into searchable golden library.
-
-**Discovery:**
-- Found 1621 JSONL conversation files in `~/.claude/projects/`
-- Found 19 historical plan/PRD files across ztgi repos
-- Successfully unified 1005 handoffs (23 plans + 982 conversations)
-
-**Tasks:**
-- [x] Create `scripts/import-all-plans.py`
-  - Scans ~/ztgi for PRD_*.md, PLAN_*.md, CURRENT_PLAN.md
-  - Compresses with V4Z (avg 53% reduction)
-  - Updates .golden_library/index.json
-  - Imported 18 plans from phi_proxy, prax-chat, qastone-spec
-- [x] Create `scripts/import-conversations.py`
-  - Parses ~/.claude/projects/*.jsonl conversations
-  - Converts to readable markdown format
-  - Compresses with V4Z
-  - Adds to golden library with category='conversation'
-- [x] Create `docs/UNIFIED_LIBRARY_GUIDE.md`
-  - Documents unified library structure
-  - Import/export workflows
-  - API reference
-  - Troubleshooting guide
-- [x] Run import-conversations.py
-  - Imported 872 valid conversations from 1621 JSONL files
-  - Skipped 749 (empty, duplicates, or tool-results)
-- [x] Fix category fields in index
-  - Updated dashboard_server.py to use category from index
-  - Fixed 21 plan entries missing category field
-  - Verified color coding (green=plan, blue=conversation)
-- [x] Test unified 3D viewer with 1005 nodes
-  - Performance confirmed smooth at 60 FPS
-  - All layouts working (globe, timeline, clusters, grid, helix, scatter)
-  - Search functionality spans all handoffs
-
-**Final Statistics:**
-```
-Total Handoffs: 1005
-├─ Plans (green): 23
-│  ├─ golden_library PRDs: 4
-│  ├─ phi_proxy PRDs: 4
-│  ├─ prax-chat plans: 7
-│  ├─ qastone-spec: 2
-│  ├─ phi_command_center: 1
-│  └─ other repos: 5
-└─ Conversations (blue): 982
-   ├─ golden_library imports: 876
-   └─ conversation_library: 106
-
-Storage:
-- Compressed files: 898 .v4z files
-- Disk usage: 3.7 MB
-- Avg compression: 45-55% reduction
-- Format: V4Z (SLIM + Zstandard)
-```
-
-**Import Statistics:**
-- Plans: 21 files → 18 imported, 3 skipped
-- Conversations: 1621 files → 872 imported, 749 skipped
-- Compression range: 42.5% - 67.4%
-- Projects covered: 15+ repos including phi_proxy, prax-chat, inbox, pyfinity, phi_command_center_desktop
-
-**Files Created:**
-- `scripts/import-all-plans.py` (210 lines) - Historical plan importer
-- `scripts/import-conversations.py` (280 lines) - Claude Code conversation importer
-- `docs/UNIFIED_LIBRARY_GUIDE.md` (350 lines) - Complete documentation
-
-**Bug Fixes:**
-- Fixed category assignment to use index values instead of hardcoded 'plan'
-- Fixed category fields for 21 plan entries
-- Updated dashboard to show correct color coding
-
-**Completed Features:**
-- ✅ Unified view of ALL Claude content (1005 handoffs)
-- ✅ Category-based coloring (green=plan, blue=conversation)
-- ✅ Import tools for plans and conversations
-- ✅ Comprehensive documentation
-- ✅ Performance tested with 1000+ nodes
-- ✅ Search across all content
-- ✅ Timeline visualization showing project evolution
-
-**Technical Notes:**
-- JSONL format: 1 JSON object per line
-- Conversation parsing extracts user/assistant messages
-- Metadata: session_id, project, created, agent_id, message_count
-- Same V4Z compression as plans (SLIM + Zstandard)
-- Category: 'conversation' vs 'plan' for color coding
-- Legacy support: Both .md and .v4z files
-
----
-
-### 🟣 Priority 4: Cross-Repo Pattern Library
-**Status:** ✅ COMPLETE
-**Owner:** Koda
-**Completed:** 2026-01-14
-**Commit:** 3cacf6c
-
-**Objective:** Build searchable pattern library across multiple repositories.
-
-**Tasks:**
-- [x] Design pattern extraction system
-  - Scan handoffs for common solutions
-  - Tag by category: auth, websocket, 3D, database, etc.
-  - Extract code snippets + context
-- [x] Build cross-repo index
-  - Script: `scan-repos.py` (463 lines)
-  - Output: `.golden_library/cross_repo_index.json` (3.7MB)
-  - Schema: repo, handoff_id, pattern_tags, snippet, category
-- [x] Add pattern search API
-  - `/api/patterns/search?q=websocket` (full-text search)
-  - `/api/patterns/categories` (list all categories)
-  - `/api/patterns/by-category?category=auth` (filter by category)
-  - Return: matching patterns with snippets, tags, context
-- [x] UI for pattern browser
-  - New "Patterns" tab in dashboard
-  - Tag cloud for 12 categories + top 30 tags
-  - Click category/tag → show matching patterns
-  - Pattern cards with code snippets, tags, repo info
-
-**Acceptance Criteria:**
-- ✅ Can search across 15+ repos (scanned 900 handoffs)
-- ✅ Pattern extraction found 3869 reusable patterns
-- ✅ Search returns relevant results (full-text + category filter)
-- ✅ UI makes patterns discoverable (tag cloud + search)
-
-**Results:**
-- **Total Patterns:** 3869 across 900 handoffs
-- **Categories:** 12 (auth, ui, search, cli, compression, git, testing, database, api, performance, 3d, websocket)
-- **Top Category:** auth (976 patterns)
-- **Code Snippets:** Extracted with language, line numbers, context
-- **Search:** Full-text search across title, description, tags, repo, file path
-- **UI:** Interactive tag cloud, pattern cards with snippets, category badges
-
-**Files to Create:**
-- `scripts/scan-repos.py`
-- `scripts/extract-patterns.py`
-- Add pattern search to `dashboard_server.py`
-- Add Patterns tab to `claude_dashboard.html`
-
-**Technical Notes:**
-- Use simple keyword matching for v1
-- Later: embeddings + semantic search
-- Store snippets with ±10 lines context
-- Dedup similar patterns across repos
+- file1.py
+- file2.py
 
 ---
 
 ## Backlog - Future Phases
 
-### Phase 5: Timeline Mode (Q1 2026)
-**Estimated:** 2-3 days
+### Phase 6: [Future Phase]
+**Estimated:** TBD
 
-Chronological visualization of handoffs (builds on 4.5 timeline layout).
-
-**Tasks:**
-- [ ] Enhanced timeline with play/pause/seek
-- [ ] Filter by date range, repo, category
-- [ ] Show compression trends over time
-- [ ] Animate project evolution (time-lapse)
-
----
-
-### Phase 6: Export Visualization
-**Estimated:** 1-2 days
-
-Save 3D views as images/GIFs for documentation.
-
-**Tasks:**
-- [ ] Export PNG (static snapshot)
-- [ ] Export GIF (rotating view)
-- [ ] Export stats as JSON/CSV
-
----
-
-### Phase 7: Comparison Mode
-**Estimated:** 2-3 days
-
-Side-by-side diff of two handoffs or time periods.
-
----
-
-### Phase 8: VR Mode
-**Estimated:** 5-7 days
-
-Immersive VR visualization (WebXR).
+[Description]
 
 ---
 
 ## Success Metrics
 
-**Phase 4.5 Complete When:**
-- ✅ 80%+ compression ratio on large PRDs
-- ✅ Git pre-commit hook auto-compresses plans
-- ✅ Archived handoffs visible in 3D viewer
-- ✅ Cross-repo pattern search functional
-- ✅ Timeline mode shows project evolution
-- ✅ Pattern library has 10+ entries
-- ✅ Commits pushed with handoff references
-- ✅ CURRENT_PLAN.md archived for Phase 5
-- ✅ Phase 5 plan created
-
-**Definition of Done:**
-- Compression benchmarks pass
-- Git hooks tested on real commits
-- 3D viewer loads archived plans
-- Pattern search returns relevant results
-- Documentation updated
-- User can navigate project history in 3D
+**Phase 5 Complete When:**
+- ✅ [Metric 1]
+- ✅ [Metric 2]
+- ✅ [Metric 3]
 
 ---
 
@@ -462,66 +82,15 @@ Immersive VR visualization (WebXR).
 
 **Quick Start:**
 1. Read this file
-2. Check previous handoff: `git show 5a4d5ca`
-3. Start with Priority 1 (Advanced Compression)
-4. Benchmark current compression vs target
-5. Commit progress, check off tasks
-6. When stuck: Review backlog or ask for clarification
+2. Check previous handoff: `git show 055034a4293f`
+3. Start with Priority 1
+4. Commit progress, check off tasks
 
 **Key Files:**
-- `src/qastone_compressor.py` - Main compression logic
-- `src/qastone_types.py` - Type definitions
-- `dashboard_server.py` - Backend API (includes 3D viewer)
-- `claude_dashboard.html` - Frontend UI
-- `.golden_library/` - Compressed handoff storage
-
-**Testing:**
-```bash
-# Benchmark compression
-python3 -m pytest tests/test_compression_benchmarks.py -v
-
-# Test git hook
-git add CURRENT_PLAN.md
-git commit -m "test: verify pre-commit hook"
-
-# View in 3D
-open http://localhost:8080 → 3D View tab
-
-# Search patterns
-curl http://localhost:8080/api/patterns/search?q=websocket
-```
-
----
-
-## Notes & Decisions
-
-**2026-01-14:** Phase 4 completed successfully
-- 3D viewer with real-time updates working
-- 60 FPS performance confirmed
-- WebSocket infrastructure ready
-- Ready for compression enhancement
-
-**Current Compression Status:**
-- SLIM only: ~60% reduction (mostly whitespace)
-- Need: 80%+ reduction on actual content
-- Problem: Repetitive markdown patterns not compressed
-- Solution: SLIM vocabulary + V4Z layer
-
-**Architecture Decision: Why V4Z?**
-- Zstandard provides 70-80% compression on text
-- Dictionary training learns project-specific patterns
-- Faster decompression than gzip/bzip2
-- Widely supported, battle-tested
+- TBD
 
 ---
 
 **Last Updated:** 2026-01-14
-**Next Review:** After Priority 2 complete
+**Next Review:** After Priority 1 complete
 **Questions/Blockers:** None currently
-
-**Progress:**
-- ✅ Priority 1: Advanced Compression (SLIM + V4Z, 97.2% on repetitive content, token collision fixed)
-- ✅ Priority 2: Automation & Git Hooks (pre-commit, archive/unarchive scripts, handoff IDs working)
-- ✅ Priority 3: 3D Viewer Integration (modal, timeline, color-coded, restore functionality)
-- ✅ Priority 3.5: Content Unification (1005 handoffs unified: 23 plans + 982 conversations)
-- 🔜 Priority 4: Cross-Repo Pattern Library (next phase)
