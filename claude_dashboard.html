@@ -957,6 +957,141 @@
       color: #10b981;
     }
 
+    /* ========================================================================= */
+    /* TIMELINE TRENDS PANEL */
+    /* ========================================================================= */
+
+    .timeline-trends-3d {
+      display: none;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+
+    .timeline-trends-3d.active {
+      display: block;
+    }
+
+    .timeline-trends-3d h4 {
+      color: #10b981;
+      margin-bottom: 12px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .trends-stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .trends-stat-box {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(100, 116, 139, 0.2);
+      border-radius: 6px;
+      padding: 8px;
+    }
+
+    .trends-stat-label {
+      font-size: 9px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .trends-stat-value {
+      font-size: 14px;
+      font-weight: bold;
+      color: #10b981;
+    }
+
+    .trends-chart-container {
+      background: rgba(30, 41, 59, 0.3);
+      border: 1px solid rgba(100, 116, 139, 0.2);
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .trends-chart-title {
+      font-size: 10px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .trends-chart-svg {
+      width: 100%;
+      height: 150px;
+      overflow: visible;
+    }
+
+    .trends-line {
+      fill: none;
+      stroke: #10b981;
+      stroke-width: 2;
+    }
+
+    .trends-area {
+      fill: rgba(16, 185, 129, 0.1);
+    }
+
+    .trends-bar {
+      fill: #6366f1;
+      transition: fill 0.2s;
+    }
+
+    .trends-bar:hover {
+      fill: #818cf8;
+      cursor: pointer;
+    }
+
+    .trends-dot {
+      fill: #10b981;
+      stroke: #0f172a;
+      stroke-width: 2;
+      cursor: pointer;
+      transition: r 0.2s;
+    }
+
+    .trends-dot:hover {
+      r: 5;
+    }
+
+    .trends-axis text {
+      fill: #64748b;
+      font-size: 9px;
+    }
+
+    .trends-axis line,
+    .trends-axis path {
+      stroke: rgba(100, 116, 139, 0.3);
+    }
+
+    .trends-grid line {
+      stroke: rgba(100, 116, 139, 0.1);
+      stroke-dasharray: 2,2;
+    }
+
+    .trends-tooltip {
+      position: absolute;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid #10b981;
+      border-radius: 6px;
+      padding: 8px;
+      font-size: 10px;
+      color: #e2e8f0;
+      pointer-events: none;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
     .viewer-footer-3d {
       padding: 10px 15px;
       border-top: 1px solid #334155;
@@ -1940,6 +2075,46 @@
             <div id="filter-status" class="filter-status">
               No filters active
             </div>
+          </div>
+
+          <!-- Timeline Trends (shown only in timeline mode) -->
+          <div id="timeline-trends-panel" class="timeline-trends-3d">
+            <h4>📊 Compression Trends</h4>
+
+            <!-- Stats Summary -->
+            <div class="trends-stats-grid">
+              <div class="trends-stat-box">
+                <div class="trends-stat-label">Avg Compression</div>
+                <div class="trends-stat-value" id="trends-avg-compression">--</div>
+              </div>
+              <div class="trends-stat-box">
+                <div class="trends-stat-label">Total Saved</div>
+                <div class="trends-stat-value" id="trends-total-saved">--</div>
+              </div>
+              <div class="trends-stat-box">
+                <div class="trends-stat-label">Best Ratio</div>
+                <div class="trends-stat-value" id="trends-best-ratio">--</div>
+              </div>
+              <div class="trends-stat-box">
+                <div class="trends-stat-label">Total Handoffs</div>
+                <div class="trends-stat-value" id="trends-total-handoffs">--</div>
+              </div>
+            </div>
+
+            <!-- Compression Ratio Over Time Chart -->
+            <div class="trends-chart-container">
+              <div class="trends-chart-title">Compression Ratio Over Time</div>
+              <svg id="trends-compression-chart" class="trends-chart-svg"></svg>
+            </div>
+
+            <!-- Handoffs Per Week Chart -->
+            <div class="trends-chart-container">
+              <div class="trends-chart-title">Handoffs Per Week</div>
+              <svg id="trends-handoffs-chart" class="trends-chart-svg"></svg>
+            </div>
+
+            <!-- Tooltip for charts -->
+            <div id="trends-tooltip" class="trends-tooltip" style="display: none;"></div>
           </div>
 
           <div class="viewer-footer-3d">
@@ -3490,17 +3665,21 @@
       });
       event.target.classList.add('active');
 
-      // Show/hide timeline controls and filters
+      // Show/hide timeline controls, filters, and trends
       const timelinePanel = document.getElementById('timeline-controls-panel');
       const filtersPanel = document.getElementById('timeline-filters-panel');
+      const trendsPanel = document.getElementById('timeline-trends-panel');
       if (layout === 'timeline') {
         timelinePanel.classList.add('active');
         filtersPanel.classList.add('active');
+        trendsPanel.classList.add('active');
         initializeTimeline();
         initializeTimelineFilters();
+        initializeTimelineTrends();
       } else {
         timelinePanel.classList.remove('active');
         filtersPanel.classList.remove('active');
+        trendsPanel.classList.remove('active');
         stopTimelinePlayback();
       }
 
@@ -4765,6 +4944,11 @@
       // Update UI
       updateFilterStatus();
 
+      // Refresh trends with new filtered data
+      if (currentLayout3D === 'timeline') {
+        initializeTimelineTrends();
+      }
+
       // Save to localStorage
       saveTimelineFilters();
 
@@ -4902,6 +5086,11 @@
       updateFilterStatus();
       document.getElementById('timeline-visible-count').textContent = nodes3D.length;
 
+      // Refresh trends with all data
+      if (currentLayout3D === 'timeline') {
+        initializeTimelineTrends();
+      }
+
       // Save to localStorage
       saveTimelineFilters();
 
@@ -4969,10 +5158,405 @@
       localStorage.setItem('timeline-filters-state', JSON.stringify(timelineFilters));
     }
 
+    /* ========================================================================= */
+    /* TIMELINE TRENDS - PRIORITY 3 */
+    /* ========================================================================= */
+
+    function initializeTimelineTrends() {
+      if (!nodes3D || nodes3D.length === 0) return;
+
+      console.log('Initializing timeline trends...');
+
+      // Calculate overall stats
+      calculateOverallStats();
+
+      // Generate trend data
+      const compressionTrends = calculateCompressionTrends();
+      const handoffsByWeek = calculateHandoffsByWeek();
+
+      // Render charts
+      renderCompressionChart(compressionTrends);
+      renderHandoffsChart(handoffsByWeek);
+
+      console.log('Trends initialized');
+    }
+
+    function calculateOverallStats() {
+      // Filter visible nodes based on current filters
+      const visibleNodes = nodes3D.filter(node => {
+        let visible = true;
+
+        // Date range filter
+        if (timelineFilters.dateStart) {
+          const startDate = new Date(timelineFilters.dateStart).getTime();
+          const nodeDate = new Date(node.created).getTime();
+          if (nodeDate < startDate) visible = false;
+        }
+
+        if (timelineFilters.dateEnd) {
+          const endDate = new Date(timelineFilters.dateEnd).getTime() + 24 * 60 * 60 * 1000;
+          const nodeDate = new Date(node.created).getTime();
+          if (nodeDate > endDate) visible = false;
+        }
+
+        // Category filter
+        if (!timelineFilters.categories.includes(node.category)) {
+          visible = false;
+        }
+
+        // Compression filter
+        const ratio = node.compression_ratio || 0;
+        if (ratio < timelineFilters.compressionMin) {
+          visible = false;
+        }
+
+        return visible;
+      });
+
+      // Calculate stats
+      const compressionRatios = visibleNodes.map(n => n.compression_ratio || 0);
+      const avgCompression = compressionRatios.length > 0
+        ? (compressionRatios.reduce((a, b) => a + b, 0) / compressionRatios.length).toFixed(1)
+        : 0;
+      const bestRatio = compressionRatios.length > 0
+        ? Math.max(...compressionRatios).toFixed(1)
+        : 0;
+
+      // Calculate total bytes saved
+      const totalSaved = visibleNodes.reduce((sum, n) => {
+        const original = n.original_size || 0;
+        const compressed = n.compressed_size || 0;
+        return sum + (original - compressed);
+      }, 0);
+
+      // Format bytes
+      const formatBytes = (bytes) => {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
+      };
+
+      // Update UI
+      document.getElementById('trends-avg-compression').textContent = avgCompression + '%';
+      document.getElementById('trends-total-saved').textContent = formatBytes(totalSaved);
+      document.getElementById('trends-best-ratio').textContent = bestRatio + '%';
+      document.getElementById('trends-total-handoffs').textContent = visibleNodes.length;
+    }
+
+    function calculateCompressionTrends() {
+      // Filter visible nodes
+      const visibleNodes = nodes3D.filter(node => {
+        let visible = true;
+        if (timelineFilters.dateStart) {
+          const startDate = new Date(timelineFilters.dateStart).getTime();
+          const nodeDate = new Date(node.created).getTime();
+          if (nodeDate < startDate) visible = false;
+        }
+        if (timelineFilters.dateEnd) {
+          const endDate = new Date(timelineFilters.dateEnd).getTime() + 24 * 60 * 60 * 1000;
+          const nodeDate = new Date(node.created).getTime();
+          if (nodeDate > endDate) visible = false;
+        }
+        if (!timelineFilters.categories.includes(node.category)) visible = false;
+        const ratio = node.compression_ratio || 0;
+        if (ratio < timelineFilters.compressionMin) visible = false;
+        return visible;
+      });
+
+      // Group by week and calculate average compression
+      const weeklyData = {};
+      visibleNodes.forEach(node => {
+        const date = new Date(node.created);
+        // Get the Monday of the week
+        const weekStart = new Date(date);
+        weekStart.setDate(date.getDate() - date.getDay() + 1);
+        weekStart.setHours(0, 0, 0, 0);
+        const weekKey = weekStart.toISOString().split('T')[0];
+
+        if (!weeklyData[weekKey]) {
+          weeklyData[weekKey] = {
+            date: weekStart,
+            compressionRatios: [],
+            count: 0
+          };
+        }
+
+        weeklyData[weekKey].compressionRatios.push(node.compression_ratio || 0);
+        weeklyData[weekKey].count++;
+      });
+
+      // Calculate averages and sort by date
+      const trends = Object.entries(weeklyData).map(([key, data]) => {
+        const avgRatio = data.compressionRatios.reduce((a, b) => a + b, 0) / data.compressionRatios.length;
+        return {
+          date: data.date,
+          avgCompression: avgRatio,
+          count: data.count
+        };
+      }).sort((a, b) => a.date - b.date);
+
+      return trends;
+    }
+
+    function calculateHandoffsByWeek() {
+      // Filter visible nodes
+      const visibleNodes = nodes3D.filter(node => {
+        let visible = true;
+        if (timelineFilters.dateStart) {
+          const startDate = new Date(timelineFilters.dateStart).getTime();
+          const nodeDate = new Date(node.created).getTime();
+          if (nodeDate < startDate) visible = false;
+        }
+        if (timelineFilters.dateEnd) {
+          const endDate = new Date(timelineFilters.dateEnd).getTime() + 24 * 60 * 60 * 1000;
+          const nodeDate = new Date(node.created).getTime();
+          if (nodeDate > endDate) visible = false;
+        }
+        if (!timelineFilters.categories.includes(node.category)) visible = false;
+        const ratio = node.compression_ratio || 0;
+        if (ratio < timelineFilters.compressionMin) visible = false;
+        return visible;
+      });
+
+      // Group by week
+      const weeklyData = {};
+      visibleNodes.forEach(node => {
+        const date = new Date(node.created);
+        const weekStart = new Date(date);
+        weekStart.setDate(date.getDate() - date.getDay() + 1);
+        weekStart.setHours(0, 0, 0, 0);
+        const weekKey = weekStart.toISOString().split('T')[0];
+
+        if (!weeklyData[weekKey]) {
+          weeklyData[weekKey] = {
+            date: weekStart,
+            count: 0,
+            plans: 0,
+            conversations: 0
+          };
+        }
+
+        weeklyData[weekKey].count++;
+        if (node.category === 'plan') weeklyData[weekKey].plans++;
+        if (node.category === 'conversation') weeklyData[weekKey].conversations++;
+      });
+
+      // Sort by date
+      const weeks = Object.values(weeklyData).sort((a, b) => a.date - b.date);
+      return weeks;
+    }
+
+    function renderCompressionChart(trends) {
+      if (!trends || trends.length === 0) {
+        console.warn('No trend data to render');
+        return;
+      }
+
+      const svg = d3.select('#trends-compression-chart');
+      svg.selectAll('*').remove();  // Clear previous chart
+
+      const container = document.querySelector('#trends-compression-chart').parentElement;
+      const width = container.clientWidth - 24;  // Account for padding
+      const height = 150;
+      const margin = { top: 10, right: 10, bottom: 25, left: 35 };
+      const chartWidth = width - margin.left - margin.right;
+      const chartHeight = height - margin.top - margin.bottom;
+
+      svg.attr('viewBox', `0 0 ${width} ${height}`);
+
+      const g = svg.append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+
+      // Scales
+      const xScale = d3.scaleTime()
+        .domain(d3.extent(trends, d => d.date))
+        .range([0, chartWidth]);
+
+      const yScale = d3.scaleLinear()
+        .domain([0, d3.max(trends, d => d.avgCompression) * 1.1])
+        .range([chartHeight, 0]);
+
+      // Grid lines
+      g.append('g')
+        .attr('class', 'trends-grid')
+        .call(d3.axisLeft(yScale).tickSize(-chartWidth).tickFormat(''))
+        .selectAll('line')
+        .attr('stroke', 'rgba(100, 116, 139, 0.1)')
+        .attr('stroke-dasharray', '2,2');
+
+      // Area
+      const area = d3.area()
+        .x(d => xScale(d.date))
+        .y0(chartHeight)
+        .y1(d => yScale(d.avgCompression))
+        .curve(d3.curveMonotoneX);
+
+      g.append('path')
+        .datum(trends)
+        .attr('class', 'trends-area')
+        .attr('d', area);
+
+      // Line
+      const line = d3.line()
+        .x(d => xScale(d.date))
+        .y(d => yScale(d.avgCompression))
+        .curve(d3.curveMonotoneX);
+
+      g.append('path')
+        .datum(trends)
+        .attr('class', 'trends-line')
+        .attr('d', line);
+
+      // Dots
+      const tooltip = d3.select('#trends-tooltip');
+
+      g.selectAll('.trends-dot')
+        .data(trends)
+        .enter()
+        .append('circle')
+        .attr('class', 'trends-dot')
+        .attr('cx', d => xScale(d.date))
+        .attr('cy', d => yScale(d.avgCompression))
+        .attr('r', 3)
+        .on('mouseover', function(event, d) {
+          tooltip
+            .style('display', 'block')
+            .style('left', (event.pageX + 10) + 'px')
+            .style('top', (event.pageY - 20) + 'px')
+            .html(`
+              <strong>Week of ${d.date.toLocaleDateString()}</strong><br>
+              Avg Compression: ${d.avgCompression.toFixed(1)}%<br>
+              Handoffs: ${d.count}
+            `);
+        })
+        .on('mouseout', function() {
+          tooltip.style('display', 'none');
+        })
+        .on('click', function(event, d) {
+          // Filter timeline to this week
+          const weekStart = new Date(d.date);
+          const weekEnd = new Date(d.date);
+          weekEnd.setDate(weekEnd.getDate() + 6);
+
+          document.getElementById('filter-date-start').value = weekStart.toISOString().split('T')[0];
+          document.getElementById('filter-date-end').value = weekEnd.toISOString().split('T')[0];
+
+          applyTimelineFilters();
+          showToast3D(`Filtered to week of ${weekStart.toLocaleDateString()}`, 'info');
+        });
+
+      // Axes
+      g.append('g')
+        .attr('class', 'trends-axis')
+        .attr('transform', `translate(0,${chartHeight})`)
+        .call(d3.axisBottom(xScale).ticks(4).tickFormat(d3.timeFormat('%b %d')));
+
+      g.append('g')
+        .attr('class', 'trends-axis')
+        .call(d3.axisLeft(yScale).ticks(5).tickFormat(d => d + '%'));
+    }
+
+    function renderHandoffsChart(weeks) {
+      if (!weeks || weeks.length === 0) {
+        console.warn('No weekly data to render');
+        return;
+      }
+
+      const svg = d3.select('#trends-handoffs-chart');
+      svg.selectAll('*').remove();  // Clear previous chart
+
+      const container = document.querySelector('#trends-handoffs-chart').parentElement;
+      const width = container.clientWidth - 24;
+      const height = 150;
+      const margin = { top: 10, right: 10, bottom: 25, left: 35 };
+      const chartWidth = width - margin.left - margin.right;
+      const chartHeight = height - margin.top - margin.bottom;
+
+      svg.attr('viewBox', `0 0 ${width} ${height}`);
+
+      const g = svg.append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+
+      // Scales
+      const xScale = d3.scaleBand()
+        .domain(weeks.map(w => w.date.toISOString().split('T')[0]))
+        .range([0, chartWidth])
+        .padding(0.2);
+
+      const yScale = d3.scaleLinear()
+        .domain([0, d3.max(weeks, w => w.count) * 1.1])
+        .range([chartHeight, 0]);
+
+      // Grid lines
+      g.append('g')
+        .attr('class', 'trends-grid')
+        .call(d3.axisLeft(yScale).tickSize(-chartWidth).tickFormat(''))
+        .selectAll('line')
+        .attr('stroke', 'rgba(100, 116, 139, 0.1)')
+        .attr('stroke-dasharray', '2,2');
+
+      // Bars
+      const tooltip = d3.select('#trends-tooltip');
+
+      g.selectAll('.trends-bar')
+        .data(weeks)
+        .enter()
+        .append('rect')
+        .attr('class', 'trends-bar')
+        .attr('x', w => xScale(w.date.toISOString().split('T')[0]))
+        .attr('y', w => yScale(w.count))
+        .attr('width', xScale.bandwidth())
+        .attr('height', w => chartHeight - yScale(w.count))
+        .on('mouseover', function(event, w) {
+          tooltip
+            .style('display', 'block')
+            .style('left', (event.pageX + 10) + 'px')
+            .style('top', (event.pageY - 20) + 'px')
+            .html(`
+              <strong>Week of ${w.date.toLocaleDateString()}</strong><br>
+              Total: ${w.count} handoffs<br>
+              Plans: ${w.plans} | Conversations: ${w.conversations}
+            `);
+        })
+        .on('mouseout', function() {
+          tooltip.style('display', 'none');
+        })
+        .on('click', function(event, w) {
+          // Filter timeline to this week
+          const weekStart = new Date(w.date);
+          const weekEnd = new Date(w.date);
+          weekEnd.setDate(weekEnd.getDate() + 6);
+
+          document.getElementById('filter-date-start').value = weekStart.toISOString().split('T')[0];
+          document.getElementById('filter-date-end').value = weekEnd.toISOString().split('T')[0];
+
+          applyTimelineFilters();
+          showToast3D(`Filtered to week of ${weekStart.toLocaleDateString()}`, 'info');
+        });
+
+      // Axes
+      g.append('g')
+        .attr('class', 'trends-axis')
+        .attr('transform', `translate(0,${chartHeight})`)
+        .call(d3.axisBottom(xScale).tickValues(
+          xScale.domain().filter((d, i) => i % Math.ceil(weeks.length / 4) === 0)
+        ).tickFormat(d => {
+          const date = new Date(d);
+          return d3.timeFormat('%b %d')(date);
+        }));
+
+      g.append('g')
+        .attr('class', 'trends-axis')
+        .call(d3.axisLeft(yScale).ticks(5));
+    }
+
     // Make functions globally accessible
     window.applyTimelineFilters = applyTimelineFilters;
     window.clearTimelineFilters = clearTimelineFilters;
     window.applyFilterPreset = applyFilterPreset;
+    window.initializeTimelineTrends = initializeTimelineTrends;
 
   </script>
 </body>
