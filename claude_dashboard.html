@@ -6598,20 +6598,15 @@
         const data = await response.json();
 
         if (data.ok && data.handoffs) {
-          // Filter out SLIM files (corrupted by pipe delimiter parsing)
+          // Filter to V4Z only (all SLIM formats have parsing issues)
           const allHandoffs = data.handoffs;
           comparisonHandoffs = allHandoffs.filter(h =>
-            h.compression_format === 'v4z' ||
-            h.compression_format === 'markdown_slim'
+            h.compression_format === 'v4z'
           );
 
-          console.log(`Loaded ${comparisonHandoffs.length}/${allHandoffs.length} handoffs for comparison`);
-          console.log('Filtered formats:', comparisonHandoffs.reduce((acc, h) => {
-            const fmt = h.compression_format || 'unknown';
-            acc[fmt] = (acc[fmt] || 0) + 1;
-            return acc;
-          }, {}));
-          console.log(`Filtered out ${allHandoffs.length - comparisonHandoffs.length} SLIM files (corrupted)`);
+          console.log(`Loaded ${comparisonHandoffs.length}/${allHandoffs.length} handoffs for comparison (V4Z only)`);
+          console.log('Available:', comparisonHandoffs.length, 'V4Z files');
+          console.log(`Filtered out ${allHandoffs.length - comparisonHandoffs.length} non-V4Z files (SLIM formats have parsing issues)`);
         }
       } catch (error) {
         console.error('Failed to load handoffs for comparison:', error);
