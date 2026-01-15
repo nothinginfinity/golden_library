@@ -102,6 +102,12 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif path == '/api/patterns/by-category':
             self.serve_patterns_by_category(parsed_path.query)
             return
+        elif path == '/api/compare':
+            self.serve_compare(parsed_path.query)
+            return
+        elif path == '/api/golden/handoffs':
+            self.serve_golden_handoffs()
+            return
         elif path == '/' or path == '/index.html':
             self.serve_dashboard()
             return
@@ -1525,6 +1531,254 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 'error': str(e),
                 'message': 'Failed to calculate statistics'
             }, status=500)
+
+    # =========================================================================
+    # Comparison API
+    # =========================================================================
+
+    def serve_golden_handoffs(self):
+        """List all golden library handoffs for comparison."""
+        try:
+            if not GOLDEN_INDEX_FILE.exists():
+                self.serve_json({'ok': True, 'handoffs': []})
+                return
+
+            with open(GOLDEN_INDEX_FILE, 'r') as f:
+                golden_index = json.load(f)
+
+            handoffs = []
+            for h in golden_index.get('handoffs', []):
+                handoffs.append({
+                    'id': h.get('handoff_id'),
+                    'filename': h.get('filename', h.get('original_file', 'unknown')),
+                    'title': h.get('title', 'Unknown'),
+                    'compression_format': h.get('compression_format', 'unknown'),
+                    'created': h.get('created', ''),
+                    'original_size': h.get('original_size', 0),
+                    'compressed_size': h.get('compressed_size', 0),
+                    'final_size': h.get('compressed_size', 0),
+                    'reduction_percent': h.get('reduction_percent', 0),
+                    'category': 'golden_library'
+                })
+
+            self.serve_json({
+                'ok': True,
+                'handoffs': handoffs,
+                'count': len(handoffs)
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def serve_compare(self, query_string):
+        """Compare two handoffs and return diff."""
+        try:
+            from urllib.parse import parse_qs
+            import difflib
+
+            params = parse_qs(query_string)
+            handoff_a = params.get('handoff_a', [None])[0]
+            handoff_b = params.get('handoff_b', [None])[0]
+
+            if not handoff_a or not handoff_b:
+                self.serve_json({
+                    'ok': False,
+                    'error': 'Missing handoff_a or handoff_b parameter'
+                }, status=400)
+                return
+
+            # Decompress both handoffs
+            content_a = self._decompress_handoff(handoff_a)
+            content_b = self._decompress_handoff(handoff_b)
+
+            if not content_a:
+                self.serve_json({
+                    'ok': False,
+                    'error': f'Failed to decompress handoff_a: {handoff_a}'
+                }, status=404)
+                return
+
+            if not content_b:
+                self.serve_json({
+                    'ok': False,
+                    'error': f'Failed to decompress handoff_b: {handoff_b}'
+                }, status=404)
+                return
+
+            # Split into lines for diff
+            lines_a = content_a.splitlines(keepends=True)
+            lines_b = content_b.splitlines(keepends=True)
+
+            # Generate unified diff
+            unified_diff = list(difflib.unified_diff(
+                lines_a,
+                lines_b,
+                fromfile=f'Handoff A ({handoff_a})',
+                tofile=f'Handoff B ({handoff_b})',
+                lineterm=''
+            ))
+
+            # Generate side-by-side diff data
+            differ = difflib.Differ()
+            diff_result = list(differ.compare(lines_a, lines_b))
+
+            # Process diff for side-by-side view
+            side_by_side = []
+            for line in diff_result:
+                prefix = line[0]
+                content = line[2:] if len(line) > 2 else ''
+
+                if prefix == ' ':  # unchanged
+                    side_by_side.append({
+                        'type': 'unchanged',
+                        'left': content,
+                        'right': content
+                    })
+                elif prefix == '-':  # removed
+                    side_by_side.append({
+                        'type': 'removed',
+                        'left': content,
+                        'right': ''
+                    })
+                elif prefix == '+':  # added
+                    side_by_side.append({
+                        'type': 'added',
+                        'left': '',
+                        'right': content
+                    })
+
+            # Calculate stats
+            added = sum(1 for item in side_by_side if item['type'] == 'added')
+            removed = sum(1 for item in side_by_side if item['type'] == 'removed')
+            changed = added + removed
+
+            self.serve_json({
+                'ok': True,
+                'handoff_a': handoff_a,
+                'handoff_b': handoff_b,
+                'unified_diff': ''.join(unified_diff),
+                'side_by_side': side_by_side,
+                'stats': {
+                    'added': added,
+                    'removed': removed,
+                    'changed': changed,
+                    'unchanged': len([x for x in side_by_side if x['type'] == 'unchanged'])
+                }
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({
+                'ok': False,
+                'error': f'Comparison failed: {str(e)}'
+            }, status=500)
+
+    def _decompress_handoff(self, handoff_id):
+        """Decompress a single handoff and return content."""
+        try:
+            print(f"[_decompress_handoff] Attempting to decompress: {handoff_id}")
+            # First check golden library
+            if GOLDEN_INDEX_FILE.exists():
+                try:
+                    with open(GOLDEN_INDEX_FILE, 'r') as f:
+                        golden_index = json.load(f)
+
+                    for handoff in golden_index.get('handoffs', []):
+                        if handoff.get('handoff_id') == handoff_id:
+                            # Found in golden library
+                            compressed_file = handoff.get('compressed_file')
+
+                            # Try new format first (V4Z with compressed_file field)
+                            if compressed_file:
+                                full_path = GOLDEN_LIBRARY_DIR.parent / compressed_file
+                                if full_path.exists():
+                                    try:
+                                        from v4z_compressor import V4ZCompressor
+                                        compressor = V4ZCompressor()
+
+                                        with open(full_path, 'r') as f:
+                                            compressed_content = f.read()
+
+                                        return compressor.decompress(compressed_content)
+                                    except Exception as e:
+                                        print(f"V4Z decompression failed: {e}")
+
+                            # Try old format (plain .md files)
+                            old_format_path = GOLDEN_LIBRARY_DIR / 'compressed' / f'{handoff_id}.md'
+                            if old_format_path.exists():
+                                with open(old_format_path, 'r') as f:
+                                    return f.read()
+
+                except Exception as e:
+                    print(f"Warning: Failed to check golden library: {e}")
+
+            # Check conversation library
+            conv_compressed_dirs = [
+                COMPRESSED_DIR / 'projects',
+                COMPRESSED_DIR / 'todos'
+            ]
+
+            for conv_dir in conv_compressed_dirs:
+                if not conv_dir.exists():
+                    continue
+
+                print(f"[_decompress_handoff] Searching in: {conv_dir}")
+
+                # Try exact match
+                slim_path = conv_dir / handoff_id
+                print(f"[_decompress_handoff] Trying exact: {slim_path}")
+                if slim_path.exists():
+                    print(f"[_decompress_handoff] Found exact match!")
+                    try:
+                        from slim_converter import SlimConverter
+                        converter = SlimConverter()
+                        print(f"[_decompress_handoff] SlimConverter loaded")
+
+                        with open(slim_path, 'r', encoding='utf-8') as f:
+                            slim_content = f.read()
+                        print(f"[_decompress_handoff] Read {len(slim_content)} bytes")
+
+                        # Convert SLIM to JSONL
+                        result = converter.slim_to_jsonl(slim_content)
+                        print(f"[_decompress_handoff] Conversion successful, {len(result)} bytes")
+                        return result
+                    except Exception as e:
+                        import traceback
+                        print(f"SLIM decompression failed: {e}")
+                        traceback.print_exc()
+
+                # Try with common extensions
+                for ext in ['', '.indexed', '.slim', '.slim.indexed']:
+                    test_path = conv_dir / f'{handoff_id}{ext}'
+                    print(f"[_decompress_handoff] Trying with extension '{ext}': {test_path}")
+                    if test_path.exists():
+                        print(f"[_decompress_handoff] Found with extension '{ext}'!")
+                        try:
+                            from slim_converter import SlimConverter
+                            converter = SlimConverter()
+                            print(f"[_decompress_handoff] SlimConverter loaded")
+
+                            with open(test_path, 'r', encoding='utf-8') as f:
+                                slim_content = f.read()
+                            print(f"[_decompress_handoff] Read {len(slim_content)} bytes")
+
+                            result = converter.slim_to_jsonl(slim_content)
+                            print(f"[_decompress_handoff] Conversion successful, {len(result)} bytes")
+                            return result
+                        except Exception as e:
+                            import traceback
+                            print(f"SLIM decompression failed: {e}")
+                            traceback.print_exc()
+
+            print(f"[_decompress_handoff] Failed to find handoff: {handoff_id}")
+            return None
+
+        except Exception as e:
+            print(f"Decompression error: {e}")
+            return None
 
     # =========================================================================
     # Pattern Library API

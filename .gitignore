@@ -51,3 +51,4 @@ config.local.json
 # Handoffs (user data)
 handoffs/
 *.meta.json
+server.log

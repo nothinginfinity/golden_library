@@ -6473,17 +6473,17 @@
     let selectedHandoffA = null;
     let selectedHandoffB = null;
 
-    // Load handoffs for comparison (reuse data from 3D viewer)
+    // Load handoffs for comparison (golden library only - SLIM JSONL format is broken)
     async function loadComparisonHandoffs() {
       if (comparisonHandoffs.length > 0) return; // Already loaded
 
       try {
-        const response = await fetch('/api/3d/handoffs');
+        const response = await fetch('/api/golden/handoffs');
         const data = await response.json();
 
         if (data.ok && data.handoffs) {
           comparisonHandoffs = data.handoffs;
-          console.log(`Loaded ${comparisonHandoffs.length} handoffs for comparison`);
+          console.log(`Loaded ${comparisonHandoffs.length} golden library handoffs for comparison`);
         }
       } catch (error) {
         console.error('Failed to load handoffs for comparison:', error);
@@ -6620,7 +6620,7 @@
         </p>
         <div class="diff-loading">
           <div class="diff-loading-spinner">⏳</div>
-          <div>Loading handoff content...</div>
+          <div>Comparing handoffs...</div>
         </div>
       `;
 
@@ -6628,18 +6628,26 @@
       resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
       try {
-        // Fetch decompressed content for both handoffs
-        const [contentA, contentB] = await Promise.all([
-          fetchHandoffContent(selectedHandoffA.id),
-          fetchHandoffContent(selectedHandoffB.id)
-        ]);
+        // Strip file extensions from handoff IDs (try longest match first)
+        const cleanIdA = selectedHandoffA.id.replace(/\.slim\.indexed$|\.indexed$|\.slim$/, '');
+        const cleanIdB = selectedHandoffB.id.replace(/\.slim\.indexed$|\.indexed$|\.slim$/, '');
 
-        if (!contentA || !contentB) {
-          throw new Error('Failed to load handoff content');
+        console.log('Original IDs:', selectedHandoffA.id, selectedHandoffB.id);
+        console.log('Clean IDs:', cleanIdA, cleanIdB);
+
+        // Call backend comparison API
+        const response = await fetch(`/api/compare?handoff_a=${cleanIdA}&handoff_b=${cleanIdB}`);
+        const data = await response.json();
+
+        if (!data.ok) {
+          throw new Error(data.error || 'Comparison failed');
         }
 
-        // Generate and display diff
-        displayDiff(contentA, contentB);
+        // Transform backend format to frontend format
+        const diff = transformBackendDiff(data);
+
+        // Display diff
+        displayDiffFromBackend(diff);
       } catch (error) {
         console.error('Comparison error:', error);
         resultsDiv.innerHTML = `
@@ -6649,6 +6657,85 @@
           </div>
         `;
       }
+    }
+
+    function transformBackendDiff(backendData) {
+      // Backend gives: {side_by_side: [{type, left, right}], stats, unified_diff}
+      // Frontend needs: {lines: [{type, lineA, lineB, numA, numB}], stats}
+
+      const lines = [];
+      let lineNumA = 1;
+      let lineNumB = 1;
+
+      backendData.side_by_side.forEach(item => {
+        const line = {
+          type: item.type,
+          lineA: item.left || null,
+          lineB: item.right || null,
+          numA: null,
+          numB: null
+        };
+
+        // Assign line numbers
+        if (item.type === 'removed') {
+          line.numA = lineNumA++;
+        } else if (item.type === 'added') {
+          line.numB = lineNumB++;
+        } else if (item.type === 'unchanged') {
+          line.numA = lineNumA++;
+          line.numB = lineNumB++;
+        }
+
+        lines.push(line);
+      });
+
+      return {
+        lines: lines,
+        stats: backendData.stats,
+        unified_diff: backendData.unified_diff
+      };
+    }
+
+    function displayDiffFromBackend(diff) {
+      const resultsDiv = document.getElementById('comparison-results');
+
+      // Build UI
+      resultsDiv.innerHTML = `
+        <div class="chart-title">⚖️ Comparison Results</div>
+        <p style="color: #94a3b8; margin: 16px 0;">
+          Comparing <strong style="color: #a5b4fc;">${selectedHandoffA.filename || selectedHandoffA.id}</strong> vs
+          <strong style="color: #a5b4fc;">${selectedHandoffB.filename || selectedHandoffB.id}</strong>
+        </p>
+
+        <div class="diff-controls">
+          <div class="diff-view-toggle">
+            <button class="diff-toggle-btn ${currentDiffView === 'sidebyside' ? 'active' : ''}" onclick="switchDiffView('sidebyside')">
+              Side-by-Side
+            </button>
+            <button class="diff-toggle-btn ${currentDiffView === 'unified' ? 'active' : ''}" onclick="switchDiffView('unified')">
+              Unified
+            </button>
+          </div>
+          <div class="diff-stats">
+            <div class="diff-stat diff-stat-added">
+              <span>+${diff.stats.added}</span>
+            </div>
+            <div class="diff-stat diff-stat-removed">
+              <span>-${diff.stats.removed}</span>
+            </div>
+            <div class="diff-stat diff-stat-unchanged">
+              <span>=${diff.stats.unchanged}</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="diff-display" class="diff-container">
+          ${renderDiff(diff, currentDiffView)}
+        </div>
+      `;
+
+      // Store diff globally for view switching
+      window.currentDiff = diff;
     }
 
     async function fetchHandoffContent(handoffId) {
@@ -6860,8 +6947,22 @@
     function switchDiffView(view) {
       currentDiffView = view;
 
-      // Re-fetch content and display (or we could cache it)
-      compareHandoffs();
+      // Re-render diff with new view (using cached diff)
+      if (window.currentDiff) {
+        const diffDisplay = document.getElementById('diff-display');
+        if (diffDisplay) {
+          diffDisplay.innerHTML = renderDiff(window.currentDiff, view);
+        }
+
+        // Update button states
+        document.querySelectorAll('.diff-toggle-btn').forEach(btn => {
+          btn.classList.remove('active');
+          if ((view === 'sidebyside' && btn.textContent.includes('Side-by-Side')) ||
+              (view === 'unified' && btn.textContent.includes('Unified'))) {
+            btn.classList.add('active');
+          }
+        });
+      }
     }
 
     function escapeHtml(text) {

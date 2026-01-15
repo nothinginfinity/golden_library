@@ -278,10 +278,12 @@ class SlimConverter:
         elif type_code == "bool":
             return value_str.lower() == "true"
         elif type_code == "int":
-            return int(value_str)
+            return int(value_str) if value_str else 0
         elif type_code == "float":
-            return float(value_str)
+            return float(value_str) if value_str else 0.0
         elif type_code == "json":
+            if not value_str or value_str.strip() == "":
+                return None
             return json.loads(value_str)
         elif type_code in ("str", "iso"):
             # Unescape pipes
