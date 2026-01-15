@@ -1410,9 +1410,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                                 'final_size': compressed_bytes,
                                 'reduction_percent': round(reduction, 1),
                                 'created': gh.get('created', datetime.now().isoformat()),
-                                'project_id': 'golden_library',
+                                'project_id': gh.get('project', 'golden_library'),
                                 'session_id': gh.get('handoff_id', 'unknown'),
-                                'category': 'plan',  # Green nodes
+                                'category': gh.get('category', 'plan'),  # Use category from index
                                 'phase': gh.get('phase', 'unknown'),
                                 'phase_name': gh.get('phase_name', '')
                             })
