@@ -7,6 +7,7 @@ Provides JSON API for dashboard to load real compressed data.
 import json
 import os
 import glob
+import sys
 from pathlib import Path
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
@@ -19,6 +20,9 @@ import time
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+# Add src directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent / 'src'))
+
 # Paths
 HOME = Path.home()
 LIBRARY_DIR = HOME / ".claude" / "conversation_library"
@@ -28,6 +32,8 @@ DAEMON_PID_FILE = HOME / ".claude" / "auto_compress_daemon.pid"
 ARSENAL_DIR = HOME / ".claude" / "arsenal"
 ARSENAL_LIBRARY = ARSENAL_DIR / "library"
 ARSENAL_PRESETS = ARSENAL_DIR / "presets"
+GOLDEN_LIBRARY_DIR = HOME / "ztgi" / "golden_library" / ".golden_library"
+GOLDEN_INDEX_FILE = GOLDEN_LIBRARY_DIR / "index.json"
 
 class DashboardHandler(SimpleHTTPRequestHandler):
     """Custom handler to serve API endpoints and static files."""
@@ -150,6 +156,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             return
         elif path == '/api/3d/handoff/decompress':
             self.decompress_3d_handoff(data)
+            return
+        elif path == '/api/golden/restore':
+            self.restore_golden_plan(data)
             return
         else:
             self.send_error(404, "Not found")
@@ -1325,17 +1334,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             stats = self.get_compression_stats()
             conversations = stats.get('conversations', [])
 
-            # Check if we have any conversations
-            if not conversations:
-                self.serve_json({
-                    'ok': True,
-                    'count': 0,
-                    'handoffs': [],
-                    'message': 'No handoffs found. The conversation library is empty.'
-                })
-                return
-
-            # Transform to 3D viewer format
+            # Transform conversation library handoffs to 3D viewer format
             handoffs = []
             skipped = 0
 
@@ -1365,13 +1364,75 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                         'created': conv.get('created', datetime.now().isoformat()),
                         'project_id': conv.get('project', 'unknown'),
                         'session_id': conv.get('id', 'unknown'),
-                        'category': conv.get('category', 'conversations')
+                        'category': 'conversation'  # Blue nodes
                     })
                 except Exception as e:
                     # Skip individual files that cause errors
                     print(f"Warning: Skipped conversation {conv.get('id', 'unknown')}: {e}")
                     skipped += 1
                     continue
+
+            # Load golden library handoffs
+            if GOLDEN_INDEX_FILE.exists():
+                try:
+                    with open(GOLDEN_INDEX_FILE, 'r') as f:
+                        golden_index = json.load(f)
+
+                    golden_handoffs = golden_index.get('handoffs', [])
+
+                    for gh in golden_handoffs:
+                        try:
+                            # Verify compressed file exists
+                            compressed_file = gh.get('compressed_file')
+                            if compressed_file:
+                                full_path = GOLDEN_LIBRARY_DIR.parent / compressed_file
+                                if not full_path.exists():
+                                    skipped += 1
+                                    continue
+
+                            # Get sizes (prefer bytes, fallback to tokens)
+                            original_bytes = gh.get('original_size_bytes', gh.get('original_size', 0))
+                            compressed_bytes = gh.get('compressed_size_bytes', gh.get('compressed_size', 0))
+
+                            # Calculate reduction
+                            reduction = gh.get('reduction_percent', 0)
+                            if reduction == 0 and original_bytes > 0:
+                                reduction = ((original_bytes - compressed_bytes) / original_bytes * 100)
+
+                            # Get format
+                            comp_format = gh.get('format', gh.get('compression_format', 'v4z'))
+
+                            handoffs.append({
+                                'id': gh.get('handoff_id', 'unknown'),
+                                'filename': gh.get('original_file', gh.get('source_file', 'unknown')),
+                                'compression_format': comp_format,
+                                'original_size': original_bytes,
+                                'final_size': compressed_bytes,
+                                'reduction_percent': round(reduction, 1),
+                                'created': gh.get('created', datetime.now().isoformat()),
+                                'project_id': 'golden_library',
+                                'session_id': gh.get('handoff_id', 'unknown'),
+                                'category': 'plan',  # Green nodes
+                                'phase': gh.get('phase', 'unknown'),
+                                'phase_name': gh.get('phase_name', '')
+                            })
+                        except Exception as e:
+                            print(f"Warning: Skipped golden handoff {gh.get('handoff_id', 'unknown')}: {e}")
+                            skipped += 1
+                            continue
+
+                except Exception as e:
+                    print(f"Warning: Failed to load golden library index: {e}")
+
+            # Check if we have any handoffs
+            if not handoffs:
+                self.serve_json({
+                    'ok': True,
+                    'count': 0,
+                    'handoffs': [],
+                    'message': 'No handoffs found. Both libraries are empty.'
+                })
+                return
 
             response = {
                 'ok': True,
@@ -1497,7 +1558,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self.serve_json({'ok': False, 'error': str(e)}, status=500)
 
     def decompress_3d_handoff(self, data):
-        """Decompress a handoff (stub for now)."""
+        """Decompress a handoff."""
         try:
             handoff_id = data.get('handoff_id')
 
@@ -1505,24 +1566,121 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 self.serve_json({'ok': False, 'error': 'Missing handoff_id'}, status=400)
                 return
 
-            # Find the conversation
+            # First check golden library
+            if GOLDEN_INDEX_FILE.exists():
+                try:
+                    with open(GOLDEN_INDEX_FILE, 'r') as f:
+                        golden_index = json.load(f)
+
+                    for handoff in golden_index.get('handoffs', []):
+                        if handoff.get('handoff_id') == handoff_id:
+                            # Found in golden library
+                            compressed_file = handoff.get('compressed_file')
+
+                            # Try new format first (V4Z with compressed_file field)
+                            if compressed_file:
+                                full_path = GOLDEN_LIBRARY_DIR.parent / compressed_file
+                                if full_path.exists():
+                                    try:
+                                        from v4z_compressor import V4ZCompressor
+                                        compressor = V4ZCompressor()
+
+                                        with open(full_path, 'r') as f:
+                                            compressed_content = f.read()
+
+                                        decompressed_content = compressor.decompress(compressed_content)
+
+                                        self.serve_json({
+                                            'ok': True,
+                                            'content': decompressed_content,
+                                            'handoff_id': handoff_id,
+                                            'source': 'golden_library'
+                                        })
+                                        return
+                                    except Exception as e:
+                                        self.serve_json({'ok': False, 'error': f'Decompression failed: {str(e)}'}, status=500)
+                                        return
+
+                            # Try old format (plain .md files)
+                            old_format_path = GOLDEN_LIBRARY_DIR / 'compressed' / f'{handoff_id}.md'
+                            if old_format_path.exists():
+                                try:
+                                    with open(old_format_path, 'r') as f:
+                                        content = f.read()
+
+                                    self.serve_json({
+                                        'ok': True,
+                                        'content': content,
+                                        'handoff_id': handoff_id,
+                                        'source': 'golden_library',
+                                        'format': 'legacy_markdown'
+                                    })
+                                    return
+                                except Exception as e:
+                                    self.serve_json({'ok': False, 'error': f'Failed to read legacy file: {str(e)}'}, status=500)
+                                    return
+
+                except Exception as e:
+                    print(f"Warning: Failed to check golden library: {e}")
+
+            # Check conversation library (stub for now)
             stats = self.get_compression_stats()
             conversations = stats.get('conversations', [])
 
             for conv in conversations:
                 if conv.get('id') == handoff_id:
-                    # Stub: In real implementation, would decompress the file
-                    output_file = f"~/.claude/decompressed/{conv.get('title', 'unknown')}.jsonl"
-
+                    # Conversation library decompression not implemented yet
                     self.serve_json({
-                        'ok': True,
-                        'message': 'Decompression not yet implemented',
-                        'output_file': output_file,
-                        'size': conv.get('original_tokens', 0) * 4
-                    })
+                        'ok': False,
+                        'error': 'Conversation library decompression not yet implemented',
+                        'message': 'Only golden library handoffs can be decompressed currently'
+                    }, status=501)
                     return
 
             self.serve_json({'ok': False, 'error': 'Handoff not found'}, status=404)
+        except Exception as e:
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def restore_golden_plan(self, data):
+        """Restore a golden library plan to CURRENT_PLAN.md."""
+        try:
+            handoff_id = data.get('handoff_id')
+
+            if not handoff_id:
+                self.serve_json({'ok': False, 'error': 'Missing handoff_id'}, status=400)
+                return
+
+            # Use the unarchive-phase.sh script
+            script_path = GOLDEN_LIBRARY_DIR.parent / 'scripts' / 'unarchive-phase.sh'
+
+            if not script_path.exists():
+                self.serve_json({'ok': False, 'error': 'unarchive-phase.sh not found'}, status=500)
+                return
+
+            # Run the unarchive script
+            result = subprocess.run(
+                [str(script_path), handoff_id],
+                cwd=GOLDEN_LIBRARY_DIR.parent,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if result.returncode == 0:
+                self.serve_json({
+                    'ok': True,
+                    'message': f'Restored handoff {handoff_id} to CURRENT_PLAN.md',
+                    'handoff_id': handoff_id
+                })
+            else:
+                error_msg = result.stderr if result.stderr else result.stdout
+                self.serve_json({
+                    'ok': False,
+                    'error': f'Restore failed: {error_msg}'
+                }, status=500)
+
+        except subprocess.TimeoutExpired:
+            self.serve_json({'ok': False, 'error': 'Restore operation timed out'}, status=500)
         except Exception as e:
             self.serve_json({'ok': False, 'error': str(e)}, status=500)
 

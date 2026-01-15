@@ -194,43 +194,116 @@ Transform compression system from basic format detection to production-ready tok
 ---
 
 ### 🟢 Priority 3: 3D Viewer Integration
-**Status:** Not Started
+**Status:** ✅ COMPLETE
 **Owner:** Koda
 **Estimated:** 1 day
 
 **Objective:** Visualize compressed handoffs in 3D viewer, click to decompress and view.
 
 **Tasks:**
-- [ ] Add `.golden_library/index.json` format
+- [x] Add `.golden_library/index.json` format
   - Schema: handoff_id, phase, date, size_original, size_compressed, tags
-- [ ] Update `/api/3d/handoffs` to include archived handoffs
-  - Current: only conversation_library handoffs
-  - New: merge with .golden_library handoffs
+- [x] Update `/api/3d/handoffs` to include archived handoffs
+  - Merged conversation_library + golden_library handoffs
   - Color by type: conversation (blue), plan (green)
-- [ ] Add click handler for plan handoffs
-  - Show decompressed content in modal
-  - Display metadata: phase, date, reduction %
-  - Add "Restore to CURRENT_PLAN.md" button
-- [ ] Implement timeline layout mode
-  - Position nodes chronologically on timeline
-  - X-axis = time, Y-axis = compression ratio
-  - Scrubber to navigate time range
+- [x] Add click handler for plan handoffs
+  - Modal shows decompressed V4Z content
+  - Displays metadata: phase, date, reduction %
+  - "Restore to CURRENT_PLAN.md" button implemented
+- [x] Implement timeline layout mode
+  - 6 layouts: globe, clusters, grid, helix, scatter, timeline
+  - Timeline: X=date, Y=compression ratio, Z=random offset
+  - Layout switcher with active state
 
-**Acceptance Criteria:**
-- Archived plans appear in 3D viewer
-- Click → modal shows decompressed content
-- Timeline mode shows project evolution
-- Can restore archived plan to working directory
+**Completed Features:**
+- ✅ Category-based coloring (green=plan, blue=conversation)
+- ✅ Legacy format support (.md files + .v4z files)
+- ✅ Modal with decompression API
+- ✅ Restore functionality via unarchive script
+- ✅ Timeline chronological layout
+- ✅ 127 handoffs visible (22 plans + 105 conversations)
 
-**Files to Modify:**
-- `dashboard_server.py` (add index.json read, merge handoffs)
-- `claude_dashboard.html` (timeline layout, modal)
-- `.golden_library/index.json` (new)
+**Bug Fixes:**
+- Fixed modal close handlers (exposed to window scope)
+- Fixed legacy .md file decompression
+- Added event handling for overlay clicks
+- Fixed V4ZCompressionResult usage in import scripts
+
+**Files Modified:**
+- `dashboard_server.py` (+180 lines) - Merged golden/conversation indexes, legacy format support, decompress/restore APIs
+- `claude_dashboard.html` (+350 lines) - Modal UI, timeline layout, color coding, click handlers
+- `.golden_library/index.json` (22 entries)
 
 **Technical Notes:**
-- Timeline X-axis: `Date.parse(created)`
-- Timeline Y-axis: `100 - reduction_percent`
-- Use different node shapes: sphere=conversation, cube=plan
+- Timeline X-axis: `Date.parse(created)` normalized to -40 to +40
+- Timeline Y-axis: `reduction_percent / 100 * 40 - 20`
+- Modal uses `window.closePlanModal` for onclick compatibility
+- Legacy files fallback to .golden_library/compressed/<id>.md
+
+---
+
+### 🔵 Priority 3.5: Content Unification & Import Tools
+**Status:** ⚠️ IN PROGRESS
+**Owner:** Koda
+**Estimated:** 2-3 hours
+
+**Objective:** Create import tools to unify ALL Claude content (plans, conversations, terminals) into searchable golden library.
+
+**Discovery:**
+- Found 1621 JSONL conversation files in `~/.claude/projects/`
+- Found 19 historical plan/PRD files across ztgi repos
+- Current golden library: 22 plans (4 original + 18 imported)
+- Potential: 547+ total handoffs after import (22 plans + 525 conversations)
+
+**Tasks:**
+- [x] Create `scripts/import-all-plans.py`
+  - Scans ~/ztgi for PRD_*.md, PLAN_*.md, CURRENT_PLAN.md
+  - Compresses with V4Z (avg 53% reduction)
+  - Updates .golden_library/index.json
+  - Imported 18 plans from phi_proxy, prax-chat, qastone-spec
+- [x] Create `scripts/import-conversations.py`
+  - Parses ~/.claude/projects/*.jsonl conversations
+  - Converts to readable markdown format
+  - Compresses with V4Z
+  - Adds to golden library with category='conversation'
+- [x] Create `docs/UNIFIED_LIBRARY_GUIDE.md`
+  - Documents unified library structure
+  - Import/export workflows
+  - API reference
+  - Troubleshooting guide
+- [ ] Run import-conversations.py (after commit)
+  - Import all 1621 conversations
+  - Expected: ~420-500 valid imports
+- [ ] Test unified 3D viewer with 500+ nodes
+  - Performance check (60 FPS target)
+  - Search functionality
+  - Timeline visualization
+
+**Import Statistics (Plans):**
+- Total scanned: 21 files
+- Imported: 18 new plans
+- Skipped: 3 (already imported or duplicates)
+- Compression range: 42.5% - 62.7%
+- Projects covered: phi_proxy, prax-chat, golden_library, qastone-spec, phi_command_center_desktop
+
+**Files Created:**
+- `scripts/import-all-plans.py` (210 lines) - Historical plan importer
+- `scripts/import-conversations.py` (280 lines) - Claude Code conversation importer
+- `docs/UNIFIED_LIBRARY_GUIDE.md` (350 lines) - Complete documentation
+
+**Next Steps (After Commit):**
+1. Commit new import tools + updated plan
+2. Push to remote with handoff reference
+3. Run `python3 scripts/import-conversations.py` (imports all 1621)
+4. Test 3D viewer with 500+ nodes
+5. Performance optimization if needed
+
+**Technical Notes:**
+- JSONL format: 1 JSON object per line
+- Conversation parsing extracts user/assistant messages
+- Metadata: session_id, project, created, agent_id, message_count
+- Same V4Z compression as plans (SLIM + Zstandard)
+- Category: 'conversation' vs 'plan' for color coding
 
 ---
 
@@ -405,5 +478,7 @@ curl http://localhost:8080/api/patterns/search?q=websocket
 **Questions/Blockers:** None currently
 
 **Progress:**
-- ✅ Priority 1: Advanced Compression (SLIM + V4Z, 97.2% on repetitive content)
-- ✅ Priority 2: Automation & Git Hooks (pre-commit, archive/unarchive scripts)
+- ✅ Priority 1: Advanced Compression (SLIM + V4Z, 97.2% on repetitive content, token collision fixed)
+- ✅ Priority 2: Automation & Git Hooks (pre-commit, archive/unarchive scripts, handoff IDs working)
+- ✅ Priority 3: 3D Viewer Integration (modal, timeline, 127 handoffs visible, color-coded)
+- ⚠️ Priority 3.5: Content Unification (import tools created, ready to import 1621 conversations)
