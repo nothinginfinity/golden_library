@@ -1365,6 +1365,122 @@
     }
 
     /* ========================================================================= */
+    /* METRICS COMPARISON STYLES */
+    /* ========================================================================= */
+
+    .metrics-comparison {
+      margin-bottom: 32px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .metrics-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .metrics-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 8px;
+      padding: 20px;
+      position: relative;
+    }
+
+    .metrics-card.winner {
+      border-color: rgba(34, 197, 94, 0.5);
+      box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
+    }
+
+    .metrics-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .metrics-card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #a5b4fc;
+    }
+
+    .metrics-winner-badge {
+      background: rgba(34, 197, 94, 0.2);
+      border: 1px solid rgba(34, 197, 94, 0.5);
+      color: #6ee7b7;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .metrics-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(100, 116, 139, 0.2);
+    }
+
+    .metrics-row:last-child {
+      border-bottom: none;
+    }
+
+    .metrics-label {
+      color: #94a3b8;
+      font-size: 0.85rem;
+    }
+
+    .metrics-value {
+      color: #e2e8f0;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .metrics-value.better {
+      color: #6ee7b7;
+    }
+
+    .metrics-value.worse {
+      color: #fca5a5;
+    }
+
+    .metrics-bar {
+      margin-top: 12px;
+    }
+
+    .metrics-bar-label {
+      color: #94a3b8;
+      font-size: 0.75rem;
+      margin-bottom: 4px;
+    }
+
+    .metrics-bar-track {
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 4px;
+      height: 8px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metrics-bar-fill {
+      background: linear-gradient(90deg, rgba(99, 102, 241, 0.6), rgba(99, 102, 241, 0.3));
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+
+    .metrics-bar-fill.better {
+      background: linear-gradient(90deg, rgba(34, 197, 94, 0.6), rgba(34, 197, 94, 0.3));
+    }
+
+    /* ========================================================================= */
     /* DIFF VIEW STYLES */
     /* ========================================================================= */
 
@@ -6708,16 +6824,184 @@
       };
     }
 
+    function calculateMetricsComparison() {
+      // Calculate which handoff is "better" based on compression
+      const compressionA = selectedHandoffA.reduction_percent || 0;
+      const compressionB = selectedHandoffB.reduction_percent || 0;
+
+      const sizeA = selectedHandoffA.original_size || 0;
+      const sizeB = selectedHandoffB.original_size || 0;
+
+      const savedA = (sizeA - (selectedHandoffA.compressed_size || selectedHandoffA.final_size || 0));
+      const savedB = (sizeB - (selectedHandoffB.compressed_size || selectedHandoffB.final_size || 0));
+
+      // Determine winner (better compression ratio wins)
+      let winnerA = false;
+      let winnerB = false;
+
+      if (compressionA > compressionB) {
+        winnerA = true;
+      } else if (compressionB > compressionA) {
+        winnerB = true;
+      } else if (savedA > savedB) {
+        winnerA = true;
+      } else if (savedB > savedA) {
+        winnerB = true;
+      }
+
+      return {
+        winnerA,
+        winnerB,
+        compressionA,
+        compressionB,
+        sizeA,
+        sizeB,
+        savedA,
+        savedB
+      };
+    }
+
+    function renderMetricsPanel() {
+      const metrics = calculateMetricsComparison();
+
+      const formatBytes = (bytes) => {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
+      };
+
+      const formatDate = (dateStr) => {
+        if (!dateStr) return 'Unknown';
+        return new Date(dateStr).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      };
+
+      // Calculate bar widths for visual comparison
+      const maxSize = Math.max(metrics.sizeA, metrics.sizeB);
+      const widthA = maxSize > 0 ? (metrics.sizeA / maxSize * 100) : 0;
+      const widthB = maxSize > 0 ? (metrics.sizeB / maxSize * 100) : 0;
+
+      return `
+        <div class="metrics-comparison">
+          <h3 style="color: #a5b4fc; margin-bottom: 4px; font-size: 1.1rem;">📊 Metrics Comparison</h3>
+          <p style="color: #64748b; font-size: 0.85rem;">Compression ratios, sizes, and performance metrics</p>
+
+          <div class="metrics-cards">
+            <!-- Handoff A Card -->
+            <div class="metrics-card ${metrics.winnerA ? 'winner' : ''}">
+              <div class="metrics-card-header">
+                <div class="metrics-card-title">🅰️ ${selectedHandoffA.filename || selectedHandoffA.id}</div>
+                ${metrics.winnerA ? '<div class="metrics-winner-badge">🏆 Winner</div>' : ''}
+              </div>
+
+              <div class="metrics-row">
+                <span class="metrics-label">Compression Ratio:</span>
+                <span class="metrics-value ${metrics.winnerA ? 'better' : ''}">${metrics.compressionA.toFixed(1)}%</span>
+              </div>
+
+              <div class="metrics-row">
+                <span class="metrics-label">Original Size:</span>
+                <span class="metrics-value">${formatBytes(metrics.sizeA)}</span>
+              </div>
+
+              <div class="metrics-row">
+                <span class="metrics-label">Compressed Size:</span>
+                <span class="metrics-value">${formatBytes(selectedHandoffA.compressed_size || selectedHandoffA.final_size || 0)}</span>
+              </div>
+
+              <div class="metrics-row">
+                <span class="metrics-label">Bytes Saved:</span>
+                <span class="metrics-value ${metrics.winnerA ? 'better' : ''}">${formatBytes(metrics.savedA)}</span>
+              </div>
+
+              <div class="metrics-row">
+                <span class="metrics-label">Format:</span>
+                <span class="metrics-value">${selectedHandoffA.compression_format || 'unknown'}</span>
+              </div>
+
+              <div class="metrics-row">
+                <span class="metrics-label">Created:</span>
+                <span class="metrics-value">${formatDate(selectedHandoffA.created)}</span>
+              </div>
+
+              <div class="metrics-bar">
+                <div class="metrics-bar-label">Relative Size</div>
+                <div class="metrics-bar-track">
+                  <div class="metrics-bar-fill ${metrics.winnerA ? 'better' : ''}" style="width: ${widthA}%"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Handoff B Card -->
+            <div class="metrics-card ${metrics.winnerB ? 'winner' : ''}">
+              <div class="metrics-card-header">
+                <div class="metrics-card-title">🅱️ ${selectedHandoffB.filename || selectedHandoffB.id}</div>
+                ${metrics.winnerB ? '<div class="metrics-winner-badge">🏆 Winner</div>' : ''}
+              </div>
+
+              <div class="metrics-row">
+                <span class="metrics-label">Compression Ratio:</span>
+                <span class="metrics-value ${metrics.winnerB ? 'better' : ''}">${metrics.compressionB.toFixed(1)}%</span>
+              </div>
+
+              <div class="metrics-row">
+                <span class="metrics-label">Original Size:</span>
+                <span class="metrics-value">${formatBytes(metrics.sizeB)}</span>
+              </div>
+
+              <div class="metrics-row">
+                <span class="metrics-label">Compressed Size:</span>
+                <span class="metrics-value">${formatBytes(selectedHandoffB.compressed_size || selectedHandoffB.final_size || 0)}</span>
+              </div>
+
+              <div class="metrics-row">
+                <span class="metrics-label">Bytes Saved:</span>
+                <span class="metrics-value ${metrics.winnerB ? 'better' : ''}">${formatBytes(metrics.savedB)}</span>
+              </div>
+
+              <div class="metrics-row">
+                <span class="metrics-label">Format:</span>
+                <span class="metrics-value">${selectedHandoffB.compression_format || 'unknown'}</span>
+              </div>
+
+              <div class="metrics-row">
+                <span class="metrics-label">Created:</span>
+                <span class="metrics-value">${formatDate(selectedHandoffB.created)}</span>
+              </div>
+
+              <div class="metrics-bar">
+                <div class="metrics-bar-label">Relative Size</div>
+                <div class="metrics-bar-track">
+                  <div class="metrics-bar-fill ${metrics.winnerB ? 'better' : ''}" style="width: ${widthB}%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     function displayDiffFromBackend(diff) {
       const resultsDiv = document.getElementById('comparison-results');
 
-      // Build UI
+      // Build UI with metrics panel
       resultsDiv.innerHTML = `
         <div class="chart-title">⚖️ Comparison Results</div>
         <p style="color: #94a3b8; margin: 16px 0;">
           Comparing <strong style="color: #a5b4fc;">${selectedHandoffA.filename || selectedHandoffA.id}</strong> vs
           <strong style="color: #a5b4fc;">${selectedHandoffB.filename || selectedHandoffB.id}</strong>
         </p>
+
+        ${renderMetricsPanel()}
+
+        <h3 style="color: #a5b4fc; margin-bottom: 16px; margin-top: 32px; font-size: 1.1rem;">📄 Content Diff</h3>
 
         <div class="diff-controls">
           <div class="diff-view-toggle">
