@@ -1364,6 +1364,189 @@
       display: block;
     }
 
+    /* ========================================================================= */
+    /* DIFF VIEW STYLES */
+    /* ========================================================================= */
+
+    .diff-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .diff-view-toggle {
+      display: flex;
+      gap: 8px;
+    }
+
+    .diff-toggle-btn {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(100, 116, 139, 0.3);
+      color: #94a3b8;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .diff-toggle-btn:hover {
+      background: rgba(30, 41, 59, 0.8);
+      color: #a5b4fc;
+    }
+
+    .diff-toggle-btn.active {
+      background: rgba(99, 102, 241, 0.3);
+      border-color: rgba(99, 102, 241, 0.6);
+      color: #a5b4fc;
+    }
+
+    .diff-stats {
+      display: flex;
+      gap: 20px;
+      font-size: 0.85rem;
+    }
+
+    .diff-stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .diff-stat-added {
+      color: #6ee7b7;
+    }
+
+    .diff-stat-removed {
+      color: #fca5a5;
+    }
+
+    .diff-stat-changed {
+      color: #fbbf24;
+    }
+
+    .diff-container {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      border-radius: 8px;
+      overflow: hidden;
+      font-family: 'SF Mono', Monaco, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+
+    .diff-side-by-side {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: rgba(100, 116, 139, 0.2);
+    }
+
+    .diff-panel {
+      background: rgba(15, 23, 42, 0.9);
+      padding: 16px;
+    }
+
+    .diff-panel-header {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #a5b4fc;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .diff-line {
+      display: flex;
+      white-space: pre-wrap;
+      word-break: break-all;
+      padding: 2px 8px;
+      transition: background 0.1s;
+    }
+
+    .diff-line:hover {
+      background: rgba(99, 102, 241, 0.1);
+    }
+
+    .diff-line-number {
+      display: inline-block;
+      width: 50px;
+      text-align: right;
+      padding-right: 12px;
+      color: #64748b;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .diff-line-content {
+      flex: 1;
+      color: #e2e8f0;
+    }
+
+    .diff-line-added {
+      background: rgba(16, 185, 129, 0.15);
+    }
+
+    .diff-line-added .diff-line-content {
+      color: #6ee7b7;
+    }
+
+    .diff-line-removed {
+      background: rgba(239, 68, 68, 0.15);
+    }
+
+    .diff-line-removed .diff-line-content {
+      color: #fca5a5;
+    }
+
+    .diff-line-changed {
+      background: rgba(245, 158, 11, 0.15);
+    }
+
+    .diff-line-changed .diff-line-content {
+      color: #fbbf24;
+    }
+
+    .diff-line-unchanged {
+      color: #94a3b8;
+    }
+
+    .diff-unified {
+      padding: 16px;
+      background: rgba(15, 23, 42, 0.9);
+    }
+
+    .diff-loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: #64748b;
+    }
+
+    .diff-loading-spinner {
+      font-size: 2rem;
+      margin-bottom: 16px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .diff-error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 8px;
+      padding: 20px;
+      color: #fca5a5;
+      text-align: center;
+    }
+
     .viewer-footer-3d {
       padding: 10px 15px;
       border-top: 1px solid #334155;
@@ -6418,7 +6601,7 @@
       }
     }
 
-    function compareHandoffs() {
+    async function compareHandoffs() {
       if (!selectedHandoffA || !selectedHandoffB) {
         alert('Please select both handoffs first');
         return;
@@ -6426,32 +6609,268 @@
 
       console.log('Comparing:', selectedHandoffA.id, 'vs', selectedHandoffB.id);
 
-      // Show results section
+      // Show results section with loading state
       const resultsDiv = document.getElementById('comparison-results');
       resultsDiv.classList.add('active');
-
-      // Placeholder for comparison results (will be implemented in Priority 2 & 3)
       resultsDiv.innerHTML = `
         <div class="chart-title">⚖️ Comparison Results</div>
         <p style="color: #94a3b8; margin: 16px 0;">
           Comparing <strong style="color: #a5b4fc;">${selectedHandoffA.filename || selectedHandoffA.id}</strong> vs
           <strong style="color: #a5b4fc;">${selectedHandoffB.filename || selectedHandoffB.id}</strong>
         </p>
-        <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 8px; padding: 20px; margin-top: 20px; text-align: center;">
-          <p style="color: #6ee7b7; font-size: 1.1rem; margin-bottom: 12px;">✅ Handoffs Selected</p>
-          <p style="color: #94a3b8; font-size: 0.9rem;">
-            Diff view, metrics comparison, and detailed analysis will be implemented in the next priorities.
-          </p>
-          <p style="color: #64748b; font-size: 0.85rem; margin-top: 12px;">
-            Phase 6 Priority 1: Handoff Selection UI - Complete<br>
-            Coming next: Priority 2 (Diff View) & Priority 3 (Metrics Comparison)
-          </p>
+        <div class="diff-loading">
+          <div class="diff-loading-spinner">⏳</div>
+          <div>Loading handoff content...</div>
         </div>
       `;
 
       // Scroll to results
       resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      try {
+        // Fetch decompressed content for both handoffs
+        const [contentA, contentB] = await Promise.all([
+          fetchHandoffContent(selectedHandoffA.id),
+          fetchHandoffContent(selectedHandoffB.id)
+        ]);
+
+        if (!contentA || !contentB) {
+          throw new Error('Failed to load handoff content');
+        }
+
+        // Generate and display diff
+        displayDiff(contentA, contentB);
+      } catch (error) {
+        console.error('Comparison error:', error);
+        resultsDiv.innerHTML = `
+          <div class="chart-title">⚖️ Comparison Results</div>
+          <div class="diff-error">
+            <strong>Error:</strong> ${error.message}
+          </div>
+        `;
+      }
     }
+
+    async function fetchHandoffContent(handoffId) {
+      try {
+        const response = await fetch('/api/3d/handoff/decompress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ handoff_id: handoffId })
+        });
+
+        const data = await response.json();
+        if (data.ok) {
+          return data.content;
+        } else {
+          console.error('Decompression failed:', data.error);
+          return null;
+        }
+      } catch (error) {
+        console.error('Fetch error:', error);
+        return null;
+      }
+    }
+
+    let currentDiffView = 'sidebyside'; // 'sidebyside' or 'unified'
+
+    function displayDiff(contentA, contentB) {
+      const resultsDiv = document.getElementById('comparison-results');
+
+      // Split content into lines
+      const linesA = contentA.split('\n');
+      const linesB = contentB.split('\n');
+
+      // Calculate diff
+      const diff = calculateLineDiff(linesA, linesB);
+
+      // Build UI
+      resultsDiv.innerHTML = `
+        <div class="chart-title">⚖️ Comparison Results</div>
+        <p style="color: #94a3b8; margin: 16px 0;">
+          Comparing <strong style="color: #a5b4fc;">${selectedHandoffA.filename || selectedHandoffA.id}</strong> (${linesA.length} lines) vs
+          <strong style="color: #a5b4fc;">${selectedHandoffB.filename || selectedHandoffB.id}</strong> (${linesB.length} lines)
+        </p>
+
+        <div class="diff-controls">
+          <div class="diff-view-toggle">
+            <button class="diff-toggle-btn ${currentDiffView === 'sidebyside' ? 'active' : ''}" onclick="switchDiffView('sidebyside')">
+              Side-by-Side
+            </button>
+            <button class="diff-toggle-btn ${currentDiffView === 'unified' ? 'active' : ''}" onclick="switchDiffView('unified')">
+              Unified
+            </button>
+          </div>
+          <div class="diff-stats">
+            <div class="diff-stat diff-stat-added">
+              <span>+${diff.stats.added}</span>
+            </div>
+            <div class="diff-stat diff-stat-removed">
+              <span>-${diff.stats.removed}</span>
+            </div>
+            <div class="diff-stat diff-stat-changed">
+              <span>~${diff.stats.changed}</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="diff-display" class="diff-container">
+          ${renderDiff(diff, currentDiffView)}
+        </div>
+      `;
+    }
+
+    function calculateLineDiff(linesA, linesB) {
+      const diff = [];
+      let stats = { added: 0, removed: 0, changed: 0, unchanged: 0 };
+
+      const maxLen = Math.max(linesA.length, linesB.length);
+
+      for (let i = 0; i < maxLen; i++) {
+        const lineA = i < linesA.length ? linesA[i] : null;
+        const lineB = i < linesB.length ? linesB[i] : null;
+
+        if (lineA === null && lineB !== null) {
+          // Added in B
+          diff.push({ type: 'added', lineA: null, lineB: lineB, numA: null, numB: i + 1 });
+          stats.added++;
+        } else if (lineA !== null && lineB === null) {
+          // Removed from A
+          diff.push({ type: 'removed', lineA: lineA, lineB: null, numA: i + 1, numB: null });
+          stats.removed++;
+        } else if (lineA !== lineB) {
+          // Changed
+          diff.push({ type: 'changed', lineA: lineA, lineB: lineB, numA: i + 1, numB: i + 1 });
+          stats.changed++;
+        } else {
+          // Unchanged
+          diff.push({ type: 'unchanged', lineA: lineA, lineB: lineB, numA: i + 1, numB: i + 1 });
+          stats.unchanged++;
+        }
+      }
+
+      return { lines: diff, stats };
+    }
+
+    function renderDiff(diff, view) {
+      if (view === 'sidebyside') {
+        return renderSideBySide(diff);
+      } else {
+        return renderUnified(diff);
+      }
+    }
+
+    function renderSideBySide(diff) {
+      const leftLines = [];
+      const rightLines = [];
+
+      diff.lines.forEach(line => {
+        const classType = `diff-line-${line.type}`;
+
+        // Left side (A)
+        if (line.lineA !== null) {
+          leftLines.push(`
+            <div class="diff-line ${classType}">
+              <span class="diff-line-number">${line.numA || ''}</span>
+              <span class="diff-line-content">${escapeHtml(line.lineA)}</span>
+            </div>
+          `);
+        } else {
+          leftLines.push(`
+            <div class="diff-line">
+              <span class="diff-line-number"></span>
+              <span class="diff-line-content" style="color: #475569;">—</span>
+            </div>
+          `);
+        }
+
+        // Right side (B)
+        if (line.lineB !== null) {
+          rightLines.push(`
+            <div class="diff-line ${classType}">
+              <span class="diff-line-number">${line.numB || ''}</span>
+              <span class="diff-line-content">${escapeHtml(line.lineB)}</span>
+            </div>
+          `);
+        } else {
+          rightLines.push(`
+            <div class="diff-line">
+              <span class="diff-line-number"></span>
+              <span class="diff-line-content" style="color: #475569;">—</span>
+            </div>
+          `);
+        }
+      });
+
+      return `
+        <div class="diff-side-by-side">
+          <div class="diff-panel">
+            <div class="diff-panel-header">🅰️ ${selectedHandoffA.filename || selectedHandoffA.id}</div>
+            ${leftLines.join('')}
+          </div>
+          <div class="diff-panel">
+            <div class="diff-panel-header">🅱️ ${selectedHandoffB.filename || selectedHandoffB.id}</div>
+            ${rightLines.join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderUnified(diff) {
+      const lines = diff.lines.map(line => {
+        const classType = `diff-line-${line.type}`;
+        let prefix = ' ';
+        let content = line.lineA || line.lineB || '';
+
+        if (line.type === 'added') {
+          prefix = '+';
+          content = line.lineB;
+        } else if (line.type === 'removed') {
+          prefix = '-';
+          content = line.lineA;
+        } else if (line.type === 'changed') {
+          // Show both lines for changed
+          return `
+            <div class="diff-line diff-line-removed">
+              <span class="diff-line-number">${line.numA}</span>
+              <span class="diff-line-content">- ${escapeHtml(line.lineA)}</span>
+            </div>
+            <div class="diff-line diff-line-added">
+              <span class="diff-line-number">${line.numB}</span>
+              <span class="diff-line-content">+ ${escapeHtml(line.lineB)}</span>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="diff-line ${classType}">
+            <span class="diff-line-number">${line.numA || line.numB || ''}</span>
+            <span class="diff-line-content">${prefix} ${escapeHtml(content)}</span>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="diff-unified">
+          ${lines}
+        </div>
+      `;
+    }
+
+    function switchDiffView(view) {
+      currentDiffView = view;
+
+      // Re-fetch content and display (or we could cache it)
+      compareHandoffs();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    window.switchDiffView = switchDiffView;
 
     function formatBytes(bytes) {
       if (bytes === 0) return '0 B';
