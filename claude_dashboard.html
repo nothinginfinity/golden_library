@@ -1177,6 +1177,193 @@
       text-align: center;
     }
 
+    /* ========================================================================= */
+    /* COMPARISON MODE STYLES */
+    /* ========================================================================= */
+
+    .comparison-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .comparison-panel {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    .comparison-panel-title {
+      font-size: 1.2rem;
+      color: #a5b4fc;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .comparison-panel-label {
+      font-size: 0.85rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .handoff-selector {
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    .handoff-search-input {
+      width: 100%;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      border-radius: 8px;
+      padding: 12px 20px;
+      font-size: 0.95rem;
+      color: #e2e8f0;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .handoff-search-input:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+
+    .handoff-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      max-height: 300px;
+      overflow-y: auto;
+      background: rgba(15, 23, 42, 0.98);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      border-radius: 8px;
+      margin-top: 4px;
+      z-index: 100;
+      display: none;
+    }
+
+    .handoff-dropdown.active {
+      display: block;
+    }
+
+    .handoff-dropdown-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(100, 116, 139, 0.2);
+      transition: all 0.2s;
+    }
+
+    .handoff-dropdown-item:hover {
+      background: rgba(99, 102, 241, 0.2);
+    }
+
+    .handoff-dropdown-item:last-child {
+      border-bottom: none;
+    }
+
+    .handoff-item-name {
+      font-size: 0.9rem;
+      color: #a5b4fc;
+      margin-bottom: 4px;
+    }
+
+    .handoff-item-meta {
+      font-size: 0.75rem;
+      color: #64748b;
+      display: flex;
+      gap: 12px;
+    }
+
+    .selected-handoff-card {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+
+    .selected-handoff-name {
+      font-size: 1rem;
+      color: #a5b4fc;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .selected-handoff-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 0.85rem;
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(100, 116, 139, 0.2);
+    }
+
+    .meta-label {
+      color: #94a3b8;
+    }
+
+    .meta-value {
+      color: #e2e8f0;
+      font-weight: 500;
+    }
+
+    .comparison-actions {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .compare-btn {
+      background: rgba(16, 185, 129, 0.3);
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      color: #6ee7b7;
+      padding: 16px 48px;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 600;
+    }
+
+    .compare-btn:hover:not(:disabled) {
+      background: rgba(16, 185, 129, 0.5);
+      border-color: rgba(16, 185, 129, 0.7);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .compare-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .comparison-results {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 12px;
+      padding: 24px;
+      display: none;
+    }
+
+    .comparison-results.active {
+      display: block;
+    }
+
     .viewer-footer-3d {
       padding: 10px 15px;
       border-top: 1px solid #334155;
@@ -1716,6 +1903,7 @@
       <button class="tab-btn" onclick="showTab('daemons')">🤖 Daemons</button>
       <button class="tab-btn" onclick="showTab('charts')">📈 Charts</button>
       <button class="tab-btn" onclick="showTab('3dview')">🌐 3D View</button>
+      <button class="tab-btn" onclick="showTab('comparison')">⚖️ Comparison</button>
       <button class="tab-btn" onclick="showTab('patterns')">🔍 Patterns</button>
     </div>
 
@@ -2307,6 +2495,146 @@
       </div>
     </div>
     <!-- End 3D View Tab -->
+
+    <!-- Comparison Tab -->
+    <div id="tab-comparison" class="tab-content">
+      <div class="chart-container" style="margin-bottom: 24px;">
+        <div class="chart-title">⚖️ Handoff Comparison</div>
+        <p style="color: #94a3b8; font-size: 0.9rem; margin-top: 8px;">
+          Select two handoffs to compare content, metrics, and compression ratios
+        </p>
+      </div>
+
+      <!-- Handoff Selection Panels -->
+      <div class="comparison-container">
+        <!-- Handoff A Selector -->
+        <div class="comparison-panel">
+          <div class="comparison-panel-title">
+            <span style="font-size: 1.5rem;">🅰️</span>
+            <span>Handoff A</span>
+          </div>
+
+          <div class="handoff-selector">
+            <div class="comparison-panel-label">Search Handoffs</div>
+            <input
+              type="text"
+              id="handoff-a-search"
+              class="handoff-search-input"
+              placeholder="Type to search by ID, filename, or date..."
+              onfocus="showHandoffDropdown('a')"
+              oninput="filterHandoffDropdown('a')"
+            />
+            <div id="handoff-a-dropdown" class="handoff-dropdown"></div>
+          </div>
+
+          <div id="handoff-a-selected" style="display: none;">
+            <div class="comparison-panel-label">Selected Handoff</div>
+            <div class="selected-handoff-card">
+              <div class="selected-handoff-name" id="handoff-a-name">-</div>
+              <div class="selected-handoff-meta">
+                <div class="meta-row">
+                  <span class="meta-label">Category:</span>
+                  <span class="meta-value" id="handoff-a-category">-</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Format:</span>
+                  <span class="meta-value" id="handoff-a-format">-</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Compression:</span>
+                  <span class="meta-value" id="handoff-a-compression">-</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Created:</span>
+                  <span class="meta-value" id="handoff-a-date">-</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Original Size:</span>
+                  <span class="meta-value" id="handoff-a-original">-</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Compressed:</span>
+                  <span class="meta-value" id="handoff-a-compressed">-</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Handoff B Selector -->
+        <div class="comparison-panel">
+          <div class="comparison-panel-title">
+            <span style="font-size: 1.5rem;">🅱️</span>
+            <span>Handoff B</span>
+          </div>
+
+          <div class="handoff-selector">
+            <div class="comparison-panel-label">Search Handoffs</div>
+            <input
+              type="text"
+              id="handoff-b-search"
+              class="handoff-search-input"
+              placeholder="Type to search by ID, filename, or date..."
+              onfocus="showHandoffDropdown('b')"
+              oninput="filterHandoffDropdown('b')"
+            />
+            <div id="handoff-b-dropdown" class="handoff-dropdown"></div>
+          </div>
+
+          <div id="handoff-b-selected" style="display: none;">
+            <div class="comparison-panel-label">Selected Handoff</div>
+            <div class="selected-handoff-card">
+              <div class="selected-handoff-name" id="handoff-b-name">-</div>
+              <div class="selected-handoff-meta">
+                <div class="meta-row">
+                  <span class="meta-label">Category:</span>
+                  <span class="meta-value" id="handoff-b-category">-</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Format:</span>
+                  <span class="meta-value" id="handoff-b-format">-</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Compression:</span>
+                  <span class="meta-value" id="handoff-b-compression">-</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Created:</span>
+                  <span class="meta-value" id="handoff-b-date">-</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Original Size:</span>
+                  <span class="meta-value" id="handoff-b-original">-</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Compressed:</span>
+                  <span class="meta-value" id="handoff-b-compressed">-</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Comparison Actions -->
+      <div class="comparison-actions">
+        <button id="compare-btn" class="compare-btn" onclick="compareHandoffs()" disabled>
+          ⚖️ Compare Handoffs
+        </button>
+        <p style="color: #64748b; font-size: 0.85rem; margin-top: 12px;">
+          Select both handoffs to enable comparison
+        </p>
+      </div>
+
+      <!-- Comparison Results (shown after compare) -->
+      <div id="comparison-results" class="comparison-results">
+        <div class="chart-title">Comparison Results</div>
+        <p style="color: #94a3b8; margin-top: 8px;">
+          Detailed comparison will appear here...
+        </p>
+      </div>
+    </div>
+    <!-- End Comparison Tab -->
 
     <!-- Patterns Tab -->
     <div id="tab-patterns" class="tab-content">
@@ -5953,6 +6281,200 @@
     window.exportTimelineStatsJSON = exportTimelineStatsJSON;
     window.exportTimelineStatsCSV = exportTimelineStatsCSV;
     window.exportCurrentView = exportCurrentView;
+
+    /* ========================================================================= */
+    /* COMPARISON MODE - PHASE 6 */
+    /* ========================================================================= */
+
+    let comparisonHandoffs = [];
+    let selectedHandoffA = null;
+    let selectedHandoffB = null;
+
+    // Load handoffs for comparison (reuse data from 3D viewer)
+    async function loadComparisonHandoffs() {
+      if (comparisonHandoffs.length > 0) return; // Already loaded
+
+      try {
+        const response = await fetch('/api/3d/handoffs');
+        const data = await response.json();
+
+        if (data.ok && data.handoffs) {
+          comparisonHandoffs = data.handoffs;
+          console.log(`Loaded ${comparisonHandoffs.length} handoffs for comparison`);
+        }
+      } catch (error) {
+        console.error('Failed to load handoffs for comparison:', error);
+      }
+    }
+
+    function showHandoffDropdown(side) {
+      // Load handoffs if not already loaded
+      if (comparisonHandoffs.length === 0) {
+        loadComparisonHandoffs().then(() => {
+          populateHandoffDropdown(side, comparisonHandoffs);
+        });
+      } else {
+        populateHandoffDropdown(side, comparisonHandoffs);
+      }
+    }
+
+    function populateHandoffDropdown(side, handoffs) {
+      const dropdown = document.getElementById(`handoff-${side}-dropdown`);
+      const searchInput = document.getElementById(`handoff-${side}-search`);
+      const searchTerm = searchInput.value.toLowerCase();
+
+      // Filter handoffs based on search term
+      let filtered = handoffs;
+      if (searchTerm) {
+        filtered = handoffs.filter(h => {
+          const filename = (h.filename || h.id || '').toLowerCase();
+          const id = (h.id || '').toLowerCase();
+          const date = (h.created || '').toLowerCase();
+          const category = (h.category || '').toLowerCase();
+
+          return filename.includes(searchTerm) ||
+                 id.includes(searchTerm) ||
+                 date.includes(searchTerm) ||
+                 category.includes(searchTerm);
+        });
+      }
+
+      // Limit to 50 results for performance
+      filtered = filtered.slice(0, 50);
+
+      // Build dropdown HTML
+      if (filtered.length === 0) {
+        dropdown.innerHTML = '<div style="padding: 16px; color: #64748b; text-align: center;">No handoffs found</div>';
+      } else {
+        dropdown.innerHTML = filtered.map(h => {
+          const date = new Date(h.created).toLocaleDateString();
+          const compressionRatio = (h.reduction_percent || 0).toFixed(1);
+          const category = h.category || 'unknown';
+
+          return `
+            <div class="handoff-dropdown-item" onclick="selectHandoff('${side}', '${h.id}')">
+              <div class="handoff-item-name">${h.filename || h.id}</div>
+              <div class="handoff-item-meta">
+                <span>${category}</span>
+                <span>${date}</span>
+                <span>${compressionRatio}% compression</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      dropdown.classList.add('active');
+    }
+
+    function filterHandoffDropdown(side) {
+      showHandoffDropdown(side);
+    }
+
+    function selectHandoff(side, handoffId) {
+      const handoff = comparisonHandoffs.find(h => h.id === handoffId);
+      if (!handoff) return;
+
+      // Store selection
+      if (side === 'a') {
+        selectedHandoffA = handoff;
+      } else {
+        selectedHandoffB = handoff;
+      }
+
+      // Update UI
+      updateSelectedHandoffUI(side, handoff);
+
+      // Hide dropdown
+      document.getElementById(`handoff-${side}-dropdown`).classList.remove('active');
+
+      // Clear search input
+      document.getElementById(`handoff-${side}-search`).value = handoff.filename || handoff.id;
+
+      // Check if both are selected to enable compare button
+      updateCompareButton();
+    }
+
+    function updateSelectedHandoffUI(side, handoff) {
+      const selectedDiv = document.getElementById(`handoff-${side}-selected`);
+      selectedDiv.style.display = 'block';
+
+      // Update all fields
+      document.getElementById(`handoff-${side}-name`).textContent = handoff.filename || handoff.id;
+      document.getElementById(`handoff-${side}-category`).textContent = handoff.category || 'unknown';
+      document.getElementById(`handoff-${side}-format`).textContent = handoff.compression_format || 'unknown';
+      document.getElementById(`handoff-${side}-compression`).textContent = `${(handoff.reduction_percent || 0).toFixed(1)}%`;
+      document.getElementById(`handoff-${side}-date`).textContent = new Date(handoff.created).toLocaleString();
+      document.getElementById(`handoff-${side}-original`).textContent = formatBytes(handoff.original_size || 0);
+      document.getElementById(`handoff-${side}-compressed`).textContent = formatBytes(handoff.final_size || 0);
+    }
+
+    function updateCompareButton() {
+      const compareBtn = document.getElementById('compare-btn');
+      if (selectedHandoffA && selectedHandoffB) {
+        compareBtn.disabled = false;
+      } else {
+        compareBtn.disabled = true;
+      }
+    }
+
+    function compareHandoffs() {
+      if (!selectedHandoffA || !selectedHandoffB) {
+        alert('Please select both handoffs first');
+        return;
+      }
+
+      console.log('Comparing:', selectedHandoffA.id, 'vs', selectedHandoffB.id);
+
+      // Show results section
+      const resultsDiv = document.getElementById('comparison-results');
+      resultsDiv.classList.add('active');
+
+      // Placeholder for comparison results (will be implemented in Priority 2 & 3)
+      resultsDiv.innerHTML = `
+        <div class="chart-title">⚖️ Comparison Results</div>
+        <p style="color: #94a3b8; margin: 16px 0;">
+          Comparing <strong style="color: #a5b4fc;">${selectedHandoffA.filename || selectedHandoffA.id}</strong> vs
+          <strong style="color: #a5b4fc;">${selectedHandoffB.filename || selectedHandoffB.id}</strong>
+        </p>
+        <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 8px; padding: 20px; margin-top: 20px; text-align: center;">
+          <p style="color: #6ee7b7; font-size: 1.1rem; margin-bottom: 12px;">✅ Handoffs Selected</p>
+          <p style="color: #94a3b8; font-size: 0.9rem;">
+            Diff view, metrics comparison, and detailed analysis will be implemented in the next priorities.
+          </p>
+          <p style="color: #64748b; font-size: 0.85rem; margin-top: 12px;">
+            Phase 6 Priority 1: Handoff Selection UI - Complete<br>
+            Coming next: Priority 2 (Diff View) & Priority 3 (Metrics Comparison)
+          </p>
+        </div>
+      `;
+
+      // Scroll to results
+      resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
+    }
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(event) {
+      if (!event.target.closest('.handoff-selector')) {
+        document.querySelectorAll('.handoff-dropdown').forEach(dropdown => {
+          dropdown.classList.remove('active');
+        });
+      }
+    });
+
+    // Make functions globally accessible
+    window.showHandoffDropdown = showHandoffDropdown;
+    window.filterHandoffDropdown = filterHandoffDropdown;
+    window.selectHandoff = selectHandoff;
+    window.compareHandoffs = compareHandoffs;
 
   </script>
 </body>
