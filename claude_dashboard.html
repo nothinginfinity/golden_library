@@ -600,6 +600,167 @@
       color: #6366f1;
     }
 
+    /* Timeline Controls */
+    .timeline-controls-3d {
+      display: none;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+
+    .timeline-controls-3d.active {
+      display: block;
+    }
+
+    .timeline-controls-3d h4 {
+      color: #f7b731;
+      margin-bottom: 12px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .timeline-playback-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+
+    .timeline-play-btn {
+      background: #10b981;
+      border: none;
+      color: #fff;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .timeline-play-btn:hover {
+      background: #059669;
+      transform: scale(1.05);
+    }
+
+    .timeline-play-btn.playing {
+      background: #ef4444;
+    }
+
+    .timeline-seek-bar {
+      flex: 1;
+      height: 40px;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      position: relative;
+      cursor: pointer;
+      overflow: hidden;
+    }
+
+    .timeline-seek-progress {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      background: linear-gradient(90deg, #10b981 0%, #6366f1 100%);
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    .timeline-seek-handle {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 32px;
+      background: #f7b731;
+      border-radius: 4px;
+      left: 0%;
+      cursor: grab;
+      transition: left 0.1s linear;
+    }
+
+    .timeline-seek-handle:active {
+      cursor: grabbing;
+    }
+
+    .timeline-date-display {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px 12px;
+      text-align: center;
+      min-width: 120px;
+    }
+
+    .timeline-date-label {
+      font-size: 9px;
+      color: #64748b;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .timeline-date-value {
+      font-size: 11px;
+      color: #f7b731;
+      font-weight: 600;
+    }
+
+    .timeline-speed-controls {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+
+    .timeline-speed-btn {
+      flex: 1;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 10px;
+      transition: all 0.2s;
+    }
+
+    .timeline-speed-btn:hover {
+      border-color: #f7b731;
+      color: #f7b731;
+    }
+
+    .timeline-speed-btn.active {
+      background: #f7b731;
+      color: #000;
+      border-color: #f7b731;
+    }
+
+    .timeline-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #64748b;
+      padding-top: 8px;
+      border-top: 1px solid #334155;
+    }
+
+    .timeline-shortcuts-hint {
+      font-size: 9px;
+      color: #475569;
+      margin-top: 8px;
+      padding: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+      border-left: 2px solid #f7b731;
+    }
+
     .viewer-footer-3d {
       padding: 10px 15px;
       border-top: 1px solid #334155;
@@ -1479,6 +1640,47 @@
             </button>
             <button class="control-btn-3d" onclick="toggleConnections3D()">Toggle Connections</button>
             <button class="control-btn-3d" onclick="reloadData3D()">Reload Data</button>
+          </div>
+
+          <!-- Timeline Controls (shown only in timeline mode) -->
+          <div id="timeline-controls-panel" class="timeline-controls-3d">
+            <h4>⏱️ Timeline Playback</h4>
+
+            <!-- Playback Controls -->
+            <div class="timeline-playback-row">
+              <button id="timeline-play-btn" class="timeline-play-btn" onclick="toggleTimelinePlayback()" title="Play/Pause (Space)">
+                ▶
+              </button>
+
+              <div id="timeline-seek-bar" class="timeline-seek-bar">
+                <div id="timeline-seek-progress" class="timeline-seek-progress"></div>
+                <div id="timeline-seek-handle" class="timeline-seek-handle"></div>
+              </div>
+
+              <div class="timeline-date-display">
+                <div class="timeline-date-label">Current Date</div>
+                <div id="timeline-current-date" class="timeline-date-value">--</div>
+              </div>
+            </div>
+
+            <!-- Speed Controls -->
+            <div class="timeline-speed-controls">
+              <button class="timeline-speed-btn active" onclick="setTimelineSpeed(1)" data-speed="1">1x</button>
+              <button class="timeline-speed-btn" onclick="setTimelineSpeed(2)" data-speed="2">2x</button>
+              <button class="timeline-speed-btn" onclick="setTimelineSpeed(5)" data-speed="5">5x</button>
+              <button class="timeline-speed-btn" onclick="setTimelineSpeed(10)" data-speed="10">10x</button>
+            </div>
+
+            <!-- Timeline Info -->
+            <div class="timeline-info">
+              <span>Showing <span id="timeline-visible-count">0</span> / <span id="timeline-total-count">0</span> handoffs</span>
+              <span>Speed: <span id="timeline-current-speed">1</span>x</span>
+            </div>
+
+            <!-- Keyboard Shortcuts Hint -->
+            <div class="timeline-shortcuts-hint">
+              <strong>Shortcuts:</strong> Space=Play/Pause | ←→=Seek | +-=Speed | Home/End=Start/End
+            </div>
           </div>
 
           <div class="viewer-footer-3d">
@@ -3029,6 +3231,16 @@
       });
       event.target.classList.add('active');
 
+      // Show/hide timeline controls
+      const timelinePanel = document.getElementById('timeline-controls-panel');
+      if (layout === 'timeline') {
+        timelinePanel.classList.add('active');
+        initializeTimeline();
+      } else {
+        timelinePanel.classList.remove('active');
+        stopTimelinePlayback();
+      }
+
       // Reposition all nodes
       nodeObjects3D.forEach((obj, i) => {
         const node = obj.userData.nodeData;
@@ -3879,6 +4091,332 @@
         });
       }
     });
+
+    // =========================================================================
+    // TIMELINE PLAYBACK ENGINE
+    // =========================================================================
+
+    let timelineState = {
+      playing: false,
+      currentTime: 0,  // Timestamp (Date.getTime())
+      minTime: 0,
+      maxTime: 0,
+      speed: 1,
+      animationFrame: null,
+      lastFrameTime: 0,
+      isDragging: false
+    };
+
+    function initializeTimeline() {
+      if (!nodes3D || nodes3D.length === 0) return;
+
+      // Calculate time range from all nodes
+      const dates = nodes3D.map(n => new Date(n.created).getTime());
+      timelineState.minTime = Math.min(...dates);
+      timelineState.maxTime = Math.max(...dates);
+
+      // Load saved state from localStorage
+      const saved = localStorage.getItem('timeline-playback-state');
+      if (saved) {
+        try {
+          const savedState = JSON.parse(saved);
+          timelineState.currentTime = savedState.currentTime || timelineState.minTime;
+          timelineState.speed = savedState.speed || 1;
+        } catch (e) {
+          timelineState.currentTime = timelineState.minTime;
+        }
+      } else {
+        timelineState.currentTime = timelineState.minTime;
+      }
+
+      // Update UI
+      updateTimelineUI();
+      setupTimelineInteractions();
+
+      // Set initial speed button
+      setTimelineSpeed(timelineState.speed);
+
+      console.log('Timeline initialized:', {
+        minDate: new Date(timelineState.minTime),
+        maxDate: new Date(timelineState.maxTime),
+        totalHandoffs: nodes3D.length
+      });
+    }
+
+    function setupTimelineInteractions() {
+      const seekBar = document.getElementById('timeline-seek-bar');
+      const seekHandle = document.getElementById('timeline-seek-handle');
+
+      // Click on seek bar to jump
+      seekBar.addEventListener('click', (e) => {
+        if (e.target === seekHandle) return;
+
+        const rect = seekBar.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const percentage = clickX / rect.width;
+
+        const timeRange = timelineState.maxTime - timelineState.minTime;
+        timelineState.currentTime = timelineState.minTime + (timeRange * percentage);
+
+        updateTimelineUI();
+        saveTimelineState();
+      });
+
+      // Drag seek handle
+      let dragStartX = 0;
+      let dragStartTime = 0;
+
+      seekHandle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        timelineState.isDragging = true;
+        dragStartX = e.clientX;
+        dragStartTime = timelineState.currentTime;
+
+        // Pause during drag
+        const wasPlaying = timelineState.playing;
+        if (wasPlaying) {
+          toggleTimelinePlayback();
+        }
+
+        const onMouseMove = (moveEvent) => {
+          const rect = seekBar.getBoundingClientRect();
+          const deltaX = moveEvent.clientX - dragStartX;
+          const deltaPercentage = deltaX / rect.width;
+
+          const timeRange = timelineState.maxTime - timelineState.minTime;
+          const newTime = dragStartTime + (timeRange * deltaPercentage);
+
+          timelineState.currentTime = Math.max(timelineState.minTime, Math.min(timelineState.maxTime, newTime));
+          updateTimelineUI();
+        };
+
+        const onMouseUp = () => {
+          timelineState.isDragging = false;
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+
+          saveTimelineState();
+
+          // Resume playback if it was playing
+          if (wasPlaying) {
+            toggleTimelinePlayback();
+          }
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+    }
+
+    function toggleTimelinePlayback() {
+      timelineState.playing = !timelineState.playing;
+
+      const playBtn = document.getElementById('timeline-play-btn');
+      playBtn.textContent = timelineState.playing ? '⏸' : '▶';
+      playBtn.classList.toggle('playing', timelineState.playing);
+
+      if (timelineState.playing) {
+        // Reset to start if at end
+        if (timelineState.currentTime >= timelineState.maxTime) {
+          timelineState.currentTime = timelineState.minTime;
+        }
+
+        timelineState.lastFrameTime = performance.now();
+        playbackLoop();
+      } else {
+        if (timelineState.animationFrame) {
+          cancelAnimationFrame(timelineState.animationFrame);
+          timelineState.animationFrame = null;
+        }
+        saveTimelineState();
+      }
+    }
+
+    function playbackLoop() {
+      if (!timelineState.playing) return;
+
+      const now = performance.now();
+      const deltaTime = now - timelineState.lastFrameTime;
+      timelineState.lastFrameTime = now;
+
+      // Advance time based on speed (1 second real time = speed * 1 day of project time)
+      const oneDayMs = 24 * 60 * 60 * 1000;
+      const timeAdvance = (deltaTime / 1000) * timelineState.speed * oneDayMs;
+
+      timelineState.currentTime += timeAdvance;
+
+      // Stop at end
+      if (timelineState.currentTime >= timelineState.maxTime) {
+        timelineState.currentTime = timelineState.maxTime;
+        toggleTimelinePlayback();
+        return;
+      }
+
+      updateTimelineUI();
+
+      timelineState.animationFrame = requestAnimationFrame(playbackLoop);
+    }
+
+    function updateTimelineUI() {
+      // Update date display
+      const dateEl = document.getElementById('timeline-current-date');
+      const currentDate = new Date(timelineState.currentTime);
+      dateEl.textContent = currentDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+
+      // Update seek bar
+      const timeRange = timelineState.maxTime - timelineState.minTime;
+      const percentage = timeRange > 0
+        ? ((timelineState.currentTime - timelineState.minTime) / timeRange) * 100
+        : 0;
+
+      const progress = document.getElementById('timeline-seek-progress');
+      const handle = document.getElementById('timeline-seek-handle');
+
+      progress.style.width = percentage + '%';
+      handle.style.left = percentage + '%';
+
+      // Update visible node count and visibility
+      let visibleCount = 0;
+      nodeObjects3D.forEach(obj => {
+        const nodeDate = new Date(obj.userData.nodeData.created).getTime();
+        const shouldBeVisible = nodeDate <= timelineState.currentTime;
+
+        if (shouldBeVisible) {
+          visibleCount++;
+
+          // Fade in effect
+          if (!obj.userData.isVisible) {
+            obj.userData.isVisible = true;
+            obj.material.opacity = 0;
+            obj.material.transparent = true;
+
+            // Animate opacity
+            const fadeIn = () => {
+              if (obj.material.opacity < 1) {
+                obj.material.opacity = Math.min(1, obj.material.opacity + 0.05);
+                requestAnimationFrame(fadeIn);
+              } else {
+                obj.material.transparent = false;
+              }
+            };
+            fadeIn();
+          }
+        } else {
+          obj.userData.isVisible = false;
+          obj.material.opacity = 0;
+          obj.material.transparent = true;
+        }
+
+        obj.visible = shouldBeVisible;
+      });
+
+      document.getElementById('timeline-visible-count').textContent = visibleCount;
+      document.getElementById('timeline-total-count').textContent = nodes3D.length;
+    }
+
+    function setTimelineSpeed(speed) {
+      timelineState.speed = speed;
+
+      // Update speed button states
+      document.querySelectorAll('.timeline-speed-btn').forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.dataset.speed) === speed);
+      });
+
+      document.getElementById('timeline-current-speed').textContent = speed;
+
+      saveTimelineState();
+    }
+
+    function saveTimelineState() {
+      localStorage.setItem('timeline-playback-state', JSON.stringify({
+        currentTime: timelineState.currentTime,
+        speed: timelineState.speed
+      }));
+    }
+
+    function stopTimelinePlayback() {
+      if (timelineState.playing) {
+        toggleTimelinePlayback();
+      }
+
+      // Reset all nodes to visible
+      nodeObjects3D.forEach(obj => {
+        obj.visible = true;
+        obj.userData.isVisible = true;
+        obj.material.opacity = 1;
+        obj.material.transparent = false;
+      });
+    }
+
+    // Keyboard shortcuts for timeline
+    document.addEventListener('keydown', (e) => {
+      // Only handle shortcuts when timeline is active
+      const timelinePanel = document.getElementById('timeline-controls-panel');
+      if (!timelinePanel || !timelinePanel.classList.contains('active')) return;
+
+      // Ignore shortcuts when typing in input fields
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      switch (e.key) {
+        case ' ':  // Space - play/pause
+          e.preventDefault();
+          toggleTimelinePlayback();
+          break;
+
+        case 'ArrowRight':  // Right arrow - seek forward
+          e.preventDefault();
+          const forwardAmount = (timelineState.maxTime - timelineState.minTime) * 0.05;  // 5% jump
+          timelineState.currentTime = Math.min(timelineState.maxTime, timelineState.currentTime + forwardAmount);
+          updateTimelineUI();
+          saveTimelineState();
+          break;
+
+        case 'ArrowLeft':  // Left arrow - seek backward
+          e.preventDefault();
+          const backwardAmount = (timelineState.maxTime - timelineState.minTime) * 0.05;  // 5% jump
+          timelineState.currentTime = Math.max(timelineState.minTime, timelineState.currentTime - backwardAmount);
+          updateTimelineUI();
+          saveTimelineState();
+          break;
+
+        case '+':  // Plus - increase speed
+        case '=':
+          e.preventDefault();
+          const newSpeedUp = Math.min(10, timelineState.speed * 2);
+          setTimelineSpeed(newSpeedUp);
+          break;
+
+        case '-':  // Minus - decrease speed
+        case '_':
+          e.preventDefault();
+          const newSpeedDown = Math.max(1, timelineState.speed / 2);
+          setTimelineSpeed(newSpeedDown);
+          break;
+
+        case 'Home':  // Home - jump to start
+          e.preventDefault();
+          timelineState.currentTime = timelineState.minTime;
+          updateTimelineUI();
+          saveTimelineState();
+          break;
+
+        case 'End':  // End - jump to end
+          e.preventDefault();
+          timelineState.currentTime = timelineState.maxTime;
+          updateTimelineUI();
+          saveTimelineState();
+          break;
+      }
+    });
+
+    // Make functions globally accessible
+    window.toggleTimelinePlayback = toggleTimelinePlayback;
+    window.setTimelineSpeed = setTimelineSpeed;
+
   </script>
 </body>
 </html>
