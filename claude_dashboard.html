@@ -1951,6 +1951,15 @@
       }
     }
 
+    @keyframes blink {
+      0%, 49% {
+        opacity: 1;
+      }
+      50%, 100% {
+        opacity: 0;
+      }
+    }
+
     /* Pattern Library Styles */
     .patterns-header {
       text-align: center;
@@ -9694,7 +9703,7 @@ ${currentConversation.display}
       };
     }
 
-    function handleWorkspaceEvent(data) {
+    async function handleWorkspaceEvent(data) {
       const event = data.event;
 
       if (event === 'session_joined') {
@@ -9718,6 +9727,15 @@ ${currentConversation.display}
         // Update typing indicator
         if (data.data.user_id !== currentUserId) {
           fetchSessionUsers();
+        }
+      } else if (event === 'cursor_move') {
+        // Display cursor from other user
+        if (data.data.user_id !== currentUserId) {
+          const session = await fetchSession();
+          if (session && session.users && session.users[data.data.user_id]) {
+            const user = session.users[data.data.user_id];
+            displayCursor(data.data.user_id, user.name, data.data.position, user.avatar_color);
+          }
         }
       } else if (event === 'agent_thinking') {
         updateAgentStatus(data.data.agent_id, 'thinking');
@@ -9744,6 +9762,21 @@ ${currentConversation.display}
       } catch (error) {
         console.error('[Workspace] Error fetching session users:', error);
       }
+    }
+
+    async function fetchSession() {
+      if (!currentSessionId) return null;
+
+      try {
+        const response = await fetch(`/api/workspace/sessions/${currentSessionId}`);
+        const data = await response.json();
+        if (data.success && data.session) {
+          return data.session;
+        }
+      } catch (error) {
+        console.error('[Workspace] Error fetching session:', error);
+      }
+      return null;
     }
 
     async function createWorkspaceSession() {
@@ -9910,6 +9943,8 @@ ${currentConversation.display}
 
     // Typing indicator debounce
     let typingTimeout = null;
+    let cursorTimeout = null;
+    let activeCursors = {}; // Track other users' cursors
 
     function sendTypingIndicator(isTyping) {
       if (!workspaceWebSocket || !currentSessionId) return;
@@ -9920,7 +9955,7 @@ ${currentConversation.display}
       }));
     }
 
-    function handleInputTyping() {
+    function handleInputTyping(event) {
       // Send typing started
       sendTypingIndicator(true);
 
@@ -9931,6 +9966,98 @@ ${currentConversation.display}
       typingTimeout = setTimeout(() => {
         sendTypingIndicator(false);
       }, 2000);
+
+      // Also track cursor position
+      handleCursorMove(event);
+    }
+
+    function handleCursorMove(event) {
+      if (!workspaceWebSocket || !currentSessionId) return;
+
+      const inputId = event.target.id;
+      const cursorPosition = event.target.selectionStart;
+
+      // Determine which panel this is
+      let panel = null;
+      if (inputId === 'agent-a-input') panel = 'agent-a';
+      else if (inputId === 'agent-b-input') panel = 'agent-b';
+      else if (inputId === 'moderator-input') panel = 'moderator';
+
+      if (!panel) return;
+
+      // Throttle cursor updates (don't send too frequently)
+      if (cursorTimeout) clearTimeout(cursorTimeout);
+
+      cursorTimeout = setTimeout(() => {
+        workspaceWebSocket.send(JSON.stringify({
+          type: 'cursor_move',
+          position: {
+            panel: panel,
+            inputId: inputId,
+            cursorPosition: cursorPosition,
+            timestamp: Date.now()
+          }
+        }));
+      }, 100); // Send at most every 100ms
+    }
+
+    function displayCursor(userId, userName, position, avatarColor) {
+      // Remove old cursor for this user in this panel
+      const oldCursor = document.getElementById(`cursor-${userId}-${position.panel}`);
+      if (oldCursor) oldCursor.remove();
+
+      // Get the input element
+      const input = document.getElementById(position.inputId);
+      if (!input) return;
+
+      // Create cursor indicator
+      const cursor = document.createElement('div');
+      cursor.id = `cursor-${userId}-${position.panel}`;
+      cursor.style.cssText = `
+        position: absolute;
+        width: 2px;
+        height: 20px;
+        background: ${avatarColor || '#3b82f6'};
+        pointer-events: none;
+        z-index: 1000;
+        animation: blink 1s infinite;
+      `;
+
+      // Create label
+      const label = document.createElement('div');
+      label.style.cssText = `
+        position: absolute;
+        top: -24px;
+        left: 0;
+        background: ${avatarColor || '#3b82f6'};
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        white-space: nowrap;
+        font-weight: 500;
+      `;
+      label.textContent = userName;
+
+      cursor.appendChild(label);
+
+      // Calculate cursor position (approximate)
+      const rect = input.getBoundingClientRect();
+      const charWidth = 8; // Approximate character width
+      cursor.style.top = `${rect.top + 8}px`;
+      cursor.style.left = `${rect.left + 10 + (position.cursorPosition * charWidth)}px`;
+
+      document.body.appendChild(cursor);
+
+      // Store cursor reference
+      activeCursors[`${userId}-${position.panel}`] = cursor;
+
+      // Auto-remove after 3 seconds of inactivity
+      setTimeout(() => {
+        const cursorEl = document.getElementById(`cursor-${userId}-${position.panel}`);
+        if (cursorEl) cursorEl.remove();
+        delete activeCursors[`${userId}-${position.panel}`];
+      }, 3000);
     }
 
     // Auto-connect WebSocket when workspace tab is opened
@@ -9941,12 +10068,14 @@ ${currentConversation.display}
         connectWorkspaceWebSocket();
       }
 
-      // Add typing indicators to input fields
+      // Add typing indicators and cursor tracking to input fields
       const inputs = ['agent-a-input', 'agent-b-input', 'moderator-input'];
       inputs.forEach(inputId => {
         const input = document.getElementById(inputId);
         if (input) {
           input.addEventListener('input', handleInputTyping);
+          input.addEventListener('keyup', handleCursorMove);
+          input.addEventListener('click', handleCursorMove);
         }
       });
     });
