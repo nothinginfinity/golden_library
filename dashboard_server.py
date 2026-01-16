@@ -2378,6 +2378,57 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             self.serve_json({'error': str(e)}, status=500)
 
+    # =========================================================================
+    # API Keys Management
+    # =========================================================================
+
+    def serve_api_keys_list(self):
+        """Load and return API keys from storage."""
+        print(f"[DEBUG] serve_api_keys_list called, API_KEYS_FILE={API_KEYS_FILE}")
+        try:
+            if API_KEYS_FILE.exists():
+                print(f"[DEBUG] API keys file exists, loading...")
+                with open(API_KEYS_FILE, 'r') as f:
+                    keys = json.load(f)
+                print(f"[DEBUG] Loaded {len(keys)} keys")
+                self.serve_json({'keys': keys})
+            else:
+                print(f"[DEBUG] API keys file does not exist, returning empty")
+                self.serve_json({'keys': {}})
+        except Exception as e:
+            print(f"[DEBUG] Error in serve_api_keys_list: {e}")
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'error': str(e)}, status=500)
+
+    def save_api_keys(self, data):
+        """Save API keys to secure storage."""
+        try:
+            keys = data.get('keys', {})
+
+            if not keys:
+                self.serve_json({'error': 'No keys provided'}, status=400)
+                return
+
+            # Ensure .claude directory exists
+            API_KEYS_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+            # Save keys to file
+            with open(API_KEYS_FILE, 'w') as f:
+                json.dump(keys, f, indent=2)
+
+            # Set restrictive permissions (owner read/write only)
+            os.chmod(API_KEYS_FILE, 0o600)
+
+            self.serve_json({
+                'success': True,
+                'message': f'Saved {len(keys)} API key(s)',
+                'count': len(keys)
+            })
+
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
     def serve_storage_stats(self):
         """Get stats for all Claude storage locations."""
         import os
