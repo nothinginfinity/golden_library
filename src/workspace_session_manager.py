@@ -44,6 +44,23 @@ class User:
     last_seen: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     cursor_position: Optional[Dict] = None
     is_typing: bool = False
+    avatar_color: Optional[str] = None  # Hex color for avatar background
+
+    def __post_init__(self):
+        """Generate avatar color if not provided."""
+        if not self.avatar_color:
+            # Generate consistent color based on user ID
+            import hashlib
+            hash_val = int(hashlib.md5(self.id.encode()).hexdigest()[:6], 16)
+            colors = ['#3b82f6', '#a855f7', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#8b5cf6']
+            self.avatar_color = colors[hash_val % len(colors)]
+
+    def get_initials(self) -> str:
+        """Get user initials for avatar."""
+        parts = self.name.split()
+        if len(parts) >= 2:
+            return (parts[0][0] + parts[1][0]).upper()
+        return self.name[:2].upper()
 
     def to_dict(self):
         """Convert to dict for JSON serialization (excluding websocket)."""
@@ -54,7 +71,9 @@ class User:
             'joined_at': self.joined_at,
             'last_seen': self.last_seen,
             'cursor_position': self.cursor_position,
-            'is_typing': self.is_typing
+            'is_typing': self.is_typing,
+            'avatar_color': self.avatar_color,
+            'initials': self.get_initials()
         }
 
 

@@ -1929,6 +1929,28 @@
       }
     }
 
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+    }
+
     /* Pattern Library Styles */
     .patterns-header {
       text-align: center;
@@ -3844,6 +3866,31 @@
     // =========================================================================
 
     const API_BASE = window.location.origin;
+
+    // =========================================================================
+    // UTILITY FUNCTIONS
+    // =========================================================================
+
+    // Escape HTML to prevent XSS
+    window.escapeHtml = function(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
+
+    // Format bytes to human readable
+    window.formatBytes = function(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
+    };
+
+    // =========================================================================
+    // MAIN DASHBOARD
+    // =========================================================================
 
     async function loadDashboardData() {
       try {
@@ -9240,21 +9287,7 @@ ${currentConversation.display}
       }
     }
 
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
     window.switchDiffView = switchDiffView;
-
-    function formatBytes(bytes) {
-      if (bytes === 0) return '0 B';
-      const k = 1024;
-      const sizes = ['B', 'KB', 'MB', 'GB'];
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
-    }
 
     // Close dropdowns when clicking outside
     document.addEventListener('click', function(event) {
@@ -9285,14 +9318,30 @@ ${currentConversation.display}
 
       if (!message) return;
 
-      // Add user message to chat
-      appendMessage(agentId, 'user', message);
-
       // Clear input
       input.value = '';
 
       // Update status
       updateAgentStatus(agentId, 'thinking');
+
+      // If in a session, send via WebSocket (Phase 2 multiplayer)
+      if (currentSessionId && workspaceWebSocket && workspaceWebSocket.readyState === WebSocket.OPEN) {
+        // Add user message to chat locally
+        appendMessage(agentId, 'user', message);
+
+        // Send via WebSocket
+        workspaceWebSocket.send(JSON.stringify({
+          type: 'workspace_message',
+          agent_id: agentId,
+          message: message
+        }));
+
+        return;
+      }
+
+      // Otherwise, fall back to Phase 1 single-user HTTP mode
+      // Add user message to chat
+      appendMessage(agentId, 'user', message);
 
       // Send to backend with SSE streaming
       try {
@@ -9404,9 +9453,45 @@ ${currentConversation.display}
       return messageEl;
     }
 
+    function appendAgentChunk(agentId, chunk) {
+      // If no current streaming message, create one
+      if (!currentStreamingMessages[agentId]) {
+        const messageEl = appendMessage(agentId, 'assistant', '');
+        currentStreamingMessages[agentId] = {
+          element: messageEl,
+          content: ''
+        };
+      }
+
+      // Append chunk to content
+      const streaming = currentStreamingMessages[agentId];
+      streaming.content += chunk;
+
+      // Update the message element
+      const contentDiv = streaming.element.querySelector('.message-content');
+      if (contentDiv) {
+        contentDiv.textContent = streaming.content;
+      }
+
+      // Auto-scroll
+      const messagesId = agentId === 'moderator' ? 'moderator-messages' : `agent-${agentId}-messages`;
+      const messagesContainer = document.getElementById(messagesId);
+      if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+    }
+
     function updateAgentStatus(agentId, status) {
       const statusId = agentId === 'moderator' ? 'moderator-status' : `agent-${agentId}-status`;
       const statusEl = document.getElementById(statusId);
+
+      // Clear streaming message when agent goes idle or error
+      if (status === 'idle' || status === 'error') {
+        delete currentStreamingMessages[agentId];
+      } else if (status === 'thinking') {
+        // Create empty streaming message when thinking starts
+        delete currentStreamingMessages[agentId];
+      }
 
       const statusMap = {
         'idle': '● idle',
@@ -9569,6 +9654,7 @@ ${currentConversation.display}
     let currentSessionId = null;
     let currentUserId = null;
     let currentUserName = 'User-' + Math.random().toString(36).substr(2, 5);
+    let currentStreamingMessages = {}; // Track streaming messages per agent
 
     function connectWorkspaceWebSocket() {
       if (workspaceWebSocket) return;
@@ -9617,14 +9703,46 @@ ${currentConversation.display}
         updateSessionUI(true);
       } else if (event === 'user_joined') {
         updateUserPresence(data.data.users);
-        showNotification(`${data.data.user_name} joined the session`);
+        showNotification(`${data.data.user_name} joined the session`, 'success');
       } else if (event === 'user_left') {
-        showNotification('A user left the session');
+        const userName = data.data.user_name || 'A user';
+        showNotification(`${userName} left the session`, 'info');
+        // Fetch updated user list
+        fetchSessionUsers();
       } else if (event === 'user_message') {
         // Display message from other user
         if (data.data.user_id !== currentUserId) {
           appendMessage(data.data.agent_id, 'user', data.data.content);
         }
+      } else if (event === 'user_typing') {
+        // Update typing indicator
+        if (data.data.user_id !== currentUserId) {
+          fetchSessionUsers();
+        }
+      } else if (event === 'agent_thinking') {
+        updateAgentStatus(data.data.agent_id, 'thinking');
+      } else if (event === 'agent_response_chunk') {
+        appendAgentChunk(data.data.agent_id, data.data.chunk);
+      } else if (event === 'agent_response_complete') {
+        updateAgentStatus(data.data.agent_id, 'idle');
+      } else if (event === 'agent_error') {
+        updateAgentStatus(data.data.agent_id, 'error');
+        showNotification(`Agent error: ${data.data.error}`, 'error');
+      }
+    }
+
+    async function fetchSessionUsers() {
+      if (!currentSessionId) return;
+
+      try {
+        const response = await fetch(`/api/workspace/sessions/${currentSessionId}`);
+        const data = await response.json();
+        if (data.success && data.session) {
+          const users = Object.values(data.session.users);
+          updateUserPresence(users);
+        }
+      } catch (error) {
+        console.error('[Workspace] Error fetching session users:', error);
       }
     }
 
@@ -9670,7 +9788,7 @@ ${currentConversation.display}
         return;
       }
 
-      workspaceWebSocket.send(JSON.dumps({
+      workspaceWebSocket.send(JSON.stringify({
         type: 'join_workspace_session',
         session_id: sessionId,
         user_name: currentUserName,
@@ -9723,16 +9841,96 @@ ${currentConversation.display}
       const userListEl = document.getElementById('user-list');
       if (!userListEl) return;
 
-      userListEl.innerHTML = users.map(user => `
-        <div style="padding: 6px 12px; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; color: #60a5fa; font-size: 0.85rem;">
-          👤 ${user.name || user.id}
-        </div>
-      `).join('');
+      // Update online count in header
+      const presenceHeader = document.querySelector('#user-presence > div:first-child');
+      if (presenceHeader) {
+        presenceHeader.textContent = `👥 Active Users (${users.length}):`;
+      }
+
+      userListEl.innerHTML = users.map(user => {
+        const initials = user.initials || (user.name || user.id).substring(0, 2).toUpperCase();
+        const avatarColor = user.avatar_color || '#3b82f6';
+        const isCurrentUser = user.id === currentUserId;
+
+        return `
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; ${isCurrentUser ? 'border-color: #10b981;' : ''}">
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: ${avatarColor}; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.75rem; color: white;">
+              ${initials}
+            </div>
+            <div style="display: flex; flex-direction: column;">
+              <div style="color: #e2e8f0; font-size: 0.85rem; font-weight: 500;">
+                ${user.name || user.id}${isCurrentUser ? ' (You)' : ''}
+              </div>
+              <div style="color: #64748b; font-size: 0.7rem;">
+                ${user.role || 'editor'}${user.is_typing ? ' • typing...' : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
-    function showNotification(message) {
-      // Simple notification (can be enhanced later)
+    function showNotification(message, type = 'info') {
+      // Create toast notification
+      const toast = document.createElement('div');
+      const colors = {
+        info: 'rgba(59, 130, 246, 0.9)',
+        success: 'rgba(16, 185, 129, 0.9)',
+        warning: 'rgba(234, 179, 8, 0.9)',
+        error: 'rgba(239, 68, 68, 0.9)'
+      };
+
+      toast.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: ${colors[type] || colors.info};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        z-index: 10000;
+        font-size: 0.9rem;
+        font-weight: 500;
+        max-width: 350px;
+        animation: slideIn 0.3s ease-out;
+      `;
+
+      toast.textContent = message;
+      document.body.appendChild(toast);
+
+      // Auto-remove after 3 seconds
+      setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease-out';
+        setTimeout(() => document.body.removeChild(toast), 300);
+      }, 3000);
+
       console.log('[Workspace]', message);
+    }
+
+    // Typing indicator debounce
+    let typingTimeout = null;
+
+    function sendTypingIndicator(isTyping) {
+      if (!workspaceWebSocket || !currentSessionId) return;
+
+      workspaceWebSocket.send(JSON.stringify({
+        type: 'user_typing',
+        is_typing: isTyping
+      }));
+    }
+
+    function handleInputTyping() {
+      // Send typing started
+      sendTypingIndicator(true);
+
+      // Clear previous timeout
+      if (typingTimeout) clearTimeout(typingTimeout);
+
+      // After 2 seconds of no typing, send typing stopped
+      typingTimeout = setTimeout(() => {
+        sendTypingIndicator(false);
+      }, 2000);
     }
 
     // Auto-connect WebSocket when workspace tab is opened
@@ -9742,6 +9940,15 @@ ${currentConversation.display}
       if (workspaceTab) {
         connectWorkspaceWebSocket();
       }
+
+      // Add typing indicators to input fields
+      const inputs = ['agent-a-input', 'agent-b-input', 'moderator-input'];
+      inputs.forEach(inputId => {
+        const input = document.getElementById(inputId);
+        if (input) {
+          input.addEventListener('input', handleInputTyping);
+        }
+      });
     });
 
     // Make workspace functions globally accessible

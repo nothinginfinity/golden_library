@@ -167,9 +167,20 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif path == '/' or path == '/index.html':
             self.serve_dashboard()
             return
+        elif path == '/chat_test.html':
+            self.serve_chat_test()
+            return
         else:
             # Return 404 for other paths
             self.send_error(404, "Not found")
+
+    def do_OPTIONS(self):
+        """Handle OPTIONS requests for CORS preflight."""
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
 
     def do_POST(self):
         """Handle POST requests."""
@@ -282,6 +293,18 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 self.wfile.write(f.read())
         else:
             self.send_error(404, f"Dashboard not found. Looked in: {Path(__file__).parent}, {Path.cwd()}")
+
+    def serve_chat_test(self):
+        """Serve the chat test page."""
+        test_path = Path(__file__).parent / "chat_test.html"
+        if test_path.exists():
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html')
+            self.end_headers()
+            with open(test_path, 'rb') as f:
+                self.wfile.write(f.read())
+        else:
+            self.send_error(404, "Chat test page not found")
 
     def serve_stats(self):
         """Serve statistics about compressed data."""
@@ -2546,13 +2569,13 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             session = session_manager.get_session(session_id)
 
             if not session:
-                self.serve_json({'error': 'Session not found'}, status=404)
+                self.serve_json({'success': False, 'error': 'Session not found'}, status=404)
                 return
 
-            self.serve_json({'session': session.to_dict()})
+            self.serve_json({'success': True, 'session': session.to_dict()})
 
         except Exception as e:
-            self.serve_json({'error': str(e)}, status=500)
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
 
     def serve_session_stats(self):
         """Get statistics about all sessions."""
@@ -3880,11 +3903,13 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         """Call Claude API with streaming and tool support."""
         import anthropic
 
-        if 'anthropic' not in api_keys:
+        # Support both 'anthropic' and 'claude' key names
+        api_key = api_keys.get('anthropic') or api_keys.get('claude')
+        if not api_key:
             self.wfile.write(f'data: {json.dumps({"error": "Claude API key not configured"})}\n\n'.encode())
             return
 
-        client = anthropic.Anthropic(api_key=api_keys['anthropic'])
+        client = anthropic.Anthropic(api_key=api_key)
 
         # Build messages
         messages = history + [{"role": "user", "content": message}]
@@ -3892,13 +3917,132 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         # System prompt
         system = """You are a helpful AI assistant integrated into the Claude History Browser. You can help users search, analyze, and organize their Claude conversation history.
 
-Available tools:
-- search_history: Search across all history
-- get_related_items: Find related conversations/files
-- get_timeline: Get activity patterns over time
-- create_artifact: Create visualizations (checklists, tables, charts)
+# CAPABILITIES & FAQ
 
-When creating artifacts, be specific with the data structure. For checklists, use {items: [{text: "...", checked: false}]}. For tables, use {columns: [...], rows: [[...]]}."""
+## What You Can Search
+- **Conversations** (6,987+): All Claude Code terminal sessions with timestamps, projects, and full text
+- **Project Sessions** (138+): Claude Code work sessions organized by project directory
+- **File Edits** (2,666+): Every file version edited by Claude with diff previews
+- **Todo Lists** (727+): Task lists from Claude sessions with status tracking
+- **Plans** (103+): Implementation plans and architecture documents
+
+## Available Tools
+
+### 1. search_history(query, type, limit)
+**What it does:** Search across all history sources with filters
+**Parameters:**
+- `query` (required): Search terms (e.g., "websocket", "api debug", "login feature")
+- `type` (optional): Filter by type - "all" | "conversation" | "project_session" | "file_edit" | "todo_list" | "plan"
+- `limit` (optional): Max results (default 20)
+
+**Example queries:**
+- "Find all conversations about websockets from last week"
+- "Search for file edits related to API development"
+- "Show me plans about authentication"
+
+### 2. get_related_items(item_id, limit)
+**What it does:** Find items related to a specific session/file/conversation
+**How it works:** Matches by session ID, shared tags, project, and time proximity
+**Use cases:**
+- "What files were edited in this session?"
+- "Show conversations related to this project"
+- "Find todos from the same work session"
+
+### 3. get_timeline(group_by)
+**What it does:** Show activity patterns over time
+**Parameters:**
+- `group_by`: "day" | "week" | "month"
+
+**Example queries:**
+- "Show my activity timeline for January"
+- "What did I work on last week?"
+- "Create a monthly breakdown of my sessions"
+
+### 4. create_artifact(type, title, data)
+**What it does:** Create visual artifacts from data
+**Types:**
+- **checklist**: Interactive todo lists - `{items: [{text: "...", checked: false}]}`
+- **table**: Data tables - `{columns: ["Name", "Value"], rows: [["foo", "bar"]]}`
+- **chart**: Visualization data (JSON preview)
+- **timeline**: Temporal data visualizations
+
+**Example queries:**
+- "Create a checklist of all debugging patterns I used"
+- "Make a table of API endpoints I worked on"
+- "Show a timeline of my December activity"
+
+## Search Tips
+
+### Natural Language Queries
+You understand natural language! Try:
+- "Find all work I did on the login feature"
+- "What was I debugging yesterday?"
+- "Show me everything related to websockets"
+- "List all my incomplete todos"
+- "When did I last work on the API?"
+
+### Time-Based Searches
+- "Show my work from January 14th"
+- "What did I do yesterday?"
+- "Find sessions from last week"
+- "Activity from December 2025"
+
+### Project-Based Searches
+- "Find all sessions in the phi_proxy project"
+- "What did I build in golden_library?"
+- "Show file edits in the dashboard project"
+
+### Category Filters
+Available categories: debugging, feature, refactor, documentation, testing, configuration, api, database, ui, git, optimization, learning
+
+Example: "Show all debugging sessions from last month"
+
+### Tag-Based Searches
+Search by auto-extracted tags like: websocket, api, mcp, test, config, error, implement, etc.
+
+## Common Workflows
+
+### Research & Analysis
+1. "Find all conversations about [topic]"
+2. "Show related files and sessions"
+3. "Create a summary table of findings"
+
+### Progress Tracking
+1. "Show my timeline for this week"
+2. "List all completed todos"
+3. "What features did I build this month?"
+
+### Debugging History
+1. "Find all error-related sessions"
+2. "Show debugging patterns I used"
+3. "When did I fix [specific bug]?"
+
+### Project Overview
+1. "Show all work in [project_name]"
+2. "Create a timeline of project activity"
+3. "List all files edited in this project"
+
+## Tips for Best Results
+
+1. **Be specific with time ranges**: "last week" > "recently"
+2. **Use project names**: They're indexed and searchable
+3. **Combine filters**: "debugging sessions in phi_proxy from yesterday"
+4. **Ask for visualizations**: I can create checklists, tables, timelines
+5. **Follow up questions**: I remember our conversation context
+
+## Data Sources & Counts
+- Total indexed items: 10,621+
+- Time range: October 2025 - Present
+- Updates: Real-time as you work
+- Storage: All in ~/.claude/ directories
+
+## If Something's Not Found
+- Try broader search terms
+- Check time range
+- Try searching by project name
+- Ask me to search related items
+
+Remember: All your Claude work is saved and searchable. Nothing is lost when you close terminals!"""
 
         # Call Claude with streaming
         try:
@@ -4512,11 +4656,17 @@ async def websocket_handler(websocket):
         connected_clients.discard(websocket)
         # Clean up session if user was in one
         if session_id and user_id and session_manager:
+            # Get user name before removing from session
+            session = session_manager.get_session(session_id)
+            user_name = None
+            if session and user_id in session.users:
+                user_name = session.users[user_id].name
+
             session_manager.leave_session(session_id, user_id)
             await session_manager.broadcast_to_session(
                 session_id,
                 'user_left',
-                {'user_id': user_id}
+                {'user_id': user_id, 'user_name': user_name}
             )
 
 
