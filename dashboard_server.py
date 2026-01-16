@@ -4667,6 +4667,26 @@ async def websocket_handler(websocket):
                                 {'agent_control': session.agent_control}
                             )
 
+                elif msg_type == 'human_message':
+                    if session_id and session_manager:
+                        message_content = data.get('message')
+                        if message_content:
+                            session = session_manager.get_session(session_id)
+                            user = session.users.get(user_id) if session else None
+                            user_name = user.name if user else 'Unknown'
+
+                            # Broadcast human message to all users in session
+                            await session_manager.broadcast_to_session(
+                                session_id,
+                                'human_message',
+                                {
+                                    'user_id': user_id,
+                                    'user_name': user_name,
+                                    'message': message_content,
+                                    'timestamp': datetime.utcnow().isoformat()
+                                }
+                            )
+
             except json.JSONDecodeError:
                 pass
             except Exception as e:
