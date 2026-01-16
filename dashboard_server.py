@@ -231,6 +231,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif path == '/api/unified/rebuild-index':
             self.rebuild_unified_index()
             return
+        elif path == '/api/assistant/chat':
+            self.serve_assistant_chat(data)
+            return
         elif path == '/api/golden/restore':
             self.restore_golden_plan(data)
             return
@@ -3745,6 +3748,403 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             traceback.print_exc()
             self.serve_json({'ok': False, 'error': str(e)}, status=500)
 
+    # =========================================================================
+    # AI ASSISTANT - LLM PROXY WITH TOOL CALLING
+    # =========================================================================
+
+    def serve_assistant_chat(self, data):
+        """Handle assistant chat with streaming and tool calling."""
+        try:
+            message = data.get('message')
+            model = data.get('model', 'claude')
+            conversation_history = data.get('history', [])
+
+            if not message:
+                self.serve_json({'ok': False, 'error': 'Missing message'}, status=400)
+                return
+
+            # Load API keys
+            api_keys = self.load_api_keys()
+
+            # Set headers for Server-Sent Events (SSE) streaming
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/event-stream')
+            self.send_header('Cache-Control', 'no-cache')
+            self.send_header('Connection', 'keep-alive')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+
+            # Define tools available to the assistant
+            tools = [
+                {
+                    "name": "search_history",
+                    "description": "Search across all Claude history (conversations, projects, file edits, todos, plans)",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "Search query to find in history"
+                            },
+                            "type": {
+                                "type": "string",
+                                "enum": ["all", "conversation", "project_session", "file_edit", "todo_list", "plan"],
+                                "description": "Type of items to search"
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Maximum number of results to return"
+                            }
+                        },
+                        "required": ["query"]
+                    }
+                },
+                {
+                    "name": "get_related_items",
+                    "description": "Find items related to a specific history item",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "item_id": {
+                                "type": "string",
+                                "description": "ID of the item to find related items for"
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Maximum number of related items to return"
+                            }
+                        },
+                        "required": ["item_id"]
+                    }
+                },
+                {
+                    "name": "get_timeline",
+                    "description": "Get activity timeline grouped by time period",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "group_by": {
+                                "type": "string",
+                                "enum": ["day", "week", "month"],
+                                "description": "How to group timeline data"
+                            }
+                        },
+                        "required": []
+                    }
+                },
+                {
+                    "name": "create_artifact",
+                    "description": "Create a visual artifact (chart, checklist, table) from data",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "enum": ["checklist", "table", "chart", "timeline"],
+                                "description": "Type of artifact to create"
+                            },
+                            "title": {
+                                "type": "string",
+                                "description": "Title for the artifact"
+                            },
+                            "data": {
+                                "type": "object",
+                                "description": "Data for the artifact (structure depends on type)"
+                            }
+                        },
+                        "required": ["type", "title", "data"]
+                    }
+                }
+            ]
+
+            # Call LLM based on model choice
+            if model == 'claude':
+                self.call_claude_with_tools(message, conversation_history, tools, api_keys)
+            elif model == 'deepseek':
+                self.call_deepseek_with_tools(message, conversation_history, tools, api_keys)
+            else:
+                self.wfile.write(f'data: {json.dumps({"error": "Unknown model"})}\n\n'.encode())
+
+            # Send completion marker
+            self.wfile.write(f'data: {json.dumps({"done": True})}\n\n'.encode())
+            self.wfile.flush()
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            error_msg = f'data: {json.dumps({"error": str(e)})}\n\n'
+            self.wfile.write(error_msg.encode())
+            self.wfile.flush()
+
+    def call_claude_with_tools(self, message, history, tools, api_keys):
+        """Call Claude API with streaming and tool support."""
+        import anthropic
+
+        if 'anthropic' not in api_keys:
+            self.wfile.write(f'data: {json.dumps({"error": "Claude API key not configured"})}\n\n'.encode())
+            return
+
+        client = anthropic.Anthropic(api_key=api_keys['anthropic'])
+
+        # Build messages
+        messages = history + [{"role": "user", "content": message}]
+
+        # System prompt
+        system = """You are a helpful AI assistant integrated into the Claude History Browser. You can help users search, analyze, and organize their Claude conversation history.
+
+Available tools:
+- search_history: Search across all history
+- get_related_items: Find related conversations/files
+- get_timeline: Get activity patterns over time
+- create_artifact: Create visualizations (checklists, tables, charts)
+
+When creating artifacts, be specific with the data structure. For checklists, use {items: [{text: "...", checked: false}]}. For tables, use {columns: [...], rows: [[...]]}."""
+
+        # Call Claude with streaming
+        try:
+            with client.messages.stream(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4096,
+                tools=tools,
+                system=system,
+                messages=messages
+            ) as stream:
+                for text in stream.text_stream:
+                    self.wfile.write(f'data: {json.dumps({"chunk": text})}\n\n'.encode())
+                    self.wfile.flush()
+
+                # Handle tool calls
+                message_obj = stream.get_final_message()
+                if message_obj.stop_reason == "tool_use":
+                    for block in message_obj.content:
+                        if block.type == "tool_use":
+                            # Execute tool
+                            tool_result = self.execute_tool(block.name, block.input)
+
+                            # Send tool call info to client
+                            self.wfile.write(f'data: {json.dumps({"tool_call": {"name": block.name, "input": block.input}})}\n\n'.encode())
+                            self.wfile.flush()
+
+                            # Continue conversation with tool result
+                            new_messages = messages + [
+                                {"role": "assistant", "content": message_obj.content},
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {
+                                            "type": "tool_result",
+                                            "tool_use_id": block.id,
+                                            "content": json.dumps(tool_result)
+                                        }
+                                    ]
+                                }
+                            ]
+
+                            # Stream the follow-up response
+                            with client.messages.stream(
+                                model="claude-sonnet-4-20250514",
+                                max_tokens=4096,
+                                tools=tools,
+                                system=system,
+                                messages=new_messages
+                            ) as follow_up_stream:
+                                for text in follow_up_stream.text_stream:
+                                    self.wfile.write(f'data: {json.dumps({"chunk": text})}\n\n'.encode())
+                                    self.wfile.flush()
+
+        except Exception as e:
+            self.wfile.write(f'data: {json.dumps({"error": str(e)})}\n\n'.encode())
+            self.wfile.flush()
+
+    def call_deepseek_with_tools(self, message, history, tools, api_keys):
+        """Call DeepSeek API (compatible with OpenAI format)."""
+        import requests
+
+        if 'deepseek' not in api_keys:
+            self.wfile.write(f'data: {json.dumps({"error": "DeepSeek API key not configured"})}\n\n'.encode())
+            return
+
+        # DeepSeek uses OpenAI-compatible API
+        url = "https://api.deepseek.com/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_keys['deepseek']}",
+            "Content-Type": "application/json"
+        }
+
+        # Build messages
+        messages = [
+            {"role": "system", "content": "You are a helpful AI assistant integrated into the Claude History Browser."}
+        ] + history + [{"role": "user", "content": message}]
+
+        payload = {
+            "model": "deepseek-chat",
+            "messages": messages,
+            "stream": True,
+            "tools": tools
+        }
+
+        try:
+            response = requests.post(url, headers=headers, json=payload, stream=True)
+
+            for line in response.iter_lines():
+                if line:
+                    line = line.decode('utf-8')
+                    if line.startswith('data: '):
+                        data = line[6:]
+                        if data == '[DONE]':
+                            break
+                        try:
+                            chunk = json.loads(data)
+                            if 'choices' in chunk and len(chunk['choices']) > 0:
+                                delta = chunk['choices'][0].get('delta', {})
+                                if 'content' in delta:
+                                    self.wfile.write(f'data: {json.dumps({"chunk": delta["content"]})}\n\n'.encode())
+                                    self.wfile.flush()
+                        except json.JSONDecodeError:
+                            pass
+
+        except Exception as e:
+            self.wfile.write(f'data: {json.dumps({"error": str(e)})}\n\n'.encode())
+            self.wfile.flush()
+
+    def execute_tool(self, tool_name, tool_input):
+        """Execute a tool call and return the result."""
+        try:
+            if tool_name == "search_history":
+                # Use existing unified search
+                query = tool_input.get('query', '')
+                type_filter = tool_input.get('type', 'all')
+                limit = tool_input.get('limit', 20)
+
+                index_data = self.get_unified_index()
+                items = index_data['items']
+
+                # Apply type filter
+                if type_filter != 'all':
+                    items = [i for i in items if i.get('type') == type_filter]
+
+                # Search
+                search_query = query.lower()
+                results = []
+                for item in items:
+                    search_fields = []
+                    for field in ['display', 'preview', 'project', 'title', 'category']:
+                        if field in item:
+                            search_fields.append(str(item[field]).lower())
+                    search_text = ' '.join(search_fields)
+
+                    if search_query in search_text:
+                        match_score = search_text.count(search_query)
+                        item['matchScore'] = match_score
+                        results.append(item)
+
+                results.sort(key=lambda x: x.get('matchScore', 0), reverse=True)
+                results = results[:limit]
+
+                return {
+                    "success": True,
+                    "results": results,
+                    "total": len(results),
+                    "query": query
+                }
+
+            elif tool_name == "get_related_items":
+                item_id = tool_input.get('item_id')
+                limit = tool_input.get('limit', 10)
+
+                index_data = self.get_unified_index()
+                items = index_data['items']
+
+                # Find source item
+                source_item = None
+                for item in items:
+                    if item.get('id') == item_id:
+                        source_item = item
+                        break
+
+                if not source_item:
+                    return {"success": False, "error": "Item not found"}
+
+                # Calculate similarity (simplified version of serve_unified_related)
+                related = []
+                source_tags = set(source_item.get('tags', []))
+                source_session = source_item.get('sessionId', '')
+
+                for item in items:
+                    if item.get('id') == item_id:
+                        continue
+                    score = 0
+                    if item.get('sessionId') == source_session and source_session:
+                        score += 5
+                    item_tags = set(item.get('tags', []))
+                    shared_tags = source_tags & item_tags
+                    score += len(shared_tags) * 3
+                    if score > 0:
+                        item['relevanceScore'] = score
+                        related.append(item)
+
+                related.sort(key=lambda x: x.get('relevanceScore', 0), reverse=True)
+                return {"success": True, "related": related[:limit]}
+
+            elif tool_name == "get_timeline":
+                group_by = tool_input.get('group_by', 'month')
+
+                index_data = self.get_unified_index()
+                items = index_data['items']
+
+                timeline = {}
+                for item in items:
+                    timestamp = item.get('timestamp', 0)
+                    if timestamp == 0:
+                        continue
+
+                    dt = datetime.fromtimestamp(timestamp / 1000)
+                    if group_by == 'day':
+                        key = dt.strftime('%Y-%m-%d')
+                    elif group_by == 'week':
+                        from datetime import timedelta
+                        week_start = dt - timedelta(days=dt.weekday())
+                        key = week_start.strftime('%Y-%m-%d')
+                    else:
+                        key = dt.strftime('%Y-%m')
+
+                    if key not in timeline:
+                        timeline[key] = {"period": key, "total": 0, "byType": {}}
+
+                    timeline[key]['total'] += 1
+                    item_type = item.get('type', 'unknown')
+                    timeline[key]['byType'][item_type] = timeline[key]['byType'].get(item_type, 0) + 1
+
+                timeline_list = list(timeline.values())
+                timeline_list.sort(key=lambda x: x['period'], reverse=True)
+
+                return {"success": True, "timeline": timeline_list[:30]}
+
+            elif tool_name == "create_artifact":
+                # Just return the artifact data for frontend rendering
+                return {
+                    "success": True,
+                    "artifact": {
+                        "type": tool_input.get('type'),
+                        "title": tool_input.get('title'),
+                        "data": tool_input.get('data')
+                    }
+                }
+
+            else:
+                return {"success": False, "error": f"Unknown tool: {tool_name}"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def load_api_keys(self):
+        """Load API keys from file."""
+        try:
+            with open(API_KEYS_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return {}
+
     def log_message(self, format, *args):
         """Override to customize logging."""
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -3965,12 +4365,68 @@ async def handle_workspace_message(session_id, user_id, data, websocket):
             }
         )
 
-        # TODO: In next phase, integrate with AgentOrchestrator
-        # For now, just acknowledge the message
-        await websocket.send(json.dumps({
-            'event': 'message_received',
-            'message_id': msg.id
-        }))
+        # Get session and orchestrator
+        session = session_manager.get_session(session_id)
+        if not session or not session.orchestrator:
+            print(f"[WebSocket] No orchestrator available for session {session_id}")
+            return
+
+        # Start streaming indicator
+        await session_manager.broadcast_to_session(
+            session_id,
+            'agent_thinking',
+            {'agent_id': agent_id}
+        )
+
+        # Stream agent response
+        full_response = []
+        try:
+            # orchestrator.send_message() is a sync iterator, run in executor
+            loop = asyncio.get_event_loop()
+
+            # Collect chunks from sync iterator
+            for chunk in session.orchestrator.send_message(agent_id, message_content):
+                full_response.append(chunk)
+
+                # Broadcast chunk to all users in session
+                await session_manager.broadcast_to_session(
+                    session_id,
+                    'agent_response_chunk',
+                    {
+                        'agent_id': agent_id,
+                        'chunk': chunk
+                    }
+                )
+
+            # After streaming complete, store full response
+            complete_response = ''.join(full_response)
+            response_msg = session_manager.add_message(
+                session_id, user_id, agent_id, 'assistant', complete_response
+            )
+
+            # Broadcast completion
+            await session_manager.broadcast_to_session(
+                session_id,
+                'agent_response_complete',
+                {
+                    'agent_id': agent_id,
+                    'message_id': response_msg.id
+                }
+            )
+
+            # Sync agent context back to session storage
+            session.agent_contexts[agent_id] = session.orchestrator.get_context(agent_id)
+
+        except Exception as e:
+            print(f"[WebSocket] Error streaming agent response: {e}")
+            await session_manager.broadcast_to_session(
+                session_id,
+                'agent_error',
+                {
+                    'agent_id': agent_id,
+                    'error': str(e)
+                }
+            )
 
     except Exception as e:
         print(f"[WebSocket] Error handling workspace message: {e}")

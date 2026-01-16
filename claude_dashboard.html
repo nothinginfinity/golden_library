@@ -2228,6 +2228,120 @@
     .type-file { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
     .type-todo { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; }
     .type-plan { background: rgba(236, 72, 153, 0.2); color: #f9a8d4; }
+
+    /* AI Assistant Styles */
+    .assistant-message {
+      padding: 12px 16px;
+      border-radius: 8px;
+      line-height: 1.6;
+      font-size: 0.9rem;
+    }
+
+    .assistant-user {
+      background: rgba(99, 102, 241, 0.2);
+      border-left: 3px solid #6366f1;
+      color: #e2e8f0;
+    }
+
+    .assistant-assistant {
+      background: rgba(16, 185, 129, 0.2);
+      border-left: 3px solid #10b981;
+      color: #e2e8f0;
+    }
+
+    .assistant-system {
+      background: rgba(100, 116, 139, 0.2);
+      border-left: 3px solid #64748b;
+      color: #cbd5e1;
+      font-size: 0.85rem;
+    }
+
+    .assistant-error {
+      background: rgba(239, 68, 68, 0.2);
+      border-left: 3px solid #ef4444;
+      color: #fca5a5;
+    }
+
+    .assistant-thinking {
+      opacity: 0.7;
+      font-style: italic;
+    }
+
+    .artifact {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 8px;
+    }
+
+    .artifact-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    .artifact-title {
+      font-weight: 600;
+      color: #a5b4fc;
+      font-size: 0.9rem;
+    }
+
+    .artifact-type {
+      font-size: 0.75rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .artifact-content {
+      color: #e2e8f0;
+      font-size: 0.85rem;
+    }
+
+    .checklist-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(100, 116, 139, 0.2);
+    }
+
+    .checklist-item:last-child {
+      border-bottom: none;
+    }
+
+    .checklist-checkbox {
+      margin-top: 2px;
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    .tool-call {
+      background: rgba(245, 158, 11, 0.1);
+      border-left: 3px solid #f59e0b;
+      padding: 8px 12px;
+      margin: 8px 0;
+      border-radius: 4px;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 0.8rem;
+      color: #fbbf24;
+    }
+
+    .tool-result {
+      background: rgba(16, 185, 129, 0.1);
+      border-left: 3px solid #10b981;
+      padding: 8px 12px;
+      margin: 8px 0;
+      border-radius: 4px;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 0.8rem;
+      color: #6ee7b7;
+    }
   </style>
 </head>
 <body>
@@ -3598,6 +3712,61 @@
                 </div>
               </div>
               <div id="conversation-detail-content" style="background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 8px; max-height: 500px; overflow-y: auto; white-space: pre-wrap; font-family: 'SF Mono', Monaco, monospace; font-size: 0.9rem; line-height: 1.6;">
+              </div>
+            </div>
+
+            <!-- AI Research Assistant -->
+            <div class="chart-container" style="margin-top: 24px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div>
+                  <div class="chart-title">🤖 AI Research Assistant</div>
+                  <div style="color: #94a3b8; font-size: 0.85rem;">
+                    Ask questions, search history, and create visualizations
+                  </div>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <select id="assistant-model" class="filter-btn" style="padding: 6px 12px;">
+                    <option value="claude">Claude (Sonnet 4.5)</option>
+                    <option value="deepseek">DeepSeek</option>
+                  </select>
+                  <button class="filter-btn" onclick="clearAssistantChat()">🗑️ Clear</button>
+                  <button class="filter-btn" onclick="toggleAssistant()">
+                    <span id="assistant-toggle-icon">▼</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Assistant Panel (collapsible) -->
+              <div id="assistant-panel" style="display: none;">
+                <!-- Chat History -->
+                <div id="assistant-chat" style="background: rgba(0, 0, 0, 0.2); border-radius: 8px; padding: 16px; max-height: 400px; overflow-y: auto; margin-bottom: 12px; display: flex; flex-direction: column; gap: 12px;">
+                  <div class="assistant-message assistant-system">
+                    <strong>Assistant:</strong> Hello! I can help you search and analyze your Claude history. Try asking me to:
+                    <ul style="margin: 8px 0 0 20px; line-height: 1.6;">
+                      <li>Search for specific topics or patterns</li>
+                      <li>Find related conversations or files</li>
+                      <li>Create timelines and visualizations</li>
+                      <li>Organize findings into checklists</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <!-- Chat Input -->
+                <div style="display: flex; gap: 8px;">
+                  <input type="text"
+                         id="assistant-input"
+                         class="search-input"
+                         placeholder="Ask me anything about your history..."
+                         onkeypress="if(event.key==='Enter') sendAssistantMessage()"
+                         style="flex: 1;">
+                  <button class="search-btn" onclick="sendAssistantMessage()" id="assistant-send-btn">
+                    Send
+                  </button>
+                </div>
+
+                <!-- Artifacts Container -->
+                <div id="assistant-artifacts" style="margin-top: 16px; display: flex; flex-direction: column; gap: 12px;">
+                </div>
               </div>
             </div>
           </div>
@@ -6839,6 +7008,274 @@ ${currentConversation.display}
       currentUnifiedFilter = { type: 'all', category: null, tags: [] };
       loadUnifiedHistory();
     };
+
+    // =========================================================================
+    // AI RESEARCH ASSISTANT
+    // =========================================================================
+
+    let assistantChatHistory = [];
+    let assistantExpanded = false;
+
+    // Toggle assistant panel
+    window.toggleAssistant = function() {
+      const panel = document.getElementById('assistant-panel');
+      const icon = document.getElementById('assistant-toggle-icon');
+
+      assistantExpanded = !assistantExpanded;
+      panel.style.display = assistantExpanded ? 'block' : 'none';
+      icon.textContent = assistantExpanded ? '▲' : '▼';
+
+      // Load history from localStorage
+      if (assistantExpanded && assistantChatHistory.length === 0) {
+        loadAssistantHistory();
+      }
+    };
+
+    // Load chat history from localStorage
+    function loadAssistantHistory() {
+      try {
+        const saved = localStorage.getItem('assistant_chat_history');
+        if (saved) {
+          assistantChatHistory = JSON.parse(saved);
+          renderChatHistory();
+        }
+      } catch (e) {
+        console.error('[Assistant] Error loading history:', e);
+      }
+    }
+
+    // Save chat history to localStorage
+    function saveAssistantHistory() {
+      try {
+        localStorage.setItem('assistant_chat_history', JSON.stringify(assistantChatHistory));
+      } catch (e) {
+        console.error('[Assistant] Error saving history:', e);
+      }
+    }
+
+    // Clear assistant chat
+    window.clearAssistantChat = function() {
+      if (!confirm('Clear all assistant chat history?')) return;
+
+      assistantChatHistory = [];
+      saveAssistantHistory();
+
+      const chatEl = document.getElementById('assistant-chat');
+      chatEl.innerHTML = '<div class="assistant-message assistant-system"><strong>Assistant:</strong> Chat cleared. How can I help you?</div>';
+
+      document.getElementById('assistant-artifacts').innerHTML = '';
+    };
+
+    // Render chat history
+    function renderChatHistory() {
+      const chatEl = document.getElementById('assistant-chat');
+      chatEl.innerHTML = '';
+
+      assistantChatHistory.forEach(msg => {
+        const msgEl = document.createElement('div');
+        msgEl.className = `assistant-message assistant-${msg.role}`;
+
+        if (msg.role === 'user') {
+          msgEl.innerHTML = `<strong>You:</strong> ${escapeHtml(msg.content)}`;
+        } else if (msg.role === 'assistant') {
+          msgEl.innerHTML = `<strong>Assistant:</strong> ${escapeHtml(msg.content)}`;
+        } else if (msg.role === 'tool') {
+          msgEl.innerHTML = `<div class="tool-call">🔧 ${escapeHtml(msg.tool_name)}: ${escapeHtml(JSON.stringify(msg.tool_input))}</div>`;
+        }
+
+        chatEl.appendChild(msgEl);
+      });
+
+      // Scroll to bottom
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    // Send message to assistant
+    window.sendAssistantMessage = async function() {
+      const input = document.getElementById('assistant-input');
+      const message = input.value.trim();
+
+      if (!message) return;
+
+      input.value = '';
+      document.getElementById('assistant-send-btn').textContent = 'Thinking...';
+      document.getElementById('assistant-send-btn').disabled = true;
+
+      // Add user message
+      assistantChatHistory.push({
+        role: 'user',
+        content: message
+      });
+
+      renderChatHistory();
+
+      // Get model selection
+      const model = document.getElementById('assistant-model').value;
+
+      // Prepare request
+      const payload = {
+        message: message,
+        model: model,
+        history: assistantChatHistory.slice(0, -1)  // Exclude the message we just added
+      };
+
+      try {
+        // Connect to SSE stream
+        const response = await fetch(`${API_BASE}/api/assistant/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let assistantResponse = '';
+
+        // Create assistant message element
+        const chatEl = document.getElementById('assistant-chat');
+        const assistantMsgEl = document.createElement('div');
+        assistantMsgEl.className = 'assistant-message assistant-assistant';
+        assistantMsgEl.innerHTML = '<strong>Assistant:</strong> <span class="assistant-thinking">Thinking...</span>';
+        chatEl.appendChild(assistantMsgEl);
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();  // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.chunk) {
+                // Add text chunk
+                assistantResponse += data.chunk;
+                assistantMsgEl.innerHTML = `<strong>Assistant:</strong> ${escapeHtml(assistantResponse)}`;
+                chatEl.scrollTop = chatEl.scrollHeight;
+
+              } else if (data.tool_call) {
+                // Show tool call
+                const toolCallEl = document.createElement('div');
+                toolCallEl.className = 'tool-call';
+                toolCallEl.textContent = `🔧 Calling ${data.tool_call.name}...`;
+                assistantMsgEl.appendChild(toolCallEl);
+
+                // Add to history
+                assistantChatHistory.push({
+                  role: 'tool',
+                  tool_name: data.tool_call.name,
+                  tool_input: data.tool_call.input
+                });
+
+              } else if (data.done) {
+                // Finalize
+                if (assistantResponse) {
+                  assistantChatHistory.push({
+                    role: 'assistant',
+                    content: assistantResponse
+                  });
+                  saveAssistantHistory();
+                }
+
+              } else if (data.error) {
+                // Show error
+                assistantMsgEl.className = 'assistant-message assistant-error';
+                assistantMsgEl.innerHTML = `<strong>Error:</strong> ${escapeHtml(data.error)}`;
+              }
+            }
+          }
+        }
+
+      } catch (err) {
+        console.error('[Assistant] Error:', err);
+
+        const chatEl = document.getElementById('assistant-chat');
+        const errorMsgEl = document.createElement('div');
+        errorMsgEl.className = 'assistant-message assistant-error';
+        errorMsgEl.innerHTML = `<strong>Error:</strong> ${escapeHtml(err.message)}`;
+        chatEl.appendChild(errorMsgEl);
+      } finally {
+        document.getElementById('assistant-send-btn').textContent = 'Send';
+        document.getElementById('assistant-send-btn').disabled = false;
+      }
+    };
+
+    // Render artifact
+    function renderArtifact(artifact) {
+      const container = document.getElementById('assistant-artifacts');
+
+      const artifactEl = document.createElement('div');
+      artifactEl.className = 'artifact';
+
+      const header = document.createElement('div');
+      header.className = 'artifact-header';
+      header.innerHTML = `
+        <div class="artifact-title">${escapeHtml(artifact.title)}</div>
+        <div class="artifact-type">${artifact.type}</div>
+      `;
+      artifactEl.appendChild(header);
+
+      const content = document.createElement('div');
+      content.className = 'artifact-content';
+
+      if (artifact.type === 'checklist') {
+        artifact.data.items.forEach((item, idx) => {
+          const itemEl = document.createElement('div');
+          itemEl.className = 'checklist-item';
+          itemEl.innerHTML = `
+            <input type="checkbox" class="checklist-checkbox" ${item.checked ? 'checked' : ''} onchange="toggleChecklistItem(this, ${idx})">
+            <span>${escapeHtml(item.text)}</span>
+          `;
+          content.appendChild(itemEl);
+        });
+
+      } else if (artifact.type === 'table') {
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.style.borderCollapse = 'collapse';
+
+        // Header
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        artifact.data.columns.forEach(col => {
+          const th = document.createElement('th');
+          th.textContent = col;
+          th.style.borderBottom = '1px solid rgba(99, 102, 241, 0.3)';
+          th.style.padding = '8px';
+          th.style.textAlign = 'left';
+          headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Rows
+        const tbody = document.createElement('tbody');
+        artifact.data.rows.forEach(row => {
+          const tr = document.createElement('tr');
+          row.forEach(cell => {
+            const td = document.createElement('td');
+            td.textContent = cell;
+            td.style.padding = '8px';
+            td.style.borderBottom = '1px solid rgba(100, 116, 139, 0.2)';
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+
+        content.appendChild(table);
+
+      } else if (artifact.type === 'chart') {
+        content.innerHTML = `<pre>${JSON.stringify(artifact.data, null, 2)}</pre>`;
+      }
+
+      artifactEl.appendChild(content);
+      container.appendChild(artifactEl);
+    }
 
     // =========================================================================
     // TIMELINE PLAYBACK ENGINE

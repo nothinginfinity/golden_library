@@ -18,6 +18,13 @@ from typing import Dict, List, Set, Optional, Any
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 
+# Import AgentOrchestrator for per-session agent management
+try:
+    from agent_orchestrator import AgentOrchestrator
+except ImportError:
+    AgentOrchestrator = None
+    print("[WorkspaceSessionManager] Warning: AgentOrchestrator not available")
+
 
 class UserRole(Enum):
     """User roles in a session."""
@@ -82,9 +89,10 @@ class WorkspaceSession:
         'moderator': []
     })
     documents: Dict[str, str] = field(default_factory=dict)  # agent_id -> document
+    orchestrator: Any = None  # AgentOrchestrator instance for this session
 
     def to_dict(self):
-        """Convert to dict for JSON serialization."""
+        """Convert to dict for JSON serialization (excluding orchestrator)."""
         return {
             'id': self.id,
             'created_at': self.created_at,
@@ -94,6 +102,7 @@ class WorkspaceSession:
             'messages': [msg.to_dict() for msg in self.messages],
             'agent_contexts': self.agent_contexts,
             'documents': self.documents
+            # orchestrator excluded (not JSON serializable)
         }
 
     def is_expired(self) -> bool:
@@ -132,6 +141,14 @@ class WorkspaceSessionManager:
             owner_id=owner_id,
             users={owner_id: owner}
         )
+
+        # Initialize AgentOrchestrator for this session
+        if AgentOrchestrator:
+            try:
+                session.orchestrator = AgentOrchestrator()
+                print(f"[SessionManager] Initialized AgentOrchestrator for session {session_id}")
+            except Exception as e:
+                print(f"[SessionManager] Warning: Could not initialize orchestrator: {e}")
 
         self.sessions[session_id] = session
         print(f"[SessionManager] Created session {session_id} for user {owner_name}")
