@@ -2478,9 +2478,15 @@
           <div style="padding: 16px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h3 style="color: #60a5fa; font-size: 1.1rem; margin-bottom: 4px;">🅰️ Agent A (Koda)</h3>
-              <span id="agent-a-status" style="font-size: 0.8rem; color: #94a3b8;">● idle</span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="agent-a-status" style="font-size: 0.8rem; color: #94a3b8;">● idle</span>
+                <span id="agent-a-control" style="font-size: 0.75rem; color: #64748b;"></span>
+              </div>
             </div>
-            <button onclick="clearAgentChat('a')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Clear</button>
+            <div style="display: flex; gap: 8px;">
+              <button id="agent-a-control-btn" onclick="toggleAgentControl('a')" style="display: none; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Claim</button>
+              <button onclick="clearAgentChat('a')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Clear</button>
+            </div>
           </div>
 
           <!-- Chat History -->
@@ -2515,9 +2521,15 @@
           <div style="padding: 16px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h3 style="color: #c084fc; font-size: 1.1rem; margin-bottom: 4px;">🅱️ Agent B (Cairn)</h3>
-              <span id="agent-b-status" style="font-size: 0.8rem; color: #94a3b8;">● idle</span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="agent-b-status" style="font-size: 0.8rem; color: #94a3b8;">● idle</span>
+                <span id="agent-b-control" style="font-size: 0.75rem; color: #64748b;"></span>
+              </div>
             </div>
-            <button onclick="clearAgentChat('b')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Clear</button>
+            <div style="display: flex; gap: 8px;">
+              <button id="agent-b-control-btn" onclick="toggleAgentControl('b')" style="display: none; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Claim</button>
+              <button onclick="clearAgentChat('b')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Clear</button>
+            </div>
           </div>
 
           <!-- Chat History -->
@@ -2553,9 +2565,15 @@
         <div style="padding: 16px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: space-between; align-items: center;">
           <div>
             <h3 style="color: #fbbf24; font-size: 1.1rem; margin-bottom: 4px;">🎭 Moderator (Prax)</h3>
-            <span id="moderator-status" style="font-size: 0.8rem; color: #94a3b8;">● idle</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="moderator-status" style="font-size: 0.8rem; color: #94a3b8;">● idle</span>
+              <span id="moderator-control" style="font-size: 0.75rem; color: #64748b;"></span>
+            </div>
           </div>
-          <button onclick="clearAgentChat('moderator')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Clear</button>
+          <div style="display: flex; gap: 8px;">
+            <button id="moderator-control-btn" onclick="toggleAgentControl('moderator')" style="display: none; background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.4); color: #fbbf24; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Claim</button>
+            <button onclick="clearAgentChat('moderator')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Clear</button>
+          </div>
         </div>
 
         <!-- Chat History -->
