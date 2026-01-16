@@ -8,6 +8,7 @@ import json
 import os
 import glob
 import sys
+import uuid
 from pathlib import Path
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
@@ -30,6 +31,13 @@ try:
 except ImportError:
     AGENT_ORCHESTRATOR = None
     print("Warning: agent_orchestrator not found. Collaborative workspace features disabled.")
+
+# Import workspace session manager for Phase 2
+try:
+    from workspace_session_manager import session_manager
+except ImportError:
+    session_manager = None
+    print("Warning: workspace_session_manager not found. Multiplayer features disabled.")
 
 # Paths
 HOME = Path.home()
@@ -130,8 +138,31 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif path == '/api/history/search':
             self.serve_history_search(parsed_path.query)
             return
+        elif path == '/api/unified/list':
+            self.serve_unified_list(parsed_path.query)
+            return
+        elif path == '/api/unified/search':
+            self.serve_unified_search(parsed_path.query)
+            return
+        elif path == '/api/unified/tags':
+            self.serve_unified_tags()
+            return
+        elif path == '/api/unified/timeline':
+            self.serve_unified_timeline(parsed_path.query)
+            return
+        elif path == '/api/unified/related':
+            self.serve_unified_related(parsed_path.query)
+            return
         elif path == '/api/keys/list':
             self.serve_api_keys_list()
+            return
+        elif path == '/api/workspace/sessions/stats':
+            self.serve_session_stats()
+            return
+        elif path.startswith('/api/workspace/sessions/'):
+            # GET /api/workspace/sessions/{session_id}
+            session_id = path.split('/')[-1]
+            self.serve_session_info(session_id)
             return
         elif path == '/' or path == '/index.html':
             self.serve_dashboard()
@@ -197,6 +228,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif path == '/api/3d/handoff/decompress':
             self.decompress_3d_handoff(data)
             return
+        elif path == '/api/unified/rebuild-index':
+            self.rebuild_unified_index()
+            return
         elif path == '/api/golden/restore':
             self.restore_golden_plan(data)
             return
@@ -212,6 +246,12 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             return
         elif path == '/api/keys/save':
             self.save_api_keys(data)
+            return
+        elif path == '/api/workspace/sessions/create':
+            self.create_workspace_session(data)
+            return
+        elif path == '/api/workspace/sessions/join':
+            self.join_workspace_session(data)
             return
         else:
             self.send_error(404, "Not found")
@@ -2429,6 +2469,101 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             self.serve_json({'error': str(e)}, status=500)
 
+    # =========================================================================
+    # Workspace Session Management (Phase 2)
+    # =========================================================================
+
+    def create_workspace_session(self, data):
+        """Create a new workspace session."""
+        if not session_manager:
+            self.serve_json({'error': 'Session manager not available'}, status=500)
+            return
+
+        try:
+            user_name = data.get('user_name', 'Anonymous')
+            user_id = data.get('user_id') or str(uuid.uuid4())
+
+            # Note: WebSocket connection will be added when user connects via WS
+            # For now, create session without WS (will be added in WS handler)
+            session_id = session_manager._generate_session_id()
+
+            self.serve_json({
+                'success': True,
+                'session_id': session_id,
+                'user_id': user_id,
+                'invite_url': f'http://localhost:8080/?session={session_id}'
+            })
+
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def join_workspace_session(self, data):
+        """Join an existing workspace session."""
+        if not session_manager:
+            self.serve_json({'error': 'Session manager not available'}, status=500)
+            return
+
+        try:
+            session_id = data.get('session_id')
+            user_name = data.get('user_name', 'Anonymous')
+
+            if not session_id:
+                self.serve_json({'error': 'session_id required'}, status=400)
+                return
+
+            session = session_manager.get_session(session_id)
+
+            if not session:
+                self.serve_json({'error': 'Session not found'}, status=404)
+                return
+
+            if session.is_expired():
+                self.serve_json({'error': 'Session expired'}, status=410)
+                return
+
+            user_id = str(uuid.uuid4())
+
+            self.serve_json({
+                'success': True,
+                'session_id': session_id,
+                'user_id': user_id,
+                'session': session.to_dict()
+            })
+
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def serve_session_info(self, session_id):
+        """Get information about a session."""
+        if not session_manager:
+            self.serve_json({'error': 'Session manager not available'}, status=500)
+            return
+
+        try:
+            session = session_manager.get_session(session_id)
+
+            if not session:
+                self.serve_json({'error': 'Session not found'}, status=404)
+                return
+
+            self.serve_json({'session': session.to_dict()})
+
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def serve_session_stats(self):
+        """Get statistics about all sessions."""
+        if not session_manager:
+            self.serve_json({'error': 'Session manager not available'}, status=500)
+            return
+
+        try:
+            stats = session_manager.get_session_stats()
+            self.serve_json(stats)
+
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
     def serve_storage_stats(self):
         """Get stats for all Claude storage locations."""
         import os
@@ -2787,6 +2922,829 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             traceback.print_exc()
             self.serve_json({'ok': False, 'error': str(e)}, status=500)
 
+    # =========================================================================
+    # UNIFIED HISTORY BROWSER - INDEXING FUNCTIONS
+    # =========================================================================
+
+    def index_projects(self):
+        """Index all project sessions from ~/.claude/projects/"""
+        from pathlib import Path
+        import re
+
+        projects_dir = Path.home() / '.claude' / 'projects'
+        if not projects_dir.exists():
+            return []
+
+        items = []
+
+        try:
+            # Scan all project directories
+            for project_dir in projects_dir.iterdir():
+                if not project_dir.is_dir():
+                    continue
+
+                # Decode project path: -Users-kanelawaccount-foo -> /Users/kanelawaccount/foo
+                project_path = project_dir.name.replace('-', '/')
+                if not project_path.startswith('/'):
+                    project_path = '/' + project_path
+
+                # Scan session directories within project
+                for session_dir in project_dir.iterdir():
+                    if not session_dir.is_dir():
+                        continue
+
+                    session_uuid = session_dir.name
+
+                    # Get session timestamp from directory mtime
+                    try:
+                        stat = session_dir.stat()
+                        timestamp = int(stat.st_mtime * 1000)
+                    except:
+                        timestamp = 0
+
+                    # Count tool files
+                    tool_results_dir = session_dir / 'tool-results'
+                    tool_count = 0
+                    tools_used = set()
+
+                    if tool_results_dir.exists():
+                        for tool_file in tool_results_dir.iterdir():
+                            if tool_file.name.startswith('toolu_'):
+                                tool_count += 1
+                                # Try to extract tool name from file content or name
+                                try:
+                                    content = tool_file.read_text(errors='ignore')[:500]
+                                    # Common tool patterns
+                                    for tool in ['Bash', 'Read', 'Write', 'Edit', 'Grep', 'Glob', 'Task']:
+                                        if tool in content:
+                                            tools_used.add(tool)
+                                except:
+                                    pass
+
+                    # Read session jsonl for preview
+                    session_jsonl = session_dir / f'{session_uuid}.jsonl'
+                    preview = f'Session with {tool_count} tool executions'
+                    if session_jsonl.exists():
+                        try:
+                            with open(session_jsonl, 'r') as f:
+                                lines = f.readlines()
+                                if len(lines) > 0:
+                                    first_entry = json.loads(lines[0])
+                                    if 'content' in first_entry:
+                                        preview = first_entry['content'][:500]
+                        except:
+                            pass
+
+                    items.append({
+                        'type': 'project_session',
+                        'id': f'project-{session_uuid}',
+                        'project': project_path.replace(str(Path.home()), '~'),
+                        'sessionId': session_uuid,
+                        'timestamp': timestamp,
+                        'toolCount': tool_count,
+                        'tools': list(tools_used) if tools_used else ['Unknown'],
+                        'preview': preview,
+                        'path': str(session_dir).replace(str(Path.home()), '~')
+                    })
+
+        except Exception as e:
+            print(f"[Unified Index] Error indexing projects: {e}")
+            import traceback
+            traceback.print_exc()
+
+        return items
+
+    def index_file_history(self):
+        """Index file edit history from ~/.claude/file-history/"""
+        from pathlib import Path
+
+        file_history_dir = Path.home() / '.claude' / 'file-history'
+        if not file_history_dir.exists():
+            return []
+
+        items = []
+
+        try:
+            # Group files by session and file hash
+            file_map = {}  # session_uuid -> {file_hash: [versions]}
+
+            for session_dir in file_history_dir.iterdir():
+                if not session_dir.is_dir():
+                    continue
+
+                session_uuid = session_dir.name
+
+                for file_path in session_dir.iterdir():
+                    if not file_path.is_file():
+                        continue
+
+                    # Parse filename: hash@vN
+                    parts = file_path.name.split('@v')
+                    if len(parts) != 2:
+                        continue
+
+                    file_hash = parts[0]
+                    try:
+                        version = int(parts[1])
+                    except:
+                        continue
+
+                    key = f'{session_uuid}:{file_hash}'
+                    if key not in file_map:
+                        file_map[key] = {
+                            'session_uuid': session_uuid,
+                            'file_hash': file_hash,
+                            'versions': [],
+                            'files': []
+                        }
+
+                    file_map[key]['versions'].append(version)
+                    file_map[key]['files'].append(file_path)
+
+            # Create items from grouped files
+            for key, data in file_map.items():
+                versions = sorted(data['versions'])
+                latest_version = max(versions)
+
+                # Get latest file for preview
+                latest_file = None
+                for fp in data['files']:
+                    if fp.name.endswith(f'@v{latest_version}'):
+                        latest_file = fp
+                        break
+
+                if not latest_file:
+                    continue
+
+                # Get timestamp from first version
+                first_file = None
+                for fp in data['files']:
+                    if fp.name.endswith(f'@v{versions[0]}'):
+                        first_file = fp
+                        break
+
+                timestamp = 0
+                if first_file:
+                    try:
+                        stat = first_file.stat()
+                        timestamp = int(stat.st_mtime * 1000)
+                    except:
+                        pass
+
+                # Get preview and size
+                preview = ''
+                size_growth = ''
+                try:
+                    content = latest_file.read_text(errors='ignore')
+                    preview = content[:500]
+
+                    if first_file and len(versions) > 1:
+                        first_size = first_file.stat().st_size
+                        latest_size = latest_file.stat().st_size
+                        growth = latest_size - first_size
+                        if growth > 0:
+                            size_growth = f'+{growth} bytes'
+                        elif growth < 0:
+                            size_growth = f'{growth} bytes'
+                        else:
+                            size_growth = 'No change'
+                except:
+                    pass
+
+                items.append({
+                    'type': 'file_edit',
+                    'id': f'file-{data["session_uuid"]}-{data["file_hash"]}',
+                    'sessionId': data['session_uuid'],
+                    'fileHash': data['file_hash'],
+                    'versions': versions,
+                    'latestVersion': latest_version,
+                    'timestamp': timestamp,
+                    'preview': preview,
+                    'sizeGrowth': size_growth,
+                    'path': str(latest_file).replace(str(Path.home()), '~')
+                })
+
+        except Exception as e:
+            print(f"[Unified Index] Error indexing file history: {e}")
+            import traceback
+            traceback.print_exc()
+
+        return items
+
+    def index_todos(self):
+        """Index todo lists from ~/.claude/todos/"""
+        from pathlib import Path
+
+        todos_dir = Path.home() / '.claude' / 'todos'
+        if not todos_dir.exists():
+            return []
+
+        items = []
+
+        try:
+            for todo_file in todos_dir.glob('*.json'):
+                try:
+                    with open(todo_file, 'r') as f:
+                        tasks = json.load(f)
+
+                    if not isinstance(tasks, list):
+                        continue
+
+                    # Extract session UUID from filename
+                    session_uuid = todo_file.stem.split('-agent-')[0] if '-agent-' in todo_file.stem else todo_file.stem
+
+                    # Count task statuses
+                    total_tasks = len(tasks)
+                    completed = sum(1 for t in tasks if t.get('status') == 'completed')
+                    in_progress = sum(1 for t in tasks if t.get('status') == 'in_progress')
+                    pending = sum(1 for t in tasks if t.get('status') == 'pending')
+
+                    # Build preview
+                    task_previews = []
+                    for task in tasks[:5]:  # First 5 tasks
+                        status = task.get('status', 'pending')
+                        icon = '✓' if status == 'completed' else '⏳' if status == 'in_progress' else '○'
+                        task_previews.append(f"{icon} {task.get('content', '')[:50]}")
+                    preview = ', '.join(task_previews)
+
+                    # Get timestamp
+                    stat = todo_file.stat()
+                    timestamp = int(stat.st_mtime * 1000)
+
+                    items.append({
+                        'type': 'todo_list',
+                        'id': f'todo-{session_uuid}',
+                        'sessionId': session_uuid,
+                        'timestamp': timestamp,
+                        'totalTasks': total_tasks,
+                        'completed': completed,
+                        'inProgress': in_progress,
+                        'pending': pending,
+                        'preview': preview,
+                        'tasks': tasks,
+                        'path': str(todo_file).replace(str(Path.home()), '~')
+                    })
+
+                except Exception as e:
+                    print(f"[Unified Index] Error reading todo file {todo_file}: {e}")
+                    continue
+
+        except Exception as e:
+            print(f"[Unified Index] Error indexing todos: {e}")
+            import traceback
+            traceback.print_exc()
+
+        return items
+
+    def index_plans(self):
+        """Index plan files from ~/.claude/plans/"""
+        from pathlib import Path
+
+        plans_dir = Path.home() / '.claude' / 'plans'
+        if not plans_dir.exists():
+            return []
+
+        items = []
+
+        try:
+            for plan_file in plans_dir.glob('*.md'):
+                try:
+                    content = plan_file.read_text(errors='ignore')
+
+                    # Extract title from first H1 heading
+                    title = plan_file.stem
+                    lines = content.split('\n')
+                    for line in lines[:10]:
+                        if line.startswith('# '):
+                            title = line[2:].strip()
+                            break
+
+                    # Get preview (first 300 chars)
+                    preview = content[:300].replace('\n', ' ')
+
+                    # Word count
+                    word_count = len(content.split())
+
+                    # Get timestamp
+                    stat = plan_file.stat()
+                    timestamp = int(stat.st_mtime * 1000)
+
+                    items.append({
+                        'type': 'plan',
+                        'id': f'plan-{plan_file.stem}',
+                        'filename': plan_file.name,
+                        'title': title,
+                        'timestamp': timestamp,
+                        'preview': preview,
+                        'wordCount': word_count,
+                        'path': str(plan_file).replace(str(Path.home()), '~')
+                    })
+
+                except Exception as e:
+                    print(f"[Unified Index] Error reading plan file {plan_file}: {e}")
+                    continue
+
+        except Exception as e:
+            print(f"[Unified Index] Error indexing plans: {e}")
+            import traceback
+            traceback.print_exc()
+
+        return items
+
+    def extract_tags_and_category(self, item):
+        """Extract category and tags from item text."""
+        # Category definitions
+        HISTORY_CATEGORIES = {
+            "debugging": ["error", "bug", "fix", "debug", "traceback", "exception", "failed", "crash"],
+            "feature": ["add", "implement", "create", "new feature", "build", "develop", "added"],
+            "refactor": ["refactor", "cleanup", "reorganize", "restructure", "rename", "clean"],
+            "documentation": ["docs", "readme", "documentation", "comment", "explain", "document"],
+            "testing": ["test", "pytest", "unittest", "assert", "mock", "coverage", "spec"],
+            "configuration": ["config", "settings", "setup", "install", "environment", "configure"],
+            "api": ["api", "endpoint", "route", "rest", "fetch", "/api/", "http"],
+            "database": ["database", "query", "sql", "schema", "index", "migration", "db"],
+            "ui": ["ui", "dashboard", "component", "style", "css", "html", "react", "frontend"],
+            "git": ["commit", "push", "merge", "branch", "pull request", "github", "git"],
+            "optimization": ["optimize", "performance", "speed", "cache", "benchmark", "fast"],
+            "learning": ["how to", "what is", "explain", "understand", "learn", "tutorial", "help"]
+        }
+
+        # Combine searchable fields
+        text_parts = []
+        if 'display' in item:
+            text_parts.append(item['display'])
+        if 'preview' in item:
+            text_parts.append(item['preview'])
+        if 'project' in item:
+            text_parts.append(item['project'])
+        if 'title' in item:
+            text_parts.append(item['title'])
+
+        text = ' '.join(text_parts).lower()
+
+        # Find category
+        category = 'general'
+        for cat, keywords in HISTORY_CATEGORIES.items():
+            for keyword in keywords:
+                if keyword in text:
+                    category = cat
+                    break
+            if category != 'general':
+                break
+
+        # Extract tags (frequent words, excluding common ones)
+        common_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'in', 'on', 'at', 'to', 'for',
+                       'of', 'with', 'by', 'from', 'this', 'that', 'these', 'those', 'and', 'or',
+                       'but', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+                       'could', 'should', 'may', 'might', 'can', 'it', 'its', 'as', 'if', 'then'}
+
+        import re
+        words = re.findall(r'\b\w{3,}\b', text.lower())
+        word_freq = {}
+        for word in words:
+            if word not in common_words and not word.isdigit():
+                word_freq[word] = word_freq.get(word, 0) + 1
+
+        # Get top 5 words as tags
+        sorted_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)
+        tags = [word for word, count in sorted_words[:5]]
+
+        item['category'] = category
+        item['tags'] = tags
+
+        return item
+
+    def build_unified_index(self):
+        """Build unified index from all sources."""
+        from pathlib import Path
+
+        cache_file = Path.home() / '.claude' / 'unified_history_index.json'
+
+        print("[Unified Index] Building index from all sources...")
+
+        # Index all sources
+        conversations = self.index_conversations()
+        projects = self.index_projects()
+        file_history = self.index_file_history()
+        todos = self.index_todos()
+        plans = self.index_plans()
+
+        # Combine all items
+        all_items = conversations + projects + file_history + todos + plans
+
+        print(f"[Unified Index] Found {len(conversations)} conversations, {len(projects)} projects, "
+              f"{len(file_history)} file edits, {len(todos)} todo lists, {len(plans)} plans")
+
+        # Extract tags and categories for all items
+        for item in all_items:
+            self.extract_tags_and_category(item)
+
+        # Sort by timestamp descending
+        all_items.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
+
+        # Build cache
+        cache_data = {
+            'items': all_items,
+            'total': len(all_items),
+            'lastUpdated': int(time.time() * 1000),
+            'counts': {
+                'conversation': len(conversations),
+                'project_session': len(projects),
+                'file_edit': len(file_history),
+                'todo_list': len(todos),
+                'plan': len(plans)
+            }
+        }
+
+        # Write cache
+        try:
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(cache_file, 'w') as f:
+                json.dump(cache_data, f, indent=2)
+            print(f"[Unified Index] Cache written to {cache_file}")
+        except Exception as e:
+            print(f"[Unified Index] Error writing cache: {e}")
+
+        return cache_data
+
+    def index_conversations(self):
+        """Index conversations from history.jsonl."""
+        from pathlib import Path
+
+        history_file = Path.home() / '.claude' / 'history.jsonl'
+        if not history_file.exists():
+            return []
+
+        items = []
+
+        try:
+            with open(history_file, 'r') as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    try:
+                        entry = json.loads(line)
+                        items.append({
+                            'type': 'conversation',
+                            'id': f'conversation-{entry.get("sessionId", "")}',
+                            'sessionId': entry.get('sessionId', ''),
+                            'timestamp': entry.get('timestamp', 0),
+                            'timeFormatted': datetime.fromtimestamp(entry.get('timestamp', 0) / 1000).strftime('%Y-%m-%d %H:%M:%S'),
+                            'project': entry.get('project', '').replace(str(Path.home()), '~'),
+                            'display': entry.get('display', ''),
+                            'preview': entry.get('display', '')[:200],
+                            'hasPaste': len(entry.get('pastedContents', {})) > 0
+                        })
+                    except json.JSONDecodeError:
+                        continue
+        except Exception as e:
+            print(f"[Unified Index] Error indexing conversations: {e}")
+
+        return items
+
+    def get_unified_index(self, force_rebuild=False):
+        """Get unified index from cache or rebuild if needed."""
+        from pathlib import Path
+
+        cache_file = Path.home() / '.claude' / 'unified_history_index.json'
+
+        # Check if cache exists and is recent (< 5 minutes old)
+        if not force_rebuild and cache_file.exists():
+            try:
+                stat = cache_file.stat()
+                age_seconds = time.time() - stat.st_mtime
+                if age_seconds < 300:  # 5 minutes
+                    with open(cache_file, 'r') as f:
+                        return json.load(f)
+            except:
+                pass
+
+        # Rebuild index
+        return self.build_unified_index()
+
+    def aggregate_tags(self, items):
+        """Aggregate tags and categories across all items."""
+        tag_counts = {}
+        category_counts = {}
+
+        for item in items:
+            # Count category
+            category = item.get('category', 'general')
+            category_counts[category] = category_counts.get(category, 0) + 1
+
+            # Count tags
+            for tag in item.get('tags', []):
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
+
+        # Sort and format
+        tags = [{'tag': tag, 'count': count} for tag, count in tag_counts.items()]
+        tags.sort(key=lambda x: x['count'], reverse=True)
+
+        categories = [{'category': cat, 'count': count} for cat, count in category_counts.items()]
+        categories.sort(key=lambda x: x['count'], reverse=True)
+
+        return {
+            'tags': tags,
+            'categories': categories
+        }
+
+    # =========================================================================
+    # UNIFIED HISTORY BROWSER - API ENDPOINTS
+    # =========================================================================
+
+    def serve_unified_list(self, query_string):
+        """List unified history with pagination and filters."""
+        from urllib.parse import parse_qs
+
+        try:
+            params = parse_qs(query_string) if query_string else {}
+            limit = int(params.get('limit', ['100'])[0])
+            offset = int(params.get('offset', ['0'])[0])
+            type_filter = params.get('type', ['all'])[0]
+            category_filter = params.get('category', [None])[0]
+            project_filter = params.get('project', [None])[0]
+
+            # Get index
+            index_data = self.get_unified_index()
+            items = index_data['items']
+
+            # Apply filters
+            filtered = items
+            if type_filter != 'all':
+                filtered = [i for i in filtered if i.get('type') == type_filter]
+            if category_filter:
+                filtered = [i for i in filtered if i.get('category') == category_filter]
+            if project_filter:
+                filtered = [i for i in filtered if project_filter in i.get('project', '')]
+
+            # Add formatted time
+            for item in filtered:
+                if 'timeFormatted' not in item and 'timestamp' in item:
+                    item['timeFormatted'] = datetime.fromtimestamp(item['timestamp'] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+
+            total = len(filtered)
+            paginated = filtered[offset:offset + limit]
+
+            self.serve_json({
+                'ok': True,
+                'items': paginated,
+                'total': total,
+                'limit': limit,
+                'offset': offset,
+                'counts': index_data['counts']
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def serve_unified_search(self, query_string):
+        """Search unified history."""
+        from urllib.parse import parse_qs
+
+        try:
+            params = parse_qs(query_string) if query_string else {}
+            search_query = params.get('q', [''])[0].lower()
+            limit = int(params.get('limit', ['100'])[0])
+            type_filter = params.get('type', ['all'])[0]
+            category_filter = params.get('category', [None])[0]
+
+            if not search_query:
+                self.serve_json({'ok': False, 'error': 'Missing search query'}, status=400)
+                return
+
+            # Get index
+            index_data = self.get_unified_index()
+            items = index_data['items']
+
+            # Apply type filter first
+            if type_filter != 'all':
+                items = [i for i in items if i.get('type') == type_filter]
+
+            # Apply category filter
+            if category_filter:
+                items = [i for i in items if i.get('category') == category_filter]
+
+            # Search
+            results = []
+            for item in items:
+                # Build searchable text
+                search_fields = []
+                for field in ['display', 'preview', 'project', 'title', 'category']:
+                    if field in item:
+                        search_fields.append(str(item[field]).lower())
+
+                search_text = ' '.join(search_fields)
+
+                if search_query in search_text:
+                    # Calculate match score
+                    match_score = search_text.count(search_query)
+                    item['matchScore'] = match_score
+                    results.append(item)
+
+            # Sort by match score then timestamp
+            results.sort(key=lambda x: (x.get('matchScore', 0), x.get('timestamp', 0)), reverse=True)
+            results = results[:limit]
+
+            # Add formatted time
+            for item in results:
+                if 'timeFormatted' not in item and 'timestamp' in item:
+                    item['timeFormatted'] = datetime.fromtimestamp(item['timestamp'] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+
+            self.serve_json({
+                'ok': True,
+                'items': results,
+                'total': len(results),
+                'query': search_query
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def serve_unified_tags(self):
+        """Get tags and categories with counts."""
+        try:
+            # Get index
+            index_data = self.get_unified_index()
+            items = index_data['items']
+
+            # Aggregate tags
+            aggregated = self.aggregate_tags(items)
+
+            self.serve_json({
+                'ok': True,
+                'tags': aggregated['tags'][:50],  # Top 50 tags
+                'categories': aggregated['categories']
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def serve_unified_timeline(self, query_string):
+        """Get timeline data grouped by time period."""
+        from urllib.parse import parse_qs
+        from datetime import datetime, timedelta
+
+        try:
+            params = parse_qs(query_string) if query_string else {}
+            group_by = params.get('group', ['month'])[0]
+
+            # Get index
+            index_data = self.get_unified_index()
+            items = index_data['items']
+
+            # Group by time period
+            timeline = {}
+            for item in items:
+                timestamp = item.get('timestamp', 0)
+                if timestamp == 0:
+                    continue
+
+                dt = datetime.fromtimestamp(timestamp / 1000)
+
+                if group_by == 'day':
+                    key = dt.strftime('%Y-%m-%d')
+                elif group_by == 'week':
+                    # Get week start (Monday)
+                    week_start = dt - timedelta(days=dt.weekday())
+                    key = week_start.strftime('%Y-%m-%d')
+                else:  # month
+                    key = dt.strftime('%Y-%m')
+
+                if key not in timeline:
+                    timeline[key] = {
+                        'period': key,
+                        'total': 0,
+                        'byType': {}
+                    }
+
+                timeline[key]['total'] += 1
+
+                item_type = item.get('type', 'unknown')
+                timeline[key]['byType'][item_type] = timeline[key]['byType'].get(item_type, 0) + 1
+
+            # Convert to list and sort
+            timeline_list = list(timeline.values())
+            timeline_list.sort(key=lambda x: x['period'], reverse=True)
+
+            self.serve_json({
+                'ok': True,
+                'timeline': timeline_list,
+                'groupBy': group_by
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def serve_unified_related(self, query_string):
+        """Find related items based on similarity."""
+        from urllib.parse import parse_qs
+
+        try:
+            params = parse_qs(query_string) if query_string else {}
+            item_id = params.get('id', [''])[0]
+            limit = int(params.get('limit', ['10'])[0])
+
+            if not item_id:
+                self.serve_json({'ok': False, 'error': 'Missing item id'}, status=400)
+                return
+
+            # Get index
+            index_data = self.get_unified_index()
+            items = index_data['items']
+
+            # Find the source item
+            source_item = None
+            for item in items:
+                if item.get('id') == item_id:
+                    source_item = item
+                    break
+
+            if not source_item:
+                self.serve_json({'ok': False, 'error': 'Item not found'}, status=404)
+                return
+
+            # Calculate similarity scores
+            related = []
+            source_tags = set(source_item.get('tags', []))
+            source_session = source_item.get('sessionId', '')
+            source_project = source_item.get('project', '')
+            source_timestamp = source_item.get('timestamp', 0)
+
+            for item in items:
+                if item.get('id') == item_id:
+                    continue  # Skip self
+
+                score = 0
+
+                # Same session = high relevance
+                if item.get('sessionId') == source_session and source_session:
+                    score += 5
+
+                # Same project
+                if item.get('project') == source_project and source_project:
+                    score += 2
+
+                # Shared tags
+                item_tags = set(item.get('tags', []))
+                shared_tags = source_tags & item_tags
+                score += len(shared_tags) * 3
+
+                # Similar timestamp (within 7 days)
+                if source_timestamp > 0 and item.get('timestamp', 0) > 0:
+                    time_diff_days = abs(source_timestamp - item.get('timestamp', 0)) / 1000 / 86400
+                    if time_diff_days <= 7:
+                        score += 1
+
+                if score > 0:
+                    item['relevanceScore'] = score
+                    related.append(item)
+
+            # Sort by relevance
+            related.sort(key=lambda x: x.get('relevanceScore', 0), reverse=True)
+            related = related[:limit]
+
+            # Add formatted time
+            for item in related:
+                if 'timeFormatted' not in item and 'timestamp' in item:
+                    item['timeFormatted'] = datetime.fromtimestamp(item['timestamp'] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+
+            self.serve_json({
+                'ok': True,
+                'related': related,
+                'sourceId': item_id
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def rebuild_unified_index(self):
+        """Rebuild unified index (POST endpoint)."""
+        try:
+            print("[Unified Index] Rebuild requested")
+            index_data = self.build_unified_index()
+
+            self.serve_json({
+                'ok': True,
+                'total': index_data['total'],
+                'counts': index_data['counts'],
+                'message': 'Index rebuilt successfully'
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
     def log_message(self, format, *args):
         """Override to customize logging."""
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -2932,16 +3890,108 @@ class HistoryWatcher(FileSystemEventHandler):
             print(f"[HistoryWatcher] Error reading history file: {e}")
 
 
+async def handle_join_workspace_session(websocket, data):
+    """Handle user joining a workspace session."""
+    if not session_manager:
+        return None
+
+    session_id = data.get('session_id')
+    user_name = data.get('user_name', 'Anonymous')
+    user_id = data.get('user_id') or str(uuid.uuid4())
+
+    try:
+        # Try to join existing session
+        session = session_manager.get_session(session_id)
+
+        if not session:
+            # Create new session if it doesn't exist
+            session = session_manager.create_session(user_id, user_name, websocket)
+            session_id = session.id
+        else:
+            # Join existing session
+            session = session_manager.join_session(session_id, user_id, user_name, websocket)
+
+            if not session:
+                return None
+
+        # Broadcast to other users that someone joined
+        await session_manager.broadcast_to_session(
+            session_id,
+            'user_joined',
+            {
+                'user_id': user_id,
+                'user_name': user_name,
+                'users': [u.to_dict() for u in session.users.values()]
+            },
+            exclude_user=user_id
+        )
+
+        return (session_id, user_id)
+
+    except Exception as e:
+        print(f"[WebSocket] Error joining session: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+async def handle_workspace_message(session_id, user_id, data, websocket):
+    """Handle a workspace message (user prompt to agent)."""
+    if not session_manager:
+        return
+
+    try:
+        agent_id = data.get('agent_id')
+        message_content = data.get('message')
+
+        if not agent_id or not message_content:
+            return
+
+        # Add user message to session
+        msg = session_manager.add_message(
+            session_id, user_id, agent_id, 'user', message_content
+        )
+
+        # Broadcast user message to all users in session
+        await session_manager.broadcast_to_session(
+            session_id,
+            'user_message',
+            {
+                'message_id': msg.id,
+                'user_id': user_id,
+                'agent_id': agent_id,
+                'content': message_content,
+                'timestamp': msg.timestamp
+            }
+        )
+
+        # TODO: In next phase, integrate with AgentOrchestrator
+        # For now, just acknowledge the message
+        await websocket.send(json.dumps({
+            'event': 'message_received',
+            'message_id': msg.id
+        }))
+
+    except Exception as e:
+        print(f"[WebSocket] Error handling workspace message: {e}")
+        import traceback
+        traceback.print_exc()
+
+
 async def websocket_handler(websocket):
     """Handle WebSocket connections from dashboard clients."""
     print(f"[WebSocket] Client connected from {websocket.remote_address}")
     connected_clients.add(websocket)
 
+    # Track session info for this connection
+    session_id = None
+    user_id = None
+
     try:
         # Send initial connection confirmation
         await websocket.send(json.dumps({
             'event': 'connected',
-            'message': 'WebSocket connected - listening for handoff updates'
+            'message': 'WebSocket connected - listening for updates'
         }))
 
         # Keep connection alive and handle incoming messages
@@ -2949,15 +3999,69 @@ async def websocket_handler(websocket):
             # Handle ping/pong or other client messages
             try:
                 data = json.loads(message)
-                if data.get('type') == 'ping':
+                msg_type = data.get('type')
+
+                if msg_type == 'ping':
                     await websocket.send(json.dumps({'type': 'pong'}))
+
+                # Workspace session events
+                elif msg_type == 'join_workspace_session':
+                    result = await handle_join_workspace_session(websocket, data)
+                    if result:
+                        session_id, user_id = result
+                        await websocket.send(json.dumps({
+                            'event': 'session_joined',
+                            'session_id': session_id,
+                            'user_id': user_id
+                        }))
+
+                elif msg_type == 'workspace_message':
+                    if session_id and session_manager:
+                        await handle_workspace_message(session_id, user_id, data, websocket)
+
+                elif msg_type == 'user_typing':
+                    if session_id and session_manager:
+                        session_manager.update_user_presence(
+                            session_id, user_id, is_typing=data.get('is_typing', False)
+                        )
+                        await session_manager.broadcast_to_session(
+                            session_id,
+                            'user_typing',
+                            {'user_id': user_id, 'is_typing': data.get('is_typing')},
+                            exclude_user=user_id
+                        )
+
+                elif msg_type == 'cursor_move':
+                    if session_id and session_manager:
+                        session_manager.update_user_presence(
+                            session_id, user_id, cursor_position=data.get('position')
+                        )
+                        await session_manager.broadcast_to_session(
+                            session_id,
+                            'cursor_move',
+                            {'user_id': user_id, 'position': data.get('position')},
+                            exclude_user=user_id
+                        )
+
             except json.JSONDecodeError:
                 pass
+            except Exception as e:
+                print(f"[WebSocket] Error handling message: {e}")
+                import traceback
+                traceback.print_exc()
 
     except websockets.exceptions.ConnectionClosed:
         print(f"[WebSocket] Client disconnected from {websocket.remote_address}")
     finally:
         connected_clients.discard(websocket)
+        # Clean up session if user was in one
+        if session_id and user_id and session_manager:
+            session_manager.leave_session(session_id, user_id)
+            await session_manager.broadcast_to_session(
+                session_id,
+                'user_left',
+                {'user_id': user_id}
+            )
 
 
     # =========================================================================

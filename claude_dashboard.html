@@ -2177,6 +2177,57 @@
       padding: 40px;
       font-size: 0.9rem;
     }
+
+    /* Unified History Browser Styles */
+    .tag-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tag {
+      padding: 8px 16px;
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      border-radius: 20px;
+      color: #a5b4fc;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tag:hover {
+      background: rgba(99, 102, 241, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .tag.category-tag {
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .tag .count {
+      opacity: 0.7;
+      margin-left: 6px;
+      font-size: 0.8rem;
+    }
+
+    .type-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-right: 8px;
+    }
+
+    .type-conversation { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
+    .type-project { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+    .type-file { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .type-todo { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; }
+    .type-plan { background: rgba(236, 72, 153, 0.2); color: #f9a8d4; }
   </style>
 </head>
 <body>
@@ -2246,7 +2297,30 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <div>
             <h2 style="font-size: 1.5rem; color: #a5b4fc; margin-bottom: 8px;">🚀 Collaborative Multi-Agent Workspace</h2>
-            <p style="color: #94a3b8; font-size: 0.9rem;">Phase 1 MVP: Single-user controlling 3 agents (Koda, Cairn, Prax)</p>
+            <p style="color: #94a3b8; font-size: 0.9rem;" id="workspace-mode-text">Phase 2: Multiplayer with WebSocket sync</p>
+          </div>
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <div id="session-status" style="display: none; padding: 8px 16px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 6px; color: #6ee7b7; font-size: 0.85rem;">
+              <span class="status-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; margin-right: 8px;"></span>
+              <span id="session-id-display"></span>
+            </div>
+            <button id="create-session-btn" onclick="createWorkspaceSession()" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border: none; color: white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+              + Create Session
+            </button>
+            <button id="join-session-btn" onclick="showJoinSessionDialog()" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #a5b4fc; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+              Join Session
+            </button>
+            <button id="copy-invite-btn" onclick="copyInviteLink()" style="display: none; background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.4); color: #fbbf24; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+              📋 Copy Invite
+            </button>
+          </div>
+        </div>
+
+        <!-- User Presence -->
+        <div id="user-presence" style="display: none; margin-top: 16px; padding: 12px; background: rgba(30, 41, 59, 0.6); border-radius: 8px;">
+          <div style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 8px;">👥 Active Users:</div>
+          <div id="user-list" style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <!-- Users will be added here dynamically -->
           </div>
         </div>
       </div>
@@ -3444,29 +3518,73 @@
               <div class="loading">Loading storage data...</div>
             </div>
 
-            <!-- Conversation Browser -->
+            <!-- Unified History Browser -->
             <div class="chart-container" style="margin-top: 24px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                 <div>
-                  <div class="chart-title">📚 Conversation History Browser</div>
-                  <div style="color: #94a3b8; font-size: 0.85rem;">Browse and search all your Claude conversations</div>
+                  <div class="chart-title">🔍 Unified History Browser</div>
+                  <div style="color: #94a3b8; font-size: 0.85rem;">
+                    Search across conversations, projects, file edits, todos, and plans
+                  </div>
                 </div>
                 <div style="display: flex; gap: 12px; align-items: center;">
-                  <span id="history-count" style="color: #64748b; font-size: 0.9rem;">-</span>
-                  <button class="filter-btn" onclick="loadConversationHistory()">🔄 Refresh</button>
+                  <span id="unified-count" style="color: #64748b;">-</span>
+                  <button class="filter-btn" onclick="refreshUnifiedHistory()">🔄 Refresh Index</button>
                 </div>
               </div>
 
-              <!-- Search Bar -->
+              <!-- Search Bar with Filters -->
               <div class="search-box" style="margin-bottom: 16px;">
-                <input type="text" id="history-search-input" class="search-input" placeholder="Search conversations..." onkeypress="if(event.key==='Enter') searchConversationHistory()">
-                <button class="search-btn" onclick="searchConversationHistory()">🔍 Search</button>
-                <button class="filter-btn" onclick="loadConversationHistory()">Clear</button>
+                <input type="text"
+                       id="unified-search-input"
+                       class="search-input"
+                       placeholder="Search across all history..."
+                       onkeypress="if(event.key==='Enter') searchUnifiedHistory()">
+                <button class="search-btn" onclick="searchUnifiedHistory()">🔍 Search</button>
+                <button class="filter-btn" onclick="clearUnifiedSearch()">Clear</button>
               </div>
 
-              <!-- Conversation List -->
-              <div id="conversation-history-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 600px; overflow-y: auto;">
-                <div class="loading">Click Refresh to load conversation history</div>
+              <!-- Type Filter Buttons -->
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+                <button class="filter-btn active" data-type="all" onclick="filterByType('all')">
+                  All (<span id="count-all">-</span>)
+                </button>
+                <button class="filter-btn" data-type="conversation" onclick="filterByType('conversation')">
+                  💬 Conversations (<span id="count-conversations">-</span>)
+                </button>
+                <button class="filter-btn" data-type="project_session" onclick="filterByType('project_session')">
+                  📁 Projects (<span id="count-projects">-</span>)
+                </button>
+                <button class="filter-btn" data-type="file_edit" onclick="filterByType('file_edit')">
+                  ✏️ File Edits (<span id="count-files">-</span>)
+                </button>
+                <button class="filter-btn" data-type="todo_list" onclick="filterByType('todo_list')">
+                  ✅ Todos (<span id="count-todos">-</span>)
+                </button>
+                <button class="filter-btn" data-type="plan" onclick="filterByType('plan')">
+                  📋 Plans (<span id="count-plans">-</span>)
+                </button>
+              </div>
+
+              <!-- Categories Section -->
+              <div style="margin-bottom: 20px;">
+                <h3 style="font-size: 0.9rem; color: #a5b4fc; margin-bottom: 12px;">Categories</h3>
+                <div id="history-category-cloud" class="tag-cloud">
+                  <div class="loading">Loading categories...</div>
+                </div>
+              </div>
+
+              <!-- Tags Section -->
+              <div style="margin-bottom: 20px;">
+                <h3 style="font-size: 0.9rem; color: #a5b4fc; margin-bottom: 12px;">Popular Tags</h3>
+                <div id="history-tag-cloud" class="tag-cloud">
+                  <div class="loading">Loading tags...</div>
+                </div>
+              </div>
+
+              <!-- Results List -->
+              <div id="unified-history-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 600px; overflow-y: auto;">
+                <div class="loading">Click Refresh to load history</div>
               </div>
             </div>
 
@@ -6395,6 +6513,334 @@ ${currentConversation.display}
     };
 
     // =========================================================================
+    // UNIFIED HISTORY BROWSER
+    // =========================================================================
+
+    let unifiedHistory = [];
+    let currentUnifiedFilter = { type: 'all', category: null, tags: [] };
+    let tagsData = { categories: [], tags: [] };
+
+    // Refresh index (rebuild on backend)
+    window.refreshUnifiedHistory = async function() {
+      try {
+        document.getElementById('unified-history-list').innerHTML =
+          '<div class="loading">Indexing all history sources...</div>';
+
+        // Build index
+        const buildResp = await fetch(`${API_BASE}/api/unified/rebuild-index`, { method: 'POST' });
+        if (!buildResp.ok) throw new Error('Failed to rebuild index');
+
+        // Load tags and categories
+        await loadTagsAndCategories();
+
+        // Load items
+        await loadUnifiedHistory();
+
+      } catch (err) {
+        console.error('[Unified History] Refresh error:', err);
+      }
+    };
+
+    // Load tags and categories
+    async function loadTagsAndCategories() {
+      try {
+        const response = await fetch(`${API_BASE}/api/unified/tags`);
+        if (!response.ok) throw new Error('Failed to load tags');
+
+        tagsData = await response.json();
+
+        // Render categories
+        renderCategoryCloud(tagsData.categories);
+
+        // Render tags
+        renderTagCloud(tagsData.tags.slice(0, 50));  // Top 50
+
+      } catch (err) {
+        console.error('[Unified History] Tags load error:', err);
+      }
+    }
+
+    // Render category cloud
+    function renderCategoryCloud(categories) {
+      const container = document.getElementById('history-category-cloud');
+      container.innerHTML = '';
+
+      categories.forEach(cat => {
+        const tag = document.createElement('div');
+        tag.className = 'tag category-tag';
+        tag.innerHTML = `${cat.category} <span class="count">(${cat.count})</span>`;
+        tag.onclick = () => filterByCategory(cat.category);
+        container.appendChild(tag);
+      });
+    }
+
+    // Render tag cloud
+    function renderTagCloud(tags) {
+      const container = document.getElementById('history-tag-cloud');
+      container.innerHTML = '';
+
+      tags.forEach(tagObj => {
+        const tag = document.createElement('div');
+        tag.className = 'tag';
+        tag.innerHTML = `${tagObj.tag} <span class="count">(${tagObj.count})</span>`;
+        tag.onclick = () => filterByTag(tagObj.tag);
+        container.appendChild(tag);
+      });
+    }
+
+    // Load unified history
+    window.loadUnifiedHistory = async function() {
+      try {
+        const listEl = document.getElementById('unified-history-list');
+        const countEl = document.getElementById('unified-count');
+
+        listEl.innerHTML = '<div class="loading">Loading...</div>';
+
+        // Build query params
+        const params = new URLSearchParams({
+          limit: 100,
+          offset: 0,
+          type: currentUnifiedFilter.type
+        });
+        if (currentUnifiedFilter.category) params.append('category', currentUnifiedFilter.category);
+
+        const response = await fetch(`${API_BASE}/api/unified/list?${params}`);
+        if (!response.ok) throw new Error('Failed to load history');
+
+        const data = await response.json();
+        unifiedHistory = data.items || [];
+
+        countEl.textContent = `${data.total} items`;
+
+        // Update type counts
+        updateTypeCounts(data.counts);
+
+        // Render list
+        renderUnifiedList(unifiedHistory);
+
+      } catch (err) {
+        console.error('[Unified History] Load error:', err);
+      }
+    };
+
+    // Search unified history
+    window.searchUnifiedHistory = async function() {
+      const searchInput = document.getElementById('unified-search-input');
+      const query = searchInput.value.trim();
+
+      if (!query) {
+        await loadUnifiedHistory();
+        return;
+      }
+
+      try {
+        const listEl = document.getElementById('unified-history-list');
+        listEl.innerHTML = '<div class="loading">Searching...</div>';
+
+        // Build query params
+        const params = new URLSearchParams({
+          q: query,
+          limit: 100,
+          type: currentUnifiedFilter.type
+        });
+        if (currentUnifiedFilter.category) params.append('category', currentUnifiedFilter.category);
+
+        const response = await fetch(`${API_BASE}/api/unified/search?${params}`);
+        if (!response.ok) throw new Error('Search failed');
+
+        const data = await response.json();
+        unifiedHistory = data.items || [];
+
+        document.getElementById('unified-count').textContent = `${data.total} results`;
+        renderUnifiedList(unifiedHistory);
+
+      } catch (err) {
+        console.error('[Unified History] Search error:', err);
+      }
+    };
+
+    // Filter by type
+    window.filterByType = function(type) {
+      currentUnifiedFilter.type = type;
+
+      // Update button states
+      document.querySelectorAll('[data-type]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === type);
+      });
+
+      loadUnifiedHistory();
+    };
+
+    // Filter by category
+    window.filterByCategory = function(category) {
+      currentUnifiedFilter.category = currentUnifiedFilter.category === category ? null : category;
+
+      // Update category tag states
+      document.querySelectorAll('.category-tag').forEach(tag => {
+        tag.classList.toggle('active', tag.textContent.startsWith(category));
+      });
+
+      loadUnifiedHistory();
+    };
+
+    // Filter by tag
+    window.filterByTag = function(tag) {
+      const searchInput = document.getElementById('unified-search-input');
+      searchInput.value = tag;
+      searchUnifiedHistory();
+    };
+
+    // Render unified list
+    function renderUnifiedList(items) {
+      const listEl = document.getElementById('unified-history-list');
+      listEl.innerHTML = '';
+
+      if (items.length === 0) {
+        listEl.innerHTML = '<div class="empty">No items found</div>';
+        return;
+      }
+
+      items.forEach(item => {
+        const card = createUnifiedCard(item);
+        listEl.appendChild(card);
+      });
+    }
+
+    // Create unified card
+    function createUnifiedCard(item) {
+      const card = document.createElement('div');
+      card.className = 'config-item';
+      card.style.cursor = 'pointer';
+      card.onclick = () => showUnifiedDetail(item);
+
+      // Type badge
+      const typeBadge = document.createElement('span');
+      typeBadge.className = `type-badge type-${item.type.split('_')[0]}`;
+      typeBadge.textContent = formatType(item.type);
+
+      // Category badge
+      const categoryBadge = document.createElement('span');
+      categoryBadge.className = 'tag category-tag';
+      categoryBadge.style.marginLeft = '8px';
+      categoryBadge.textContent = item.category || 'general';
+
+      // Time
+      const time = document.createElement('div');
+      time.style.fontSize = '0.75rem';
+      time.style.color = '#64748b';
+      time.style.marginBottom = '4px';
+      time.textContent = item.timeFormatted;
+
+      // Header with badges
+      const header = document.createElement('div');
+      header.style.marginBottom = '8px';
+      header.appendChild(typeBadge);
+      header.appendChild(categoryBadge);
+
+      // Preview
+      const preview = document.createElement('div');
+      preview.className = 'config-item-name';
+      preview.style.fontSize = '0.9rem';
+      preview.style.color = '#e2e8f0';
+      preview.style.whiteSpace = 'normal';
+      preview.style.wordBreak = 'break-word';
+      preview.textContent = item.preview;
+
+      // Tags
+      const tagsDiv = document.createElement('div');
+      tagsDiv.style.display = 'flex';
+      tagsDiv.style.gap = '4px';
+      tagsDiv.style.marginTop = '8px';
+      tagsDiv.style.flexWrap = 'wrap';
+
+      (item.tags || []).slice(0, 5).forEach(tag => {
+        const tagEl = document.createElement('span');
+        tagEl.className = 'tag';
+        tagEl.style.fontSize = '0.7rem';
+        tagEl.style.padding = '2px 8px';
+        tagEl.textContent = tag;
+        tagsDiv.appendChild(tagEl);
+      });
+
+      // Build card
+      card.appendChild(time);
+      card.appendChild(header);
+      card.appendChild(preview);
+      if (item.tags && item.tags.length > 0) {
+        card.appendChild(tagsDiv);
+      }
+
+      return card;
+    }
+
+    // Format type display
+    function formatType(type) {
+      const map = {
+        'conversation': '💬 Conversation',
+        'project_session': '📁 Project',
+        'file_edit': '✏️ File Edit',
+        'todo_list': '✅ Todo List',
+        'plan': '📋 Plan'
+      };
+      return map[type] || type;
+    }
+
+    // Show unified detail
+    function showUnifiedDetail(item) {
+      // Reuse existing modal, adapt content based on type
+      const modal = document.getElementById('conversation-detail-modal');
+      const title = document.getElementById('conversation-detail-title');
+      const content = document.getElementById('conversation-detail-content');
+
+      title.textContent = `${formatType(item.type)} - ${item.timeFormatted}`;
+      content.innerHTML = formatDetailContent(item);
+
+      modal.style.display = 'block';
+      modal.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Format detail content based on type
+    function formatDetailContent(item) {
+      switch (item.type) {
+        case 'conversation':
+          return `<strong>Project:</strong> ${item.project}\n<strong>Session:</strong> ${item.sessionId}\n\n${item.display}`;
+
+        case 'project_session':
+          return `<strong>Project:</strong> ${item.project}\n<strong>Session:</strong> ${item.sessionId}\n<strong>Tools Used:</strong> ${item.tools.join(', ')}\n<strong>Tool Executions:</strong> ${item.toolCount}\n\n${item.preview}`;
+
+        case 'file_edit':
+          return `<strong>File Hash:</strong> ${item.fileHash}\n<strong>Versions:</strong> ${item.versions.join(', ')}\n<strong>Size Growth:</strong> ${item.sizeGrowth}\n\n${item.preview}`;
+
+        case 'todo_list':
+          const tasks = item.tasks.map(t => `[${t.status === 'completed' ? '✓' : t.status === 'in_progress' ? '⏳' : '○'}] ${t.content}`).join('\n');
+          return `<strong>Session:</strong> ${item.sessionId}\n<strong>Tasks:</strong> ${item.totalTasks} (${item.completed} completed)\n\n${tasks}`;
+
+        case 'plan':
+          return `<strong>Plan:</strong> ${item.filename}\n<strong>Title:</strong> ${item.title}\n<strong>Words:</strong> ${item.wordCount}\n\n${item.preview}`;
+
+        default:
+          return item.preview || 'No content available';
+      }
+    }
+
+    // Update type counts
+    function updateTypeCounts(counts) {
+      document.getElementById('count-all').textContent = counts.all || (counts.conversation + counts.project_session + counts.file_edit + counts.todo_list + counts.plan) || 0;
+      document.getElementById('count-conversations').textContent = counts.conversation || 0;
+      document.getElementById('count-projects').textContent = counts.project_session || 0;
+      document.getElementById('count-files').textContent = counts.file_edit || 0;
+      document.getElementById('count-todos').textContent = counts.todo_list || 0;
+      document.getElementById('count-plans').textContent = counts.plan || 0;
+    }
+
+    // Clear search
+    window.clearUnifiedSearch = function() {
+      document.getElementById('unified-search-input').value = '';
+      currentUnifiedFilter = { type: 'all', category: null, tags: [] };
+      loadUnifiedHistory();
+    };
+
+    // =========================================================================
     // TIMELINE PLAYBACK ENGINE
     // =========================================================================
 
@@ -8677,6 +9123,195 @@ ${currentConversation.display}
     window.saveApiKeys = saveApiKeys;
     window.loadApiKeys = loadApiKeys;
     window.toggleKeyVisibility = toggleKeyVisibility;
+
+    // =========================================================================
+    // PHASE 2: WEBSOCKET & MULTIPLAYER SESSION MANAGEMENT
+    // =========================================================================
+
+    let workspaceWebSocket = null;
+    let currentSessionId = null;
+    let currentUserId = null;
+    let currentUserName = 'User-' + Math.random().toString(36).substr(2, 5);
+
+    function connectWorkspaceWebSocket() {
+      if (workspaceWebSocket) return;
+
+      const wsUrl = 'ws://localhost:8081';
+      workspaceWebSocket = new WebSocket(wsUrl);
+
+      workspaceWebSocket.onopen = () => {
+        console.log('[Workspace] WebSocket connected');
+
+        // Auto-join session if session ID in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session');
+        if (sessionId) {
+          joinWorkspaceSessionViaWS(sessionId);
+        }
+      };
+
+      workspaceWebSocket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleWorkspaceEvent(data);
+        } catch (e) {
+          console.error('[Workspace] Error parsing WS message:', e);
+        }
+      };
+
+      workspaceWebSocket.onerror = (error) => {
+        console.error('[Workspace] WebSocket error:', error);
+      };
+
+      workspaceWebSocket.onclose = () => {
+        console.log('[Workspace] WebSocket disconnected');
+        workspaceWebSocket = null;
+        // Auto-reconnect after 3 seconds
+        setTimeout(connectWorkspaceWebSocket, 3000);
+      };
+    }
+
+    function handleWorkspaceEvent(data) {
+      const event = data.event;
+
+      if (event === 'session_joined') {
+        currentSessionId = data.session_id;
+        currentUserId = data.user_id;
+        updateSessionUI(true);
+      } else if (event === 'user_joined') {
+        updateUserPresence(data.data.users);
+        showNotification(`${data.data.user_name} joined the session`);
+      } else if (event === 'user_left') {
+        showNotification('A user left the session');
+      } else if (event === 'user_message') {
+        // Display message from other user
+        if (data.data.user_id !== currentUserId) {
+          appendMessage(data.data.agent_id, 'user', data.data.content);
+        }
+      }
+    }
+
+    async function createWorkspaceSession() {
+      try {
+        const response = await fetch('/api/workspace/sessions/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_name: currentUserName,
+            user_id: currentUserId
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          currentSessionId = data.session_id;
+          currentUserId = data.user_id;
+
+          // Connect to WebSocket if not already connected
+          if (!workspaceWebSocket) {
+            connectWorkspaceWebSocket();
+            // Wait a bit for connection
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+
+          // Join via WebSocket
+          joinWorkspaceSessionViaWS(currentSessionId);
+
+          // Update URL
+          window.history.pushState({}, '', `?session=${currentSessionId}`);
+        }
+      } catch (error) {
+        console.error('[Workspace] Error creating session:', error);
+        alert('Failed to create session: ' + error.message);
+      }
+    }
+
+    function joinWorkspaceSessionViaWS(sessionId) {
+      if (!workspaceWebSocket || workspaceWebSocket.readyState !== WebSocket.OPEN) {
+        console.error('[Workspace] WebSocket not connected');
+        return;
+      }
+
+      workspaceWebSocket.send(JSON.dumps({
+        type: 'join_workspace_session',
+        session_id: sessionId,
+        user_name: currentUserName,
+        user_id: currentUserId
+      }));
+    }
+
+    function showJoinSessionDialog() {
+      const sessionId = prompt('Enter session ID to join:');
+      if (sessionId) {
+        window.location.href = `?session=${sessionId}`;
+        location.reload();
+      }
+    }
+
+    function copyInviteLink() {
+      if (!currentSessionId) return;
+
+      const inviteUrl = `${window.location.origin}?session=${currentSessionId}`;
+      navigator.clipboard.writeText(inviteUrl).then(() => {
+        alert('Invite link copied to clipboard!');
+      });
+    }
+
+    function updateSessionUI(isInSession) {
+      const statusEl = document.getElementById('session-status');
+      const sessionIdEl = document.getElementById('session-id-display');
+      const createBtn = document.getElementById('create-session-btn');
+      const joinBtn = document.getElementById('join-session-btn');
+      const copyBtn = document.getElementById('copy-invite-btn');
+      const userPresence = document.getElementById('user-presence');
+
+      if (isInSession && currentSessionId) {
+        statusEl.style.display = 'block';
+        sessionIdEl.textContent = `Session: ${currentSessionId}`;
+        createBtn.style.display = 'none';
+        joinBtn.style.display = 'none';
+        copyBtn.style.display = 'block';
+        userPresence.style.display = 'block';
+      } else {
+        statusEl.style.display = 'none';
+        createBtn.style.display = 'block';
+        joinBtn.style.display = 'block';
+        copyBtn.style.display = 'none';
+        userPresence.style.display = 'none';
+      }
+    }
+
+    function updateUserPresence(users) {
+      const userListEl = document.getElementById('user-list');
+      if (!userListEl) return;
+
+      userListEl.innerHTML = users.map(user => `
+        <div style="padding: 6px 12px; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; color: #60a5fa; font-size: 0.85rem;">
+          👤 ${user.name || user.id}
+        </div>
+      `).join('');
+    }
+
+    function showNotification(message) {
+      // Simple notification (can be enhanced later)
+      console.log('[Workspace]', message);
+    }
+
+    // Auto-connect WebSocket when workspace tab is opened
+    document.addEventListener('DOMContentLoaded', () => {
+      // Check if on workspace tab
+      const workspaceTab = document.getElementById('tab-workspace');
+      if (workspaceTab) {
+        connectWorkspaceWebSocket();
+      }
+    });
+
+    // Make workspace functions globally accessible
+    window.createWorkspaceSession = createWorkspaceSession;
+    window.showJoinSessionDialog = showJoinSessionDialog;
+    window.copyInviteLink = copyInviteLink;
+    window.connectWorkspaceWebSocket = connectWorkspaceWebSocket;
 
   </script>
 </body>
