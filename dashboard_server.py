@@ -23,6 +23,14 @@ from watchdog.events import FileSystemEventHandler
 # Add src directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
+# Import agent orchestrator for collaborative workspace
+try:
+    from agent_orchestrator import AgentOrchestrator
+    AGENT_ORCHESTRATOR = None  # Will be initialized on first use
+except ImportError:
+    AGENT_ORCHESTRATOR = None
+    print("Warning: agent_orchestrator not found. Collaborative workspace features disabled.")
+
 # Paths
 HOME = Path.home()
 LIBRARY_DIR = HOME / ".claude" / "conversation_library"
@@ -34,6 +42,7 @@ ARSENAL_LIBRARY = ARSENAL_DIR / "library"
 ARSENAL_PRESETS = ARSENAL_DIR / "presets"
 GOLDEN_LIBRARY_DIR = HOME / "ztgi" / "golden_library" / ".golden_library"
 GOLDEN_INDEX_FILE = GOLDEN_LIBRARY_DIR / "index.json"
+API_KEYS_FILE = HOME / ".claude" / "api_keys.json"
 
 class DashboardHandler(SimpleHTTPRequestHandler):
     """Custom handler to serve API endpoints and static files."""
@@ -108,6 +117,22 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif path == '/api/golden/handoffs':
             self.serve_golden_handoffs()
             return
+        elif path == '/api/storage/stats':
+            self.serve_storage_stats()
+            return
+        elif path.startswith('/api/storage/list/'):
+            location_key = path.split('/')[-1]
+            self.serve_storage_list(location_key)
+            return
+        elif path == '/api/history/list':
+            self.serve_history_list(parsed_path.query)
+            return
+        elif path == '/api/history/search':
+            self.serve_history_search(parsed_path.query)
+            return
+        elif path == '/api/keys/list':
+            self.serve_api_keys_list()
+            return
         elif path == '/' or path == '/index.html':
             self.serve_dashboard()
             return
@@ -174,6 +199,19 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             return
         elif path == '/api/golden/restore':
             self.restore_golden_plan(data)
+            return
+        elif path == '/api/agent/chat':
+            self.agent_chat(data)
+            return
+        elif path == '/api/agent/load-document':
+            self.agent_load_document(data)
+            return
+        elif path.startswith('/api/storage/open/'):
+            location_key = path.split('/')[-1]
+            self.open_storage_location(location_key)
+            return
+        elif path == '/api/keys/save':
+            self.save_api_keys(data)
             return
         else:
             self.send_error(404, "Not found")
@@ -2233,6 +2271,471 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         else:
             return 'unknown'
 
+    # =========================================================================
+    # Collaborative Workspace Methods (Agent Chat)
+    # =========================================================================
+
+    def agent_chat(self, data):
+        """Stream agent response from collaborative workspace."""
+        global AGENT_ORCHESTRATOR
+
+        agent_id = data.get('agent_id')
+        message = data.get('message')
+        document = data.get('document')  # Optional
+
+        if not agent_id or not message:
+            self.serve_json({'error': 'Missing agent_id or message'}, status=400)
+            return
+
+        # Initialize orchestrator on first use
+        if AGENT_ORCHESTRATOR is None:
+            try:
+                AGENT_ORCHESTRATOR = AgentOrchestrator()
+            except ValueError as e:
+                self.serve_json({'error': str(e)}, status=500)
+                return
+
+        # Load document if provided and not already loaded
+        if document and AGENT_ORCHESTRATOR.agents[agent_id].get('document') is None:
+            AGENT_ORCHESTRATOR.load_document(agent_id, document)
+
+        # Set headers for Server-Sent Events (SSE) streaming
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Connection', 'keep-alive')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+
+        try:
+            # Stream response chunks
+            for chunk in AGENT_ORCHESTRATOR.send_message(agent_id, message):
+                # Send as SSE format: data: <content>\n\n
+                self.wfile.write(f'data: {json.dumps({"chunk": chunk})}\n\n'.encode())
+                self.wfile.flush()
+
+            # Send completion marker
+            self.wfile.write(f'data: {json.dumps({"done": True})}\n\n'.encode())
+            self.wfile.flush()
+
+        except Exception as e:
+            error_msg = f'data: {json.dumps({"error": str(e)})}\n\n'
+            self.wfile.write(error_msg.encode())
+            self.wfile.flush()
+
+    def agent_load_document(self, data):
+        """Load a document into an agent's context."""
+        global AGENT_ORCHESTRATOR
+
+        agent_id = data.get('agent_id')
+        document = data.get('document')
+        handoff_id = data.get('handoff_id')  # Optional: load from V4Z handoff
+
+        if not agent_id:
+            self.serve_json({'error': 'Missing agent_id'}, status=400)
+            return
+
+        # Initialize orchestrator if needed
+        if AGENT_ORCHESTRATOR is None:
+            try:
+                AGENT_ORCHESTRATOR = AgentOrchestrator()
+            except ValueError as e:
+                self.serve_json({'error': str(e)}, status=500)
+                return
+
+        # Load document from handoff if specified
+        if handoff_id:
+            try:
+                # Decompress handoff to get content
+                handoff_path = GOLDEN_LIBRARY_DIR / f"{handoff_id}.v4z"
+                if not handoff_path.exists():
+                    self.serve_json({'error': f'Handoff not found: {handoff_id}'}, status=404)
+                    return
+
+                # Use decompress script to get content
+                import decompress
+                with open(handoff_path, 'r') as f:
+                    compressed = f.read()
+
+                decompressed = decompress.decompress_v4z(compressed)
+                document = decompressed
+
+            except Exception as e:
+                self.serve_json({'error': f'Failed to load handoff: {str(e)}'}, status=500)
+                return
+
+        if not document:
+            self.serve_json({'error': 'Missing document or handoff_id'}, status=400)
+            return
+
+        try:
+            AGENT_ORCHESTRATOR.load_document(agent_id, document)
+            self.serve_json({
+                'success': True,
+                'agent_id': agent_id,
+                'document_length': len(document)
+            })
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def serve_storage_stats(self):
+        """Get stats for all Claude storage locations."""
+        import os
+        from pathlib import Path
+
+        # Define storage locations
+        home = Path.home()
+        locations = {
+            'historyJsonl': home / '.claude' / 'history.jsonl',
+            'projects': home / '.claude' / 'projects',
+            'sessions': home / 'Library' / 'Application Support' / 'Claude' / 'claude-code-sessions',
+            'debug': home / '.claude' / 'debug',
+            'todos': home / '.claude' / 'todos',
+            'fileHistory': home / '.claude' / 'file-history',
+            'shellSnapshots': home / '.claude' / 'shell-snapshots',
+            'mcpCache': home / 'Library' / 'Caches' / 'claude-cli-nodejs',
+            'appSupportCache': home / 'Library' / 'Application Support' / 'Claude' / 'Cache',
+            'codeCache': home / 'Library' / 'Application Support' / 'Claude' / 'Code Cache',
+            'telemetry': home / '.claude' / 'telemetry',
+            'plans': home / '.claude' / 'plans',
+            'logs': home / 'Library' / 'Logs' / 'Claude',
+            'settings': home / '.claude' / 'settings.json',
+            'settingsLocal': home / '.claude' / 'settings.local.json'
+        }
+
+        def format_bytes(bytes):
+            """Format bytes to human readable."""
+            if bytes == 0:
+                return '0 B'
+            k = 1024
+            sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+            i = 0
+            while bytes >= k and i < len(sizes) - 1:
+                bytes /= k
+                i += 1
+            return f'{bytes:.2f} {sizes[i]}'
+
+        def get_dir_stats(path):
+            """Get directory size and file count."""
+            if not path.exists():
+                return {'exists': False, 'size': 0, 'files': 0}
+
+            total_size = 0
+            file_count = 0
+
+            try:
+                for item in path.rglob('*'):
+                    if item.is_file():
+                        try:
+                            total_size += item.stat().st_size
+                            file_count += 1
+                        except:
+                            pass
+            except Exception as e:
+                print(f'Error scanning {path}: {e}')
+
+            return {
+                'exists': True,
+                'path': str(path),
+                'size': total_size,
+                'files': file_count,
+                'sizeFormatted': format_bytes(total_size)
+            }
+
+        def get_file_stats(path):
+            """Get file size."""
+            if not path.exists():
+                return {'exists': False, 'size': 0}
+
+            try:
+                stat = path.stat()
+                return {
+                    'exists': True,
+                    'path': str(path),
+                    'size': stat.st_size,
+                    'modified': stat.st_mtime,
+                    'sizeFormatted': format_bytes(stat.st_size)
+                }
+            except Exception as e:
+                return {'exists': False, 'size': 0, 'error': str(e)}
+
+        try:
+            stats = {}
+            total = 0
+
+            for key, path in locations.items():
+                if path.is_file() or (path.exists() and not path.is_dir()):
+                    stats[key] = get_file_stats(path)
+                else:
+                    stats[key] = get_dir_stats(path)
+
+                total += stats[key].get('size', 0)
+
+            self.serve_json({
+                'ok': True,
+                'locations': stats,
+                'total': total,
+                'totalFormatted': format_bytes(total)
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def serve_storage_list(self, location_key):
+        """List files in a storage location."""
+        import os
+        from pathlib import Path
+
+        home = Path.home()
+        locations = {
+            'historyJsonl': home / '.claude' / 'history.jsonl',
+            'projects': home / '.claude' / 'projects',
+            'sessions': home / 'Library' / 'Application Support' / 'Claude' / 'claude-code-sessions',
+            'debug': home / '.claude' / 'debug',
+            'todos': home / '.claude' / 'todos',
+            'fileHistory': home / '.claude' / 'file-history',
+            'shellSnapshots': home / '.claude' / 'shell-snapshots',
+            'mcpCache': home / 'Library' / 'Caches' / 'claude-cli-nodejs',
+            'appSupportCache': home / 'Library' / 'Application Support' / 'Claude' / 'Cache',
+            'codeCache': home / 'Library' / 'Application Support' / 'Claude' / 'Code Cache',
+            'telemetry': home / '.claude' / 'telemetry',
+            'plans': home / '.claude' / 'plans',
+            'logs': home / 'Library' / 'Logs' / 'Claude',
+            'settings': home / '.claude' / 'settings.json',
+            'settingsLocal': home / '.claude' / 'settings.local.json'
+        }
+
+        if location_key not in locations:
+            self.serve_json({'ok': False, 'error': 'Invalid location key'}, status=400)
+            return
+
+        path = locations[location_key]
+
+        if not path.exists():
+            self.serve_json({'ok': True, 'files': []})
+            return
+
+        def format_bytes(bytes):
+            if bytes == 0:
+                return '0 B'
+            k = 1024
+            sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+            i = 0
+            while bytes >= k and i < len(sizes) - 1:
+                bytes /= k
+                i += 1
+            return f'{bytes:.2f} {sizes[i]}'
+
+        try:
+            files = []
+
+            if path.is_file():
+                stat = path.stat()
+                files.append({
+                    'name': path.name,
+                    'path': str(path),
+                    'size': stat.st_size,
+                    'sizeFormatted': format_bytes(stat.st_size),
+                    'modified': stat.st_mtime,
+                    'isDirectory': False
+                })
+            else:
+                # List directory contents
+                for item in sorted(path.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+                    try:
+                        stat = item.stat()
+                        files.append({
+                            'name': item.name,
+                            'path': str(item),
+                            'size': stat.st_size if item.is_file() else 0,
+                            'sizeFormatted': format_bytes(stat.st_size) if item.is_file() else '-',
+                            'modified': stat.st_mtime,
+                            'isDirectory': item.is_dir()
+                        })
+                    except:
+                        pass
+
+            self.serve_json({
+                'ok': True,
+                'files': files[:200],  # Limit to 200 files
+                'total': len(files)
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def open_storage_location(self, location_key):
+        """Open a storage location in Finder."""
+        import subprocess
+        from pathlib import Path
+
+        home = Path.home()
+        locations = {
+            'historyJsonl': home / '.claude' / 'history.jsonl',
+            'projects': home / '.claude' / 'projects',
+            'sessions': home / 'Library' / 'Application Support' / 'Claude' / 'claude-code-sessions',
+            'debug': home / '.claude' / 'debug',
+            'todos': home / '.claude' / 'todos',
+            'fileHistory': home / '.claude' / 'file-history',
+            'shellSnapshots': home / '.claude' / 'shell-snapshots',
+            'mcpCache': home / 'Library' / 'Caches' / 'claude-cli-nodejs',
+            'appSupportCache': home / 'Library' / 'Application Support' / 'Claude' / 'Cache',
+            'codeCache': home / 'Library' / 'Application Support' / 'Claude' / 'Code Cache',
+            'telemetry': home / '.claude' / 'telemetry',
+            'plans': home / '.claude' / 'plans',
+            'logs': home / 'Library' / 'Logs' / 'Claude',
+            'settings': home / '.claude' / 'settings.json',
+            'settingsLocal': home / '.claude' / 'settings.local.json'
+        }
+
+        if location_key not in locations:
+            self.serve_json({'ok': False, 'error': 'Invalid location key'}, status=400)
+            return
+
+        path = locations[location_key]
+
+        if not path.exists():
+            self.serve_json({'ok': False, 'error': 'Location does not exist'}, status=404)
+            return
+
+        try:
+            # Use 'open' command on macOS to open in Finder
+            # If it's a file, open the parent directory
+            target = path.parent if path.is_file() else path
+            subprocess.run(['open', str(target)], check=True)
+
+            self.serve_json({
+                'ok': True,
+                'location': str(target)
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def serve_history_list(self, query_string):
+        """List conversation history with pagination and filters."""
+        from urllib.parse import parse_qs
+        from pathlib import Path
+
+        try:
+            params = parse_qs(query_string) if query_string else {}
+            limit = int(params.get('limit', ['100'])[0])
+            offset = int(params.get('offset', ['0'])[0])
+            project_filter = params.get('project', [None])[0]
+
+            history_file = Path.home() / '.claude' / 'history.jsonl'
+            if not history_file.exists():
+                self.serve_json({'ok': True, 'conversations': [], 'total': 0})
+                return
+
+            conversations = []
+            with open(history_file, 'r') as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    try:
+                        entry = json.loads(line)
+                        # Apply project filter if specified
+                        if project_filter and project_filter not in entry.get('project', ''):
+                            continue
+
+                        conversations.append({
+                            'sessionId': entry.get('sessionId', ''),
+                            'timestamp': entry.get('timestamp', 0),
+                            'timeFormatted': datetime.fromtimestamp(entry.get('timestamp', 0) / 1000).strftime('%Y-%m-%d %H:%M:%S'),
+                            'project': entry.get('project', '').replace(str(Path.home()), '~'),
+                            'display': entry.get('display', ''),
+                            'preview': entry.get('display', '')[:200],
+                            'hasPaste': len(entry.get('pastedContents', {})) > 0
+                        })
+                    except json.JSONDecodeError:
+                        continue
+
+            # Sort by timestamp descending (newest first)
+            conversations.sort(key=lambda x: x['timestamp'], reverse=True)
+
+            total = len(conversations)
+            paginated = conversations[offset:offset + limit]
+
+            self.serve_json({
+                'ok': True,
+                'conversations': paginated,
+                'total': total,
+                'limit': limit,
+                'offset': offset
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def serve_history_search(self, query_string):
+        """Search conversation history."""
+        from urllib.parse import parse_qs
+        from pathlib import Path
+
+        try:
+            params = parse_qs(query_string) if query_string else {}
+            search_query = params.get('q', [''])[0].lower()
+            limit = int(params.get('limit', ['100'])[0])
+
+            if not search_query:
+                self.serve_json({'ok': False, 'error': 'Missing search query'}, status=400)
+                return
+
+            history_file = Path.home() / '.claude' / 'history.jsonl'
+            if not history_file.exists():
+                self.serve_json({'ok': True, 'conversations': [], 'total': 0})
+                return
+
+            results = []
+            with open(history_file, 'r') as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    try:
+                        entry = json.loads(line)
+                        display = entry.get('display', '').lower()
+                        project = entry.get('project', '').lower()
+
+                        # Search in display text or project path
+                        if search_query in display or search_query in project:
+                            results.append({
+                                'sessionId': entry.get('sessionId', ''),
+                                'timestamp': entry.get('timestamp', 0),
+                                'timeFormatted': datetime.fromtimestamp(entry.get('timestamp', 0) / 1000).strftime('%Y-%m-%d %H:%M:%S'),
+                                'project': entry.get('project', '').replace(str(Path.home()), '~'),
+                                'display': entry.get('display', ''),
+                                'preview': entry.get('display', '')[:200],
+                                'hasPaste': len(entry.get('pastedContents', {})) > 0,
+                                'matchScore': display.count(search_query) + project.count(search_query)
+                            })
+                    except json.JSONDecodeError:
+                        continue
+
+            # Sort by match score then timestamp
+            results.sort(key=lambda x: (x['matchScore'], x['timestamp']), reverse=True)
+            results = results[:limit]
+
+            self.serve_json({
+                'ok': True,
+                'conversations': results,
+                'total': len(results),
+                'query': search_query
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
     def log_message(self, format, *args):
         """Override to customize logging."""
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -2303,6 +2806,81 @@ class HandoffWatcher(FileSystemEventHandler):
             print(f"[HandoffWatcher] Error processing {file_path}: {e}")
 
 
+class HistoryWatcher(FileSystemEventHandler):
+    """Watch for new entries in history.jsonl."""
+
+    def __init__(self):
+        super().__init__()
+        self.history_file = Path.home() / '.claude' / 'history.jsonl'
+        self.file_position = 0
+        # Initialize position to end of file to avoid broadcasting existing entries
+        if self.history_file.exists():
+            self.file_position = self.history_file.stat().st_size
+
+    def on_modified(self, event):
+        """Handle file modifications."""
+        if event.is_directory:
+            return
+
+        file_path = Path(event.src_path)
+
+        # Only process history.jsonl
+        if file_path != self.history_file:
+            return
+
+        # Read new lines
+        try:
+            with open(self.history_file, 'r') as f:
+                f.seek(self.file_position)
+                new_lines = f.read()
+                self.file_position = f.tell()
+
+            if not new_lines.strip():
+                return
+
+            # Parse each new line as JSON
+            for line in new_lines.strip().split('\n'):
+                if not line.strip():
+                    continue
+
+                try:
+                    entry = json.loads(line)
+
+                    # Extract conversation info
+                    display = entry.get('display', '')
+                    timestamp = entry.get('timestamp', 0)
+                    project = entry.get('project', '')
+                    session_id = entry.get('sessionId', '')
+                    pasted = entry.get('pastedContents', {})
+
+                    # Truncate display for preview
+                    preview = display[:200] + '...' if len(display) > 200 else display
+
+                    notification = {
+                        'event': 'new_conversation',
+                        'data': {
+                            'sessionId': session_id,
+                            'timestamp': timestamp,
+                            'timeFormatted': datetime.fromtimestamp(timestamp / 1000).strftime('%Y-%m-%d %H:%M:%S'),
+                            'project': project.replace(str(Path.home()), '~'),
+                            'display': display,
+                            'preview': preview,
+                            'hasPaste': len(pasted) > 0
+                        }
+                    }
+
+                    # Queue notification for WebSocket broadcast
+                    pending_notifications.append(notification)
+                    print(f"[HistoryWatcher] New conversation entry: {preview[:50]}...")
+
+                except json.JSONDecodeError as e:
+                    print(f"[HistoryWatcher] Error parsing JSON line: {e}")
+                    continue
+
+        except Exception as e:
+            print(f"[HistoryWatcher] Error reading history file: {e}")
+
+
 async def websocket_handler(websocket):
     """Handle WebSocket connections from dashboard clients."""
     print(f"[WebSocket] Client connected from {websocket.remote_address}")
@@ -2329,6 +2907,114 @@ async def websocket_handler(websocket):
         print(f"[WebSocket] Client disconnected from {websocket.remote_address}")
     finally:
         connected_clients.discard(websocket)
+
+
+    # =========================================================================
+    # Collaborative Workspace Methods (Agent Chat)
+    # =========================================================================
+
+    def agent_chat(self, data):
+        """Stream agent response from collaborative workspace."""
+        global AGENT_ORCHESTRATOR
+
+        agent_id = data.get('agent_id')
+        message = data.get('message')
+        document = data.get('document')  # Optional
+
+        if not agent_id or not message:
+            self.serve_json({'error': 'Missing agent_id or message'}, status=400)
+            return
+
+        # Initialize orchestrator on first use
+        if AGENT_ORCHESTRATOR is None:
+            try:
+                AGENT_ORCHESTRATOR = AgentOrchestrator()
+            except ValueError as e:
+                self.serve_json({'error': str(e)}, status=500)
+                return
+
+        # Load document if provided and not already loaded
+        if document and AGENT_ORCHESTRATOR.agents[agent_id].get('document') is None:
+            AGENT_ORCHESTRATOR.load_document(agent_id, document)
+
+        # Set headers for Server-Sent Events (SSE) streaming
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Connection', 'keep-alive')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+
+        try:
+            # Stream response chunks
+            for chunk in AGENT_ORCHESTRATOR.send_message(agent_id, message):
+                # Send as SSE format: data: <content>\n\n
+                self.wfile.write(f'data: {json.dumps({"chunk": chunk})}\n\n'.encode())
+                self.wfile.flush()
+
+            # Send completion marker
+            self.wfile.write(f'data: {json.dumps({"done": True})}\n\n'.encode())
+            self.wfile.flush()
+
+        except Exception as e:
+            error_msg = f'data: {json.dumps({"error": str(e)})}\n\n'
+            self.wfile.write(error_msg.encode())
+            self.wfile.flush()
+
+    def agent_load_document(self, data):
+        """Load a document into an agent's context."""
+        global AGENT_ORCHESTRATOR
+
+        agent_id = data.get('agent_id')
+        document = data.get('document')
+        handoff_id = data.get('handoff_id')  # Optional: load from V4Z handoff
+
+        if not agent_id:
+            self.serve_json({'error': 'Missing agent_id'}, status=400)
+            return
+
+        # Initialize orchestrator if needed
+        if AGENT_ORCHESTRATOR is None:
+            try:
+                AGENT_ORCHESTRATOR = AgentOrchestrator()
+            except ValueError as e:
+                self.serve_json({'error': str(e)}, status=500)
+                return
+
+        # Load document from handoff if specified
+        if handoff_id:
+            try:
+                # Decompress handoff to get content
+                handoff_path = GOLDEN_LIBRARY_DIR / f"{handoff_id}.v4z"
+                if not handoff_path.exists():
+                    self.serve_json({'error': f'Handoff not found: {handoff_id}'}, status=404)
+                    return
+
+                # Use decompress script to get content
+                import decompress
+                with open(handoff_path, 'r') as f:
+                    compressed = f.read()
+
+                decompressed = decompress.decompress_v4z(compressed)
+                document = decompressed
+
+            except Exception as e:
+                self.serve_json({'error': f'Failed to load handoff: {str(e)}'}, status=500)
+                return
+
+        if not document:
+            self.serve_json({'error': 'Missing document or handoff_id'}, status=400)
+            return
+
+        try:
+            AGENT_ORCHESTRATOR.load_document(agent_id, document)
+            self.serve_json({
+                'success': True,
+                'agent_id': agent_id,
+                'document_length': len(document)
+            })
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
 
 
 async def broadcast_notifications():
@@ -2358,14 +3044,25 @@ async def run_websocket_server(port=8081):
 
     # Start file watcher
     observer = Observer()
-    event_handler = HandoffWatcher()
 
+    # Watch for new handoffs
+    handoff_handler = HandoffWatcher()
     if COMPRESSED_DIR.exists():
-        observer.schedule(event_handler, str(COMPRESSED_DIR), recursive=True)
-        observer.start()
+        observer.schedule(handoff_handler, str(COMPRESSED_DIR), recursive=True)
         print(f"[WebSocket] Watching {COMPRESSED_DIR} for new handoffs")
     else:
         print(f"[WebSocket] Warning: {COMPRESSED_DIR} does not exist")
+
+    # Watch for new conversation history entries
+    history_handler = HistoryWatcher()
+    history_dir = Path.home() / '.claude'
+    if history_dir.exists():
+        observer.schedule(history_handler, str(history_dir), recursive=False)
+        print(f"[WebSocket] Watching {history_dir / 'history.jsonl'} for new conversations")
+    else:
+        print(f"[WebSocket] Warning: {history_dir} does not exist")
+
+    observer.start()
 
     # Start broadcast task
     broadcast_task = asyncio.create_task(broadcast_notifications())
