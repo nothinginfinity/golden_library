@@ -9764,7 +9764,69 @@ ${currentConversation.display}
       } else if (event === 'agent_error') {
         updateAgentStatus(data.data.agent_id, 'error');
         showNotification(`Agent error: ${data.data.error}`, 'error');
+      } else if (event === 'agent_control_updated') {
+        updateAgentControlDisplay(data.data.agent_control);
       }
+    }
+
+    function updateAgentControlDisplay(agentControl) {
+      if (!agentControl) return;
+
+      ['a', 'b', 'moderator'].forEach(agentId => {
+        const controllerId = agentControl[agentId];
+        const controlSpan = document.getElementById(`agent-${agentId}-control`);
+        const controlBtn = document.getElementById(`agent-${agentId}-control-btn`);
+        const input = document.getElementById(agentId === 'moderator' ? 'moderator-input' : `agent-${agentId}-input`);
+
+        if (controllerId) {
+          // Agent is controlled
+          const isCurrentUser = controllerId === currentUserId;
+
+          if (isCurrentUser) {
+            controlSpan.textContent = '(You control)';
+            controlSpan.style.color = '#10b981';
+            controlBtn.textContent = 'Release';
+            controlBtn.style.display = 'block';
+            if (input) input.disabled = false;
+          } else {
+            // Get controller name
+            fetchSession().then(session => {
+              if (session && session.users && session.users[controllerId]) {
+                const controllerName = session.users[controllerId].name;
+                controlSpan.textContent = `(Controlled by ${controllerName})`;
+                controlSpan.style.color = '#ef4444';
+              }
+            });
+            controlBtn.textContent = 'Claim';
+            controlBtn.style.display = 'block';
+            if (input) input.disabled = true;
+          }
+        } else {
+          // Agent is uncontrolled
+          controlSpan.textContent = '';
+          controlBtn.textContent = 'Claim';
+          controlBtn.style.display = 'block';
+          if (input) input.disabled = false;
+        }
+      });
+    }
+
+    function toggleAgentControl(agentId) {
+      if (!workspaceWebSocket || !currentSessionId) {
+        showNotification('Not connected to session', 'error');
+        return;
+      }
+
+      // Check current control state
+      const controlSpan = document.getElementById(`agent-${agentId}-control`);
+      const isControlling = controlSpan.textContent.includes('You control');
+
+      const eventType = isControlling ? 'release_agent_control' : 'claim_agent_control';
+
+      workspaceWebSocket.send(JSON.stringify({
+        type: eventType,
+        agent_id: agentId
+      }));
     }
 
     async function fetchSessionUsers() {
