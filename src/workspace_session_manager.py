@@ -108,6 +108,11 @@ class WorkspaceSession:
         'moderator': []
     })
     documents: Dict[str, str] = field(default_factory=dict)  # agent_id -> document
+    agent_control: Dict[str, Optional[str]] = field(default_factory=lambda: {
+        'a': None,  # user_id who controls Agent A
+        'b': None,  # user_id who controls Agent B
+        'moderator': None  # user_id who controls Moderator
+    })
     orchestrator: Any = None  # AgentOrchestrator instance for this session
 
     def to_dict(self):
@@ -120,7 +125,8 @@ class WorkspaceSession:
             'users': {uid: user.to_dict() for uid, user in self.users.items()},
             'messages': [msg.to_dict() for msg in self.messages],
             'agent_contexts': self.agent_contexts,
-            'documents': self.documents
+            'documents': self.documents,
+            'agent_control': self.agent_control
             # orchestrator excluded (not JSON serializable)
         }
 
@@ -326,6 +332,45 @@ class WorkspaceSessionManager:
             session_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
             if session_id not in self.sessions:
                 return session_id
+
+    def claim_agent_control(self, session_id: str, user_id: str, agent_id: str) -> bool:
+        """
+        Claim control of an agent.
+
+        Args:
+            session_id: Session ID
+            user_id: User requesting control
+            agent_id: Agent to control ('a', 'b', 'moderator')
+
+        Returns:
+            True if control granted, False if agent already controlled
+        """
+        session = self.sessions.get(session_id)
+        if not session or agent_id not in session.agent_control:
+            return False
+
+        # If agent is uncontrolled or controlled by requesting user, grant control
+        current_controller = session.agent_control.get(agent_id)
+        if current_controller is None or current_controller == user_id:
+            session.agent_control[agent_id] = user_id
+            print(f"[SessionManager] User {user_id} claimed control of agent {agent_id}")
+            return True
+
+        return False
+
+    def release_agent_control(self, session_id: str, user_id: str, agent_id: str) -> bool:
+        """Release control of an agent."""
+        session = self.sessions.get(session_id)
+        if not session or agent_id not in session.agent_control:
+            return False
+
+        # Only the controller can release
+        if session.agent_control.get(agent_id) == user_id:
+            session.agent_control[agent_id] = None
+            print(f"[SessionManager] User {user_id} released control of agent {agent_id}")
+            return True
+
+        return False
 
     def get_session_stats(self) -> Dict:
         """Get statistics about all sessions."""

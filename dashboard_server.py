@@ -4643,6 +4643,30 @@ async def websocket_handler(websocket):
                             exclude_user=user_id
                         )
 
+                elif msg_type == 'claim_agent_control':
+                    if session_id and session_manager:
+                        agent_id = data.get('agent_id')
+                        success = session_manager.claim_agent_control(session_id, user_id, agent_id)
+                        if success:
+                            session = session_manager.get_session(session_id)
+                            await session_manager.broadcast_to_session(
+                                session_id,
+                                'agent_control_updated',
+                                {'agent_control': session.agent_control}
+                            )
+
+                elif msg_type == 'release_agent_control':
+                    if session_id and session_manager:
+                        agent_id = data.get('agent_id')
+                        success = session_manager.release_agent_control(session_id, user_id, agent_id)
+                        if success:
+                            session = session_manager.get_session(session_id)
+                            await session_manager.broadcast_to_session(
+                                session_id,
+                                'agent_control_updated',
+                                {'agent_control': session.agent_control}
+                            )
+
             except json.JSONDecodeError:
                 pass
             except Exception as e:
