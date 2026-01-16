@@ -7186,11 +7186,12 @@ ${currentConversation.display}
       // Get model selection
       const model = document.getElementById('assistant-model').value;
 
-      // Prepare request
+      // Prepare request (filter out tool messages - they're for display only)
+      const apiHistory = assistantChatHistory.slice(0, -1).filter(msg => msg.role !== 'tool');
       const payload = {
         message: message,
         model: model,
-        history: assistantChatHistory.slice(0, -1)  // Exclude the message we just added
+        history: apiHistory
       };
 
       try {
