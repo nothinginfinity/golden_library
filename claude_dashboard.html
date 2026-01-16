@@ -4287,8 +4287,19 @@
       });
 
       // Show selected tab
-      document.getElementById(`tab-${tabName}`).classList.add('active');
-      event.target.classList.add('active');
+      const tabElement = document.getElementById(`tab-${tabName}`);
+      if (!tabElement) {
+        console.error(`Tab not found: tab-${tabName}`);
+        return;
+      }
+      tabElement.classList.add('active');
+
+      // Find and activate the corresponding button
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        if (btn.getAttribute('onclick')?.includes(`'${tabName}'`)) {
+          btn.classList.add('active');
+        }
+      });
 
       // Load config data if switching to config tab
       if (tabName === 'config') {
