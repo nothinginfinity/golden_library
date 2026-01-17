@@ -840,31 +840,201 @@ Added comprehensive API key management for 10 LLM providers:
 
 ---
 
-### Phase 4: Human Chat + Permissions
-**Duration:** 1-2 days
-**Goal:** Smooth collaboration experience
+### Phase 4: Human Chat + Permissions + Agent-to-Agent Communication
+**Duration:** 2-3 days
+**Goal:** Full multi-dimensional collaboration (humans ↔ humans, humans ↔ agents, agents ↔ agents)
 
+#### 4A: Human Collaboration (COMPLETED ✅)
 **Tasks:**
-1. Text chat sidebar (human ↔ human)
-2. @mentions and notifications
-3. Permission system (owner, editor, viewer)
-4. Document locking (prevent conflicts)
-5. Control handoff (transfer agent control)
-6. Audit log (who did what)
-7. Session settings (timeout, permissions)
-8. User testing and feedback
+1. ✅ Text chat sidebar (human ↔ human)
+2. ✅ @mentions and notifications
+3. ✅ Permission system (owner, editor, viewer)
+4. ✅ Document locking (prevent conflicts)
+5. ✅ Control handoff (transfer agent control)
+6. ✅ Audit log (who did what)
+7. ✅ Session settings (timeout, permissions)
+8. ✅ Agent awareness of users (system prompt injection)
 
 **Deliverables:**
-- Human chat working
-- Permissions enforced
-- Document locking prevents conflicts
-- Audit log for accountability
+- ✅ Human chat working
+- ✅ Permissions enforced
+- ✅ Document locking prevents conflicts
+- ✅ Audit log for accountability
+- ✅ Agents can distinguish between users by name
 
 **Success Criteria:**
-- Humans can text chat while working
-- @mentions notify users
-- Permissions work correctly
-- No edit conflicts
+- ✅ Humans can text chat while working
+- ✅ @mentions notify users
+- ✅ Permissions work correctly
+- ✅ No edit conflicts
+- ✅ Agents address users by name
+
+#### 4B: Agent-to-Agent Communication (MCP Inbox-Collab Integration)
+**Duration:** 1 day
+**Goal:** Enable agents (Prax, Cairn, Koda) to coordinate directly via MCP tools
+
+**Background:**
+Prax (Orchestrator) needs to coordinate Cairn (Architect) and Koda (Builder) directly without human intermediation. Using the existing mcp-twin/inbox-collab infrastructure, agents get "email for AI" - asynchronous message passing with persistence and history.
+
+**Architecture:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Collaborative Workspace                    │
+├─────────────────────────────────────────────────────────────┤
+│  Humans (via UI)              Agents (via MCP Tools)        │
+│  ├─ Alice (owner)             ├─ Prax (orchestrator)        │
+│  ├─ Bob (editor)              ├─ Cairn (architect)          │
+│  └─ Carol (viewer)            └─ Koda (builder)             │
+│                                                              │
+│  Human ↔ Human: WebSocket chat, @mentions                   │
+│  Human ↔ Agent: Direct messages, agent sees sender name     │
+│  Agent ↔ Agent: MCP inbox tools (async messaging)           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Tasks:**
+
+1. **MCP Tool Integration**
+   - Add `mcp__inbox-collab__send_message` tool to all agents
+   - Add `mcp__inbox-collab__check_inbox` tool to all agents
+   - Add `mcp__inbox-collab__mark_read` tool for message management
+   - Add `mcp__inbox-collab__search_messages` for finding past conversations
+
+2. **Agent Inbox Setup**
+   - Create agent-specific inboxes: `inbox_agent_prax.fsl`, `inbox_agent_cairn.fsl`, `inbox_agent_koda.fsl`
+   - Store in session-scoped directory: `~/ztgi/workspace_sessions/{session_id}/agent_inboxes/`
+   - Messages persist for session duration + 24 hours (configurable)
+
+3. **Message Format (FSL Nano)**
+   - Reuse existing inbox-collab message format
+   - Example: `§T:cairn§o:analyze_architecture§p:H§c:user_requested_feature_X§from:prax§`
+   - Supports: target, objective, priority, context, sender metadata
+
+4. **Orchestrator Integration**
+   - Update `AgentOrchestrator` to expose MCP tools per agent
+   - Tools available based on agent role:
+     - Prax: Can send to Cairn, Koda; checks all inboxes
+     - Cairn: Can send to Prax, Koda; checks own inbox + Prax
+     - Koda: Can send to Prax, Cairn; checks own inbox + Prax
+
+5. **UI Indicators**
+   - Show "📬" badge on agent panel when unread messages in inbox
+   - Show agent-to-agent conversation thread in audit log
+   - Optional: Expandable "Agent Messages" section showing inbox activity
+
+6. **System Prompts Enhancement**
+   - Add MCP tool usage instructions to agent system prompts
+   - Prax: "Use send_message to coordinate Cairn and Koda directly"
+   - Cairn: "Check your inbox for coordination from Prax"
+   - Koda: "Report status updates to Prax via send_message"
+
+7. **Workflow Examples**
+   - **Parallel workstreams**: Prax assigns Cairn (design) + Koda (prototype) concurrently
+   - **Design → Build handoff**: Cairn completes spec → messages Koda → Koda implements
+   - **Status gathering**: Prax checks both inboxes → synthesizes progress report
+   - **Blocker escalation**: Koda encounters issue → messages Prax → Prax coordinates solution
+
+**Implementation Details:**
+
+**MCP Tool Definitions:**
+```json
+{
+  "send_message": {
+    "target": "prax|cairn|koda",
+    "content": "Message content (supports markdown)",
+    "priority": "high|medium|low",
+    "context": "Optional context/metadata"
+  },
+  "check_inbox": {
+    "from": "prax|cairn|koda",  // optional filter
+    "unread_only": true,
+    "limit": 10
+  },
+  "mark_read": {
+    "message_id": "uuid"
+  },
+  "search_messages": {
+    "query": "keyword or phrase",
+    "from": "prax|cairn|koda"  // optional
+  }
+}
+```
+
+**Backend Changes:**
+```python
+# src/workspace_session_manager.py
+class WorkspaceSession:
+    agent_inboxes: Dict[str, List[Message]] = field(default_factory=lambda: {
+        'prax': [],
+        'cairn': [],
+        'koda': []
+    })
+
+    def send_agent_message(self, from_agent: str, to_agent: str, content: str, priority: str = 'medium'):
+        """Send message from one agent to another via inbox."""
+        # Create message
+        # Add to target agent's inbox
+        # Broadcast 'agent_message_sent' event to UI
+        # Log to audit trail
+```
+
+**Frontend Changes:**
+```javascript
+// claude_dashboard.html
+function displayAgentInboxBadge(agentId, unreadCount) {
+  // Show badge on agent panel
+  // Update on 'agent_message_received' WebSocket event
+}
+
+function showAgentConversationThread(fromAgent, toAgent) {
+  // Optional: Show agent-to-agent message history
+  // Filterable in audit log
+}
+```
+
+**Deliverables:**
+- MCP inbox-collab tools integrated into agent orchestrator
+- Agent-specific inboxes with persistence
+- UI badges/indicators for agent inbox activity
+- Audit log entries for agent-to-agent messages
+- System prompts include tool usage guidance
+- Working example workflows (parallel, handoff, status gathering)
+
+**Success Criteria:**
+- Prax can send messages to Cairn and Koda
+- Cairn and Koda can check their inboxes and respond
+- Messages persist across page refreshes
+- Audit log shows agent communication timeline
+- Agents proactively use inbox tools for coordination
+- Example: User says "Build feature X" → Prax coordinates → Cairn designs → Koda implements
+
+**Testing Scenarios:**
+
+1. **Parallel Assignment**
+   - User: "Prax, have Cairn design the API while Koda prototypes the UI"
+   - Prax sends message to both agents
+   - Both agents work independently
+   - Prax gathers status from both inboxes
+
+2. **Sequential Handoff**
+   - User: "Cairn, design the data model"
+   - Cairn completes, sends spec to Koda
+   - Koda implements based on Cairn's design
+   - Prax monitors progress via inbox checks
+
+3. **Blocker Resolution**
+   - Koda encounters dependency issue
+   - Koda messages Prax with blocker details
+   - Prax coordinates with Cairn for solution
+   - Cairn provides guidance to Koda
+   - Workflow continues
+
+**Integration with Existing Phase 4 Features:**
+- **@mentions**: Humans can @mention agents, agents can reference humans by name in messages
+- **Permissions**: Viewer-role users can observe agent conversations in audit log but can't interrupt
+- **Audit log**: All agent-to-agent messages logged with timestamps, priority, read status
+- **Session settings**: Configure agent inbox retention, auto-cleanup policies
+- **User awareness**: Agents include human context when coordinating ("Alice requested feature X")
 
 ---
 

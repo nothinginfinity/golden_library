@@ -19,12 +19,13 @@ import json
 class AgentOrchestrator:
     """Orchestrates multiple Claude agents for collaborative workspace."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, session_users: Optional[Dict] = None):
         """
         Initialize orchestrator with API key.
 
         Args:
             api_key: Anthropic API key (defaults to ANTHROPIC_API_KEY env var or ~/.claude/api_keys.json)
+            session_users: Dict of users in the collaborative session (user_id -> User object)
         """
         # Try to get API key from multiple sources
         if api_key:
@@ -55,6 +56,9 @@ class AgentOrchestrator:
 
         self.client = anthropic.Anthropic(api_key=self.api_key)
 
+        # Store session users for collaborative context
+        self.session_users = session_users or {}
+
         # Initialize 3 agents with separate contexts
         self.agents = {
             'a': {
@@ -79,6 +83,15 @@ class AgentOrchestrator:
                 'document': None
             }
         }
+
+    def update_session_users(self, session_users: Dict):
+        """
+        Update the session users for collaborative context.
+
+        Args:
+            session_users: Dict of users in the session (user_id -> User object)
+        """
+        self.session_users = session_users
 
     def set_agent_role(self, agent_id: str, role: str):
         """
@@ -119,7 +132,8 @@ class AgentOrchestrator:
         self,
         agent_id: str,
         message: str,
-        max_tokens: int = 4000
+        max_tokens: int = 4000,
+        sender_user_id: Optional[str] = None
     ) -> Iterator[str]:
         """
         Send a message to a specific agent and stream the response.
@@ -128,6 +142,7 @@ class AgentOrchestrator:
             agent_id: Agent identifier ('a', 'b', or 'moderator')
             message: User message/prompt
             max_tokens: Maximum tokens for response
+            sender_user_id: ID of user sending the message (for collaborative context)
 
         Yields:
             Response chunks as they arrive
@@ -144,8 +159,8 @@ class AgentOrchestrator:
             'content': message
         })
 
-        # Build system prompt based on role
-        system_prompt = self._build_system_prompt(agent['role'])
+        # Build system prompt based on role (with collaborative context)
+        system_prompt = self._build_system_prompt(agent['role'], sender_user_id)
 
         try:
             # Stream response from Claude
@@ -255,20 +270,51 @@ class AgentOrchestrator:
                 'content': f'[Document loaded]\n\n{doc}'
             })
 
-    def _build_system_prompt(self, role: str) -> str:
+    def _build_system_prompt(self, role: str, sender_user_id: Optional[str] = None) -> str:
         """
         Build system prompt based on agent role.
 
         Args:
             role: Agent role (koda, cairn, prax, etc.)
+            sender_user_id: ID of user sending the current message
 
         Returns:
             System prompt string
         """
         base_prompt = "You are a helpful AI assistant working in a collaborative workspace."
 
+        # Add collaborative session context if we have session users
+        if self.session_users:
+            user_list = []
+            sender_name = None
+            for uid, user in self.session_users.items():
+                user_data = user if isinstance(user, dict) else user.to_dict()
+                name = user_data.get('name', 'Unknown')
+                user_role = user_data.get('role', 'unknown')
+
+                if uid == sender_user_id:
+                    sender_name = name
+                    user_list.append(f"- {name} ({user_role}) ← sending the current message")
+                else:
+                    user_list.append(f"- {name} ({user_role})")
+
+            users_context = "\n".join(user_list)
+
+            collab_context = f"""
+COLLABORATIVE SESSION CONTEXT:
+You are in a collaborative workspace with {len(self.session_users)} user(s):
+{users_context}
+
+IMPORTANT: When responding to messages, you can distinguish between users by their names. Address them directly when appropriate. Be aware that multiple people may be working together in this session."""
+
+            if sender_name:
+                collab_context += f"\n\nThe current message is from {sender_name}."
+
+            base_prompt += "\n\n" + collab_context
+
         role_prompts = {
             'koda': """
+
 You are Koda, the Builder agent. Your focus is on implementation, coding, and building.
 - Provide working code and practical solutions
 - Be direct and results-oriented
@@ -276,6 +322,7 @@ You are Koda, the Builder agent. Your focus is on implementation, coding, and bu
 - Report blockers clearly
 """,
             'cairn': """
+
 You are Cairn, the Architect agent. Your focus is on design, architecture, and specifications.
 - Think systematically about structure and patterns
 - Design before building
@@ -283,11 +330,13 @@ You are Cairn, the Architect agent. Your focus is on design, architecture, and s
 - Review implementations for issues
 """,
             'prax': """
+
 You are Prax, the Orchestrator agent. Your focus is on coordination and strategy.
-- Coordinate between multiple agents
+- Coordinate between multiple agents and users
 - Make strategic decisions
 - Think about the big picture
 - Track progress across workstreams
+- Help facilitate collaboration between different users
 """,
         }
 

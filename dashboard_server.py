@@ -170,6 +170,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif path == '/chat_test.html':
             self.serve_chat_test()
             return
+        elif path == '/test_tabs.html':
+            self.serve_test_tabs()
+            return
         else:
             # Return 404 for other paths
             self.send_error(404, "Not found")
@@ -305,6 +308,18 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 self.wfile.write(f.read())
         else:
             self.send_error(404, "Chat test page not found")
+
+    def serve_test_tabs(self):
+        """Serve the tabs test page."""
+        test_path = Path(__file__).parent / "test_tabs.html"
+        if test_path.exists():
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html')
+            self.end_headers()
+            with open(test_path, 'rb') as f:
+                self.wfile.write(f.read())
+        else:
+            self.send_error(404, "Tabs test page not found")
 
     def serve_stats(self):
         """Serve statistics about compressed data."""
@@ -4505,9 +4520,31 @@ async def handle_workspace_message(session_id, user_id, data, websocket):
                 'user_id': user_id,
                 'agent_id': agent_id,
                 'content': message_content,
-                'timestamp': msg.timestamp
+                'timestamp': msg.timestamp,
+                'mentions': msg.mentions
             }
         )
+
+        # Send mention notifications if any
+        if msg.mentions:
+            session = session_manager.get_session(session_id)
+            user = session.users.get(user_id) if session else None
+            user_name = user.name if user else 'Unknown'
+
+            for mentioned_user_id in msg.mentions:
+                if mentioned_user_id != user_id:
+                    await session_manager.broadcast_to_session(
+                        session_id,
+                        'mention_notification',
+                        {
+                            'mentioned_user_id': mentioned_user_id,
+                            'from_user_id': user_id,
+                            'from_user_name': user_name,
+                            'message_preview': message_content[:100],
+                            'agent_id': agent_id,
+                            'timestamp': msg.timestamp
+                        }
+                    )
 
         # Get session and orchestrator
         session = session_manager.get_session(session_id)
@@ -4525,11 +4562,11 @@ async def handle_workspace_message(session_id, user_id, data, websocket):
         # Stream agent response
         full_response = []
         try:
-            # orchestrator.send_message() is a sync iterator, run in executor
+            # orchestrator.send_message() is a sync iterator with sender_user_id for collaborative context
             loop = asyncio.get_event_loop()
 
-            # Collect chunks from sync iterator
-            for chunk in session.orchestrator.send_message(agent_id, message_content):
+            # Collect chunks from sync iterator (orchestrator builds collaborative context in system prompt)
+            for chunk in session.orchestrator.send_message(agent_id, message_content, sender_user_id=user_id):
                 full_response.append(chunk)
 
                 # Broadcast chunk to all users in session
@@ -4617,7 +4654,14 @@ async def websocket_handler(websocket):
 
                 elif msg_type == 'workspace_message':
                     if session_id and session_manager:
-                        await handle_workspace_message(session_id, user_id, data, websocket)
+                        # Check permission to send messages
+                        if not session_manager.can_send_messages(session_id, user_id):
+                            await websocket.send(json.dumps({
+                                'event': 'permission_denied',
+                                'message': 'You do not have permission to send messages (viewer role)'
+                            }))
+                        else:
+                            await handle_workspace_message(session_id, user_id, data, websocket)
 
                 elif msg_type == 'user_typing':
                     if session_id and session_manager:
@@ -4667,25 +4711,147 @@ async def websocket_handler(websocket):
                                 {'agent_control': session.agent_control}
                             )
 
+                elif msg_type == 'handoff_agent_control':
+                    if session_id and session_manager:
+                        agent_id = data.get('agent_id')
+                        to_user_id = data.get('to_user_id')
+                        if agent_id and to_user_id:
+                            success = session_manager.handoff_agent_control(
+                                session_id, user_id, to_user_id, agent_id
+                            )
+                            if success:
+                                session = session_manager.get_session(session_id)
+                                await session_manager.broadcast_to_session(
+                                    session_id,
+                                    'agent_control_updated',
+                                    {'agent_control': session.agent_control}
+                                )
+                                # Notify both users
+                                to_user = session.users.get(to_user_id)
+                                from_user = session.users.get(user_id)
+                                if to_user and from_user:
+                                    await session_manager.broadcast_to_session(
+                                        session_id,
+                                        'control_handoff_notification',
+                                        {
+                                            'agent_id': agent_id,
+                                            'from_user_name': from_user.name,
+                                            'to_user_name': to_user.name,
+                                            'to_user_id': to_user_id
+                                        }
+                                    )
+                            else:
+                                await websocket.send(json.dumps({
+                                    'event': 'handoff_failed',
+                                    'message': 'Failed to hand off control'
+                                }))
+
                 elif msg_type == 'human_message':
                     if session_id and session_manager:
-                        message_content = data.get('message')
-                        if message_content:
-                            session = session_manager.get_session(session_id)
-                            user = session.users.get(user_id) if session else None
-                            user_name = user.name if user else 'Unknown'
+                        # Check permission to send messages
+                        if not session_manager.can_send_messages(session_id, user_id):
+                            await websocket.send(json.dumps({
+                                'event': 'permission_denied',
+                                'message': 'You do not have permission to send messages (viewer role)'
+                            }))
+                        else:
+                            message_content = data.get('message')
+                            if message_content:
+                                session = session_manager.get_session(session_id)
+                                user = session.users.get(user_id) if session else None
+                                user_name = user.name if user else 'Unknown'
 
-                            # Broadcast human message to all users in session
-                            await session_manager.broadcast_to_session(
-                                session_id,
-                                'human_message',
-                                {
-                                    'user_id': user_id,
-                                    'user_name': user_name,
-                                    'message': message_content,
-                                    'timestamp': datetime.utcnow().isoformat()
-                                }
+                                # Parse mentions
+                                mentions = session_manager._parse_mentions(message_content, session_id)
+
+                                # Broadcast human message to all users in session
+                                await session_manager.broadcast_to_session(
+                                    session_id,
+                                    'human_message',
+                                    {
+                                        'user_id': user_id,
+                                        'user_name': user_name,
+                                        'message': message_content,
+                                        'timestamp': datetime.utcnow().isoformat(),
+                                        'mentions': mentions
+                                    }
+                                )
+
+                                # Send mention notifications to mentioned users
+                                if mentions:
+                                    for mentioned_user_id in mentions:
+                                        if mentioned_user_id != user_id:  # Don't notify yourself
+                                            await session_manager.broadcast_to_session(
+                                                session_id,
+                                                'mention_notification',
+                                                {
+                                                    'mentioned_user_id': mentioned_user_id,
+                                                    'from_user_id': user_id,
+                                                    'from_user_name': user_name,
+                                                    'message_preview': message_content[:100],
+                                                    'timestamp': datetime.utcnow().isoformat()
+                                                }
+                                            )
+
+                elif msg_type == 'change_user_role':
+                    if session_id and session_manager:
+                        target_user_id = data.get('target_user_id')
+                        new_role = data.get('new_role')
+
+                        if target_user_id and new_role:
+                            success = session_manager.change_user_role(
+                                session_id, user_id, target_user_id, new_role
                             )
+
+                            if success:
+                                # Broadcast role change to all users
+                                session = session_manager.get_session(session_id)
+                                await session_manager.broadcast_to_session(
+                                    session_id,
+                                    'user_role_changed',
+                                    {
+                                        'user_id': target_user_id,
+                                        'new_role': new_role,
+                                        'users': {uid: u.to_dict() for uid, u in session.users.items()}
+                                    }
+                                )
+                            else:
+                                await websocket.send(json.dumps({
+                                    'event': 'permission_denied',
+                                    'message': 'Failed to change role (insufficient permissions or invalid target)'
+                                }))
+
+                elif msg_type == 'acquire_document_lock':
+                    if session_id and session_manager:
+                        agent_id = data.get('agent_id')
+                        if agent_id:
+                            success = session_manager.acquire_document_lock(session_id, user_id, agent_id)
+                            if success:
+                                session = session_manager.get_session(session_id)
+                                await session_manager.broadcast_to_session(
+                                    session_id,
+                                    'document_lock_updated',
+                                    {'document_locks': session.document_locks}
+                                )
+                            else:
+                                await websocket.send(json.dumps({
+                                    'event': 'document_lock_failed',
+                                    'agent_id': agent_id,
+                                    'message': 'Document is locked by another user'
+                                }))
+
+                elif msg_type == 'release_document_lock':
+                    if session_id and session_manager:
+                        agent_id = data.get('agent_id')
+                        if agent_id:
+                            success = session_manager.release_document_lock(session_id, user_id, agent_id)
+                            if success:
+                                session = session_manager.get_session(session_id)
+                                await session_manager.broadcast_to_session(
+                                    session_id,
+                                    'document_lock_updated',
+                                    {'document_locks': session.document_locks}
+                                )
 
             except json.JSONDecodeError:
                 pass

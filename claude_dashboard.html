@@ -2470,6 +2470,37 @@
             <!-- Users will be added here dynamically -->
           </div>
         </div>
+
+        <!-- Session Info & Audit Log -->
+        <div id="session-info-panel" style="display: none; margin-top: 16px; background: rgba(30, 41, 59, 0.6); border-radius: 8px; overflow: hidden;">
+          <!-- Session Info Header -->
+          <div onclick="toggleAuditLog()" style="padding: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(148, 163, 184, 0.2);">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: #94a3b8; font-size: 0.85rem;">📋 Session Info & Audit Log</span>
+              <span id="audit-log-count" style="background: rgba(99, 102, 241, 0.3); color: #a5b4fc; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px;">0 events</span>
+            </div>
+            <span id="audit-toggle-icon" style="color: #94a3b8; font-size: 0.9rem;">▼</span>
+          </div>
+
+          <!-- Session Details -->
+          <div id="session-details" style="padding: 12px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); display: none;">
+            <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px; font-size: 0.75rem;">
+              <div style="color: #64748b;">Session ID:</div>
+              <div id="session-info-id" style="color: #e2e8f0; font-family: monospace;"></div>
+              <div style="color: #64748b;">Created:</div>
+              <div id="session-info-created" style="color: #e2e8f0;"></div>
+              <div style="color: #64748b;">Expires:</div>
+              <div id="session-info-expires" style="color: #e2e8f0;"></div>
+            </div>
+          </div>
+
+          <!-- Audit Log -->
+          <div id="audit-log-content" style="display: none; max-height: 300px; overflow-y: auto;">
+            <div id="audit-log-list" style="padding: 8px;">
+              <!-- Audit entries will be added here -->
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Main Layout with Chat Sidebar -->
@@ -2493,6 +2524,7 @@
             </div>
             <div style="display: flex; gap: 8px;">
               <button id="agent-a-control-btn" onclick="toggleAgentControl('a')" style="display: none; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Claim</button>
+              <button id="agent-a-handoff-btn" onclick="handoffAgentControl('a')" style="display: none; background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.4); color: #fbbf24; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Handoff</button>
               <button onclick="clearAgentChat('a')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Clear</button>
             </div>
           </div>
@@ -2536,6 +2568,7 @@
             </div>
             <div style="display: flex; gap: 8px;">
               <button id="agent-b-control-btn" onclick="toggleAgentControl('b')" style="display: none; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Claim</button>
+              <button id="agent-b-handoff-btn" onclick="handoffAgentControl('b')" style="display: none; background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.4); color: #fbbf24; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Handoff</button>
               <button onclick="clearAgentChat('b')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Clear</button>
             </div>
           </div>
@@ -2585,6 +2618,7 @@
           </div>
           <div style="display: flex; gap: 8px;">
             <button id="moderator-control-btn" onclick="toggleAgentControl('moderator')" style="display: none; background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.4); color: #fbbf24; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Claim</button>
+            <button id="moderator-handoff-btn" onclick="handoffAgentControl('moderator')" style="display: none; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #6ee7b7; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Handoff</button>
             <button onclick="clearAgentChat('moderator')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Clear</button>
           </div>
         </div>
@@ -9787,6 +9821,8 @@ ${currentConversation.display}
       };
     }
 
+    let auditLogRefreshInterval = null;
+
     async function handleWorkspaceEvent(data) {
       const event = data.event;
 
@@ -9794,6 +9830,19 @@ ${currentConversation.display}
         currentSessionId = data.session_id;
         currentUserId = data.user_id;
         updateSessionUI(true);
+        // Fetch session details and update session info
+        const session = await fetchSession();
+        if (session) {
+          updateSessionInfo(session);
+        }
+        // Start periodic audit log refresh
+        if (auditLogRefreshInterval) clearInterval(auditLogRefreshInterval);
+        auditLogRefreshInterval = setInterval(async () => {
+          const session = await fetchSession();
+          if (session) {
+            updateAuditLog(session.audit_log || []);
+          }
+        }, 5000); // Refresh every 5 seconds
       } else if (event === 'user_joined') {
         updateUserPresence(data.data.users);
         showNotification(`${data.data.user_name} joined the session`, 'success');
@@ -9837,6 +9886,43 @@ ${currentConversation.display}
         if (data.data.user_id !== currentUserId) {
           appendHumanChatMessage(data.data.user_name, data.data.message, false);
         }
+      } else if (event === 'mention_notification') {
+        // Handle mention notification
+        if (data.data.mentioned_user_id === currentUserId) {
+          showNotification(
+            `${data.data.from_user_name} mentioned you: "${data.data.message_preview}"`,
+            'info'
+          );
+
+          // Play notification sound (browser permission)
+          try {
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBi6Dz/LNeSsFJYHN8dyEOw0VYrjp7KFPEg9Nn+fxvmogBTB9zPPNfC0GJHzK8uGHOwkSXrTr66BWEwpMoe3xv2wdBSeJz/PNejAHJIPN9NyGPAkQX7Ts66hVEQtKnuzyvmsgBiyJzfLPeywHJYPO89yGPAkSYLTs66dVEgtLnuzxwGsdBjB+yvPOei0FJ4PP8t2EOwsUYrfp7KBPFApEoeryvWwfBTCDzPLNey0FKIPQAiFB');
+            audio.volume = 0.3;
+            audio.play().catch(() => {});
+          } catch (e) {}
+        }
+      } else if (event === 'permission_denied') {
+        showNotification(data.data.message || data.message || 'Permission denied', 'error');
+      } else if (event === 'user_role_changed') {
+        // Refresh user presence display
+        if (data.data.users) {
+          const users = Object.values(data.data.users);
+          updateUserPresence(users);
+        }
+        showNotification(`User role updated to ${data.data.new_role}`, 'success');
+      } else if (event === 'document_lock_updated') {
+        updateDocumentLockDisplay(data.data.document_locks);
+      } else if (event === 'document_lock_failed') {
+        showNotification(data.data.message || 'Failed to acquire document lock', 'warning');
+      } else if (event === 'control_handoff_notification') {
+        const { from_user_name, to_user_name, to_user_id, agent_id } = data.data;
+        if (to_user_id === currentUserId) {
+          showNotification(`${from_user_name} handed off ${agent_id.toUpperCase()} control to you`, 'success');
+        } else {
+          showNotification(`${from_user_name} handed off ${agent_id.toUpperCase()} control to ${to_user_name}`, 'info');
+        }
+      } else if (event === 'handoff_failed') {
+        showNotification(data.data.message || 'Failed to hand off control', 'error');
       }
     }
 
@@ -9847,6 +9933,7 @@ ${currentConversation.display}
         const controllerId = agentControl[agentId];
         const controlSpan = document.getElementById(`agent-${agentId}-control`);
         const controlBtn = document.getElementById(`agent-${agentId}-control-btn`);
+        const handoffBtn = document.getElementById(`agent-${agentId}-handoff-btn`);
         const input = document.getElementById(agentId === 'moderator' ? 'moderator-input' : `agent-${agentId}-input`);
 
         if (controllerId) {
@@ -9858,6 +9945,7 @@ ${currentConversation.display}
             controlSpan.style.color = '#10b981';
             controlBtn.textContent = 'Release';
             controlBtn.style.display = 'block';
+            if (handoffBtn) handoffBtn.style.display = 'block';
             if (input) input.disabled = false;
           } else {
             // Get controller name
@@ -9870,6 +9958,7 @@ ${currentConversation.display}
             });
             controlBtn.textContent = 'Claim';
             controlBtn.style.display = 'block';
+            if (handoffBtn) handoffBtn.style.display = 'none';
             if (input) input.disabled = true;
           }
         } else {
@@ -9877,6 +9966,7 @@ ${currentConversation.display}
           controlSpan.textContent = '';
           controlBtn.textContent = 'Claim';
           controlBtn.style.display = 'block';
+          if (handoffBtn) handoffBtn.style.display = 'none';
           if (input) input.disabled = false;
         }
       });
@@ -9898,6 +9988,181 @@ ${currentConversation.display}
         type: eventType,
         agent_id: agentId
       }));
+    }
+
+    async function handoffAgentControl(agentId) {
+      if (!workspaceWebSocket || !currentSessionId) {
+        showNotification('Not connected to session', 'error');
+        return;
+      }
+
+      // Get list of eligible users (editors/owners, not current user)
+      const session = await fetchSession();
+      if (!session) return;
+
+      const eligibleUsers = Object.values(session.users).filter(user =>
+        user.id !== currentUserId &&
+        (user.role === 'owner' || user.role === 'editor')
+      );
+
+      if (eligibleUsers.length === 0) {
+        showNotification('No eligible users to hand off to', 'info');
+        return;
+      }
+
+      // Show selection dialog
+      const userNames = eligibleUsers.map(u => u.name).join('\n');
+      const selection = prompt(`Select user to hand off ${agentId.toUpperCase()} control to:\n\n${eligibleUsers.map((u, i) => `${i + 1}. ${u.name}`).join('\n')}\n\nEnter number (1-${eligibleUsers.length}):`);
+
+      if (selection) {
+        const index = parseInt(selection) - 1;
+        if (index >= 0 && index < eligibleUsers.length) {
+          const targetUser = eligibleUsers[index];
+          workspaceWebSocket.send(JSON.stringify({
+            type: 'handoff_agent_control',
+            agent_id: agentId,
+            to_user_id: targetUser.id
+          }));
+        } else {
+          showNotification('Invalid selection', 'error');
+        }
+      }
+    }
+
+    function toggleAuditLog() {
+      const auditContent = document.getElementById('audit-log-content');
+      const sessionDetails = document.getElementById('session-details');
+      const toggleIcon = document.getElementById('audit-toggle-icon');
+
+      if (auditContent && sessionDetails && toggleIcon) {
+        const isVisible = auditContent.style.display !== 'none';
+
+        if (isVisible) {
+          auditContent.style.display = 'none';
+          sessionDetails.style.display = 'none';
+          toggleIcon.textContent = '▼';
+        } else {
+          auditContent.style.display = 'block';
+          sessionDetails.style.display = 'block';
+          toggleIcon.textContent = '▲';
+        }
+      }
+    }
+
+    function updateSessionInfo(session) {
+      if (!session) return;
+
+      // Update session details
+      const sessionIdEl = document.getElementById('session-info-id');
+      const sessionCreatedEl = document.getElementById('session-info-created');
+      const sessionExpiresEl = document.getElementById('session-info-expires');
+
+      if (sessionIdEl) sessionIdEl.textContent = session.id;
+      if (sessionCreatedEl) {
+        const created = new Date(session.created_at);
+        sessionCreatedEl.textContent = created.toLocaleString();
+      }
+      if (sessionExpiresEl) {
+        const expires = new Date(session.expires_at);
+        sessionExpiresEl.textContent = expires.toLocaleString();
+      }
+
+      // Update audit log
+      updateAuditLog(session.audit_log || []);
+
+      // Show session info panel
+      const sessionInfoPanel = document.getElementById('session-info-panel');
+      if (sessionInfoPanel) sessionInfoPanel.style.display = 'block';
+    }
+
+    function updateAuditLog(auditLog) {
+      const auditListEl = document.getElementById('audit-log-list');
+      const auditCountEl = document.getElementById('audit-log-count');
+
+      if (!auditListEl) return;
+
+      if (auditCountEl) {
+        auditCountEl.textContent = `${auditLog.length} events`;
+      }
+
+      if (auditLog.length === 0) {
+        auditListEl.innerHTML = '<div style="text-align: center; color: #64748b; padding: 16px; font-size: 0.85rem;">No activity yet</div>';
+        return;
+      }
+
+      // Show most recent 20 entries
+      const recentEntries = auditLog.slice(-20).reverse();
+
+      auditListEl.innerHTML = recentEntries.map(entry => {
+        const timestamp = new Date(entry.timestamp);
+        const timeStr = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        let icon = '•';
+        let color = '#94a3b8';
+        let actionText = entry.action;
+
+        switch (entry.action) {
+          case 'join':
+            icon = '👋';
+            color = '#10b981';
+            actionText = `joined`;
+            break;
+          case 'leave':
+            icon = '👋';
+            color = '#ef4444';
+            actionText = `left`;
+            break;
+          case 'message':
+            icon = '💬';
+            color = '#3b82f6';
+            actionText = `sent message to ${entry.details?.agent_id || 'agent'}`;
+            break;
+          case 'claim_control':
+            icon = '🎮';
+            color = '#a855f7';
+            actionText = `claimed control of ${entry.details?.agent_id || 'agent'}`;
+            break;
+          case 'release_control':
+            icon = '🔓';
+            color = '#64748b';
+            actionText = `released ${entry.details?.agent_id || 'agent'}`;
+            break;
+          case 'handoff_control':
+            icon = '🤝';
+            color = '#f59e0b';
+            actionText = `handed off ${entry.details?.agent_id || 'agent'}`;
+            break;
+          case 'role_change':
+            icon = '👤';
+            color = '#ec4899';
+            actionText = `changed role to ${entry.details?.new_role || 'unknown'}`;
+            break;
+          case 'lock_acquire':
+            icon = '🔒';
+            color = '#fbbf24';
+            actionText = `started editing ${entry.details?.agent_id || 'document'}`;
+            break;
+          case 'lock_release':
+            icon = '🔓';
+            color = '#64748b';
+            actionText = `stopped editing ${entry.details?.agent_id || 'document'}`;
+            break;
+        }
+
+        return `
+          <div style="padding: 6px 8px; border-left: 2px solid ${color}; margin-bottom: 4px; background: rgba(15, 23, 42, 0.4); border-radius: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: start; gap: 8px;">
+              <div style="flex: 1;">
+                <span style="font-size: 0.75rem;">
+                  <span style="margin-right: 4px;">${icon}</span>
+                  <span style="color: ${color}; font-weight: 500;">${actionText}</span>
+                </span>
+              </div>
+              <div style="color: #64748b; font-size: 0.65rem; white-space: nowrap;">${timeStr}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
     async function fetchSessionUsers() {
@@ -10024,6 +10289,69 @@ ${currentConversation.display}
       }
     }
 
+    async function changeUserRole(targetUserId, newRole) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+      ws.send(JSON.stringify({
+        type: 'change_user_role',
+        target_user_id: targetUserId,
+        new_role: newRole
+      }));
+    }
+
+    function handleDocumentLock(inputId, acquire) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+      let agentId;
+      if (inputId === 'agent-a-input') agentId = 'a';
+      else if (inputId === 'agent-b-input') agentId = 'b';
+      else if (inputId === 'moderator-input') agentId = 'moderator';
+      else return;
+
+      ws.send(JSON.stringify({
+        type: acquire ? 'acquire_document_lock' : 'release_document_lock',
+        agent_id: agentId
+      }));
+    }
+
+    function updateDocumentLockDisplay(documentLocks) {
+      if (!documentLocks) return;
+
+      ['a', 'b', 'moderator'].forEach(agentId => {
+        const lockerId = documentLocks[agentId];
+        const inputId = agentId === 'moderator' ? 'moderator-input' : `agent-${agentId}-input`;
+        const input = document.getElementById(inputId);
+        const statusSpan = document.getElementById(`agent-${agentId}-status`);
+
+        if (input && lockerId && lockerId !== currentUserId) {
+          // Someone else is editing - disable input
+          input.disabled = true;
+          input.placeholder = 'Someone is editing...';
+          input.style.cursor = 'not-allowed';
+        } else if (input) {
+          // Enable input
+          input.disabled = false;
+          input.placeholder = agentId === 'moderator' ? 'Message Moderator...' : `Message Agent ${agentId.toUpperCase()}...`;
+          input.style.cursor = 'text';
+        }
+
+        // Update status to show who's editing
+        if (statusSpan && lockerId) {
+          fetchSession().then(session => {
+            if (session && session.users && session.users[lockerId]) {
+              const userName = session.users[lockerId].name;
+              const isCurrentUser = lockerId === currentUserId;
+              statusSpan.textContent = `● ${isCurrentUser ? 'You are' : userName + ' is'} editing`;
+              statusSpan.style.color = '#fbbf24';
+            }
+          });
+        } else if (statusSpan) {
+          statusSpan.textContent = '● idle';
+          statusSpan.style.color = '#94a3b8';
+        }
+      });
+    }
+
     function updateUserPresence(users) {
       const userListEl = document.getElementById('user-list');
       if (!userListEl) return;
@@ -10034,22 +10362,32 @@ ${currentConversation.display}
         presenceHeader.textContent = `👥 Active Users (${users.length}):`;
       }
 
+      // Check if current user is owner
+      const currentUser = users.find(u => u.id === currentUserId);
+      const isOwner = currentUser && currentUser.role === 'owner';
+
       userListEl.innerHTML = users.map(user => {
         const initials = user.initials || (user.name || user.id).substring(0, 2).toUpperCase();
         const avatarColor = user.avatar_color || '#3b82f6';
         const isCurrentUser = user.id === currentUserId;
+        const canChangeRole = isOwner && !isCurrentUser && user.role !== 'owner';
 
         return `
           <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; ${isCurrentUser ? 'border-color: #10b981;' : ''}">
             <div style="width: 32px; height: 32px; border-radius: 50%; background: ${avatarColor}; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.75rem; color: white;">
               ${initials}
             </div>
-            <div style="display: flex; flex-direction: column;">
+            <div style="display: flex; flex-direction: column; flex: 1;">
               <div style="color: #e2e8f0; font-size: 0.85rem; font-weight: 500;">
                 ${user.name || user.id}${isCurrentUser ? ' (You)' : ''}
               </div>
               <div style="color: #64748b; font-size: 0.7rem;">
-                ${user.role || 'editor'}${user.is_typing ? ' • typing...' : ''}
+                ${canChangeRole ? `
+                  <select onchange="changeUserRole('${user.id}', this.value)" style="background: rgba(15, 23, 42, 0.8); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 4px; padding: 2px 4px; font-size: 0.7rem; cursor: pointer;">
+                    <option value="editor" ${user.role === 'editor' ? 'selected' : ''}>Editor</option>
+                    <option value="viewer" ${user.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+                  </select>
+                ` : `${user.role || 'editor'}`}${user.is_typing ? ' • typing...' : ''}
               </div>
             </div>
           </div>
@@ -10230,6 +10568,8 @@ ${currentConversation.display}
           input.addEventListener('input', handleInputTyping);
           input.addEventListener('keyup', handleCursorMove);
           input.addEventListener('click', handleCursorMove);
+          input.addEventListener('focus', (e) => handleDocumentLock(inputId, true));
+          input.addEventListener('blur', (e) => handleDocumentLock(inputId, false));
         }
       });
     });
@@ -10306,6 +10646,14 @@ ${currentConversation.display}
       }));
     }
 
+    function highlightMentions(text) {
+      // Highlight @mentions in text
+      // Supports @username and @"User Name" formats
+      return text
+        .replace(/@"([^"]+)"/g, '<span style="background: rgba(234, 179, 8, 0.3); color: #fbbf24; padding: 2px 4px; border-radius: 3px; font-weight: 600;">@$1</span>')
+        .replace(/@(\w+)/g, '<span style="background: rgba(234, 179, 8, 0.3); color: #fbbf24; padding: 2px 4px; border-radius: 3px; font-weight: 600;">@$1</span>');
+    }
+
     function appendHumanChatMessage(userName, message, isCurrentUser = false) {
       const messagesContainer = document.getElementById('human-chat-messages');
 
@@ -10328,7 +10676,7 @@ ${currentConversation.display}
 
       const contentEl = document.createElement('div');
       contentEl.style.cssText = 'color: #e2e8f0; font-size: 0.85rem; line-height: 1.4;';
-      contentEl.textContent = message;
+      contentEl.innerHTML = highlightMentions(message);
 
       const timeEl = document.createElement('div');
       timeEl.style.cssText = 'font-size: 0.7rem; color: #64748b; margin-top: 4px;';

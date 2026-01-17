@@ -34,6 +34,21 @@ class UserRole(Enum):
 
 
 @dataclass
+class AuditEntry:
+    """Represents an audit log entry."""
+    id: str
+    session_id: str
+    timestamp: str
+    user_id: str
+    action: str  # 'join', 'leave', 'message', 'claim_control', 'release_control', 'role_change', 'lock_acquire', 'lock_release'
+    details: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self):
+        """Convert to dict for JSON serialization."""
+        return asdict(self)
+
+
+@dataclass
 class User:
     """Represents a user in a workspace session."""
     id: str
@@ -87,6 +102,7 @@ class Message:
     role: str  # 'user' or 'assistant'
     content: str
     timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    mentions: List[str] = field(default_factory=list)  # List of mentioned user_ids
 
     def to_dict(self):
         """Convert to dict for JSON serialization."""
@@ -113,6 +129,12 @@ class WorkspaceSession:
         'b': None,  # user_id who controls Agent B
         'moderator': None  # user_id who controls Moderator
     })
+    document_locks: Dict[str, Optional[str]] = field(default_factory=lambda: {
+        'a': None,  # user_id currently editing Agent A
+        'b': None,  # user_id currently editing Agent B
+        'moderator': None  # user_id currently editing Moderator
+    })
+    audit_log: List[AuditEntry] = field(default_factory=list)
     orchestrator: Any = None  # AgentOrchestrator instance for this session
 
     def to_dict(self):
@@ -126,7 +148,9 @@ class WorkspaceSession:
             'messages': [msg.to_dict() for msg in self.messages],
             'agent_contexts': self.agent_contexts,
             'documents': self.documents,
-            'agent_control': self.agent_control
+            'agent_control': self.agent_control,
+            'document_locks': self.document_locks,
+            'audit_log': [entry.to_dict() for entry in self.audit_log]
             # orchestrator excluded (not JSON serializable)
         }
 
@@ -143,6 +167,64 @@ class WorkspaceSessionManager:
         self.sessions: Dict[str, WorkspaceSession] = {}
         self.session_duration_hours = session_duration_hours
         self.cleanup_task = None
+
+    def _add_audit_entry(self, session_id: str, user_id: str, action: str, details: Dict[str, Any] = None):
+        """Add an entry to the audit log."""
+        session = self.sessions.get(session_id)
+        if not session:
+            return
+
+        entry = AuditEntry(
+            id=str(uuid.uuid4()),
+            session_id=session_id,
+            timestamp=datetime.utcnow().isoformat(),
+            user_id=user_id,
+            action=action,
+            details=details or {}
+        )
+
+        session.audit_log.append(entry)
+        print(f"[SessionManager] Audit: {action} by {user_id} in {session_id}")
+
+    def _parse_mentions(self, content: str, session_id: str) -> List[str]:
+        """
+        Parse @mentions from message content and return list of mentioned user IDs.
+
+        Supports:
+        - @username (exact match)
+        - @"User Name" (quoted names with spaces)
+        """
+        import re
+
+        session = self.sessions.get(session_id)
+        if not session:
+            return []
+
+        mentioned_ids = []
+
+        # Pattern 1: @"User Name" (quoted)
+        quoted_pattern = r'@"([^"]+)"'
+        quoted_matches = re.findall(quoted_pattern, content)
+
+        # Pattern 2: @username (no spaces)
+        simple_pattern = r'@(\w+)'
+        simple_matches = re.findall(simple_pattern, content)
+
+        all_mentions = quoted_matches + simple_matches
+
+        # Match against actual user names in session
+        for mention in all_mentions:
+            mention_lower = mention.lower()
+            for user_id, user in session.users.items():
+                # Match full name or first name
+                if (user.name.lower() == mention_lower or
+                    user.name.lower().startswith(mention_lower + ' ') or
+                    user.name.split()[0].lower() == mention_lower):
+                    if user_id not in mentioned_ids:
+                        mentioned_ids.append(user_id)
+                        break
+
+        return mentioned_ids
 
     def create_session(self, owner_id: str, owner_name: str, owner_ws: Any) -> WorkspaceSession:
         """Create a new workspace session."""
@@ -170,7 +252,7 @@ class WorkspaceSessionManager:
         # Initialize AgentOrchestrator for this session
         if AgentOrchestrator:
             try:
-                session.orchestrator = AgentOrchestrator()
+                session.orchestrator = AgentOrchestrator(session_users=session.users)
                 print(f"[SessionManager] Initialized AgentOrchestrator for session {session_id}")
             except Exception as e:
                 print(f"[SessionManager] Warning: Could not initialize orchestrator: {e}")
@@ -203,6 +285,13 @@ class WorkspaceSessionManager:
         session.users[user_id] = user
         print(f"[SessionManager] User {user_name} joined session {session_id}")
 
+        # Update orchestrator with new session users
+        if session.orchestrator:
+            session.orchestrator.update_session_users(session.users)
+
+        # Audit log
+        self._add_audit_entry(session_id, user_id, 'join', {'user_name': user_name})
+
         return session
 
     def leave_session(self, session_id: str, user_id: str):
@@ -214,8 +303,16 @@ class WorkspaceSessionManager:
 
         if user_id in session.users:
             user_name = session.users[user_id].name
+
+            # Audit log
+            self._add_audit_entry(session_id, user_id, 'leave', {'user_name': user_name})
+
             del session.users[user_id]
             print(f"[SessionManager] User {user_name} left session {session_id}")
+
+            # Update orchestrator with updated session users
+            if session.orchestrator:
+                session.orchestrator.update_session_users(session.users)
 
         # Delete session if no users left
         if not session.users:
@@ -233,13 +330,17 @@ class WorkspaceSessionManager:
         if not session:
             return None
 
+        # Parse mentions from content
+        mentions = self._parse_mentions(content, session_id)
+
         message = Message(
             id=str(uuid.uuid4()),
             session_id=session_id,
             user_id=user_id,
             agent_id=agent_id,
             role=role,
-            content=content
+            content=content,
+            mentions=mentions
         )
 
         session.messages.append(message)
@@ -250,6 +351,17 @@ class WorkspaceSessionManager:
                 'role': role,
                 'content': content
             })
+
+        # Audit log for user messages (not assistant responses to avoid noise)
+        if role == 'user':
+            self._add_audit_entry(
+                session_id, user_id, 'message',
+                {
+                    'agent_id': agent_id,
+                    'message_preview': content[:100] if content else '',
+                    'mentions': mentions
+                }
+            )
 
         return message
 
@@ -333,6 +445,81 @@ class WorkspaceSessionManager:
             if session_id not in self.sessions:
                 return session_id
 
+    def can_control_agent(self, session_id: str, user_id: str) -> bool:
+        """Check if user has permission to control agents (OWNER or EDITOR)."""
+        session = self.sessions.get(session_id)
+        if not session or user_id not in session.users:
+            return False
+
+        user = session.users[user_id]
+        return user.role in (UserRole.OWNER, UserRole.EDITOR)
+
+    def can_send_messages(self, session_id: str, user_id: str) -> bool:
+        """Check if user has permission to send messages (OWNER or EDITOR)."""
+        return self.can_control_agent(session_id, user_id)
+
+    def can_change_roles(self, session_id: str, user_id: str) -> bool:
+        """Check if user has permission to change roles (OWNER only)."""
+        session = self.sessions.get(session_id)
+        if not session or user_id not in session.users:
+            return False
+
+        return session.users[user_id].role == UserRole.OWNER
+
+    def change_user_role(self, session_id: str, requesting_user_id: str, target_user_id: str, new_role: str) -> bool:
+        """
+        Change a user's role (OWNER only).
+
+        Args:
+            session_id: Session ID
+            requesting_user_id: User requesting the change
+            target_user_id: User whose role to change
+            new_role: New role ('owner', 'editor', or 'viewer')
+
+        Returns:
+            True if successful, False otherwise
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return False
+
+        # Check permission
+        if not self.can_change_roles(session_id, requesting_user_id):
+            print(f"[SessionManager] User {requesting_user_id} not authorized to change roles")
+            return False
+
+        # Can't change owner's role
+        if target_user_id == session.owner_id:
+            print(f"[SessionManager] Cannot change owner's role")
+            return False
+
+        # Validate new role
+        try:
+            role_enum = UserRole(new_role)
+        except ValueError:
+            print(f"[SessionManager] Invalid role: {new_role}")
+            return False
+
+        # Update role
+        if target_user_id in session.users:
+            old_role = session.users[target_user_id].role.value
+            session.users[target_user_id].role = role_enum
+            print(f"[SessionManager] Changed {target_user_id} role to {new_role}")
+
+            # Update orchestrator with updated session users
+            if session.orchestrator:
+                session.orchestrator.update_session_users(session.users)
+
+            # Audit log
+            self._add_audit_entry(
+                session_id, requesting_user_id, 'role_change',
+                {'target_user_id': target_user_id, 'old_role': old_role, 'new_role': new_role}
+            )
+
+            return True
+
+        return False
+
     def claim_agent_control(self, session_id: str, user_id: str, agent_id: str) -> bool:
         """
         Claim control of an agent.
@@ -343,10 +530,15 @@ class WorkspaceSessionManager:
             agent_id: Agent to control ('a', 'b', 'moderator')
 
         Returns:
-            True if control granted, False if agent already controlled
+            True if control granted, False if agent already controlled or no permission
         """
         session = self.sessions.get(session_id)
         if not session or agent_id not in session.agent_control:
+            return False
+
+        # Check permission
+        if not self.can_control_agent(session_id, user_id):
+            print(f"[SessionManager] User {user_id} not authorized to control agents")
             return False
 
         # If agent is uncontrolled or controlled by requesting user, grant control
@@ -354,6 +546,10 @@ class WorkspaceSessionManager:
         if current_controller is None or current_controller == user_id:
             session.agent_control[agent_id] = user_id
             print(f"[SessionManager] User {user_id} claimed control of agent {agent_id}")
+
+            # Audit log
+            self._add_audit_entry(session_id, user_id, 'claim_control', {'agent_id': agent_id})
+
             return True
 
         return False
@@ -368,6 +564,102 @@ class WorkspaceSessionManager:
         if session.agent_control.get(agent_id) == user_id:
             session.agent_control[agent_id] = None
             print(f"[SessionManager] User {user_id} released control of agent {agent_id}")
+
+            # Audit log
+            self._add_audit_entry(session_id, user_id, 'release_control', {'agent_id': agent_id})
+
+            return True
+
+        return False
+
+    def handoff_agent_control(self, session_id: str, from_user_id: str, to_user_id: str, agent_id: str) -> bool:
+        """
+        Hand off agent control from one user to another.
+
+        Args:
+            session_id: Session ID
+            from_user_id: Current controller
+            to_user_id: New controller
+            agent_id: Agent to transfer
+
+        Returns:
+            True if successful, False otherwise
+        """
+        session = self.sessions.get(session_id)
+        if not session or agent_id not in session.agent_control:
+            return False
+
+        # Verify current controller
+        if session.agent_control.get(agent_id) != from_user_id:
+            print(f"[SessionManager] User {from_user_id} is not current controller")
+            return False
+
+        # Verify target user exists and has permission
+        if to_user_id not in session.users:
+            print(f"[SessionManager] Target user {to_user_id} not in session")
+            return False
+
+        if not self.can_control_agent(session_id, to_user_id):
+            print(f"[SessionManager] Target user {to_user_id} cannot control agents")
+            return False
+
+        # Transfer control
+        session.agent_control[agent_id] = to_user_id
+        print(f"[SessionManager] Handed off {agent_id} from {from_user_id} to {to_user_id}")
+
+        # Audit log
+        self._add_audit_entry(
+            session_id, from_user_id, 'handoff_control',
+            {'agent_id': agent_id, 'to_user_id': to_user_id}
+        )
+
+        return True
+
+    def acquire_document_lock(self, session_id: str, user_id: str, agent_id: str) -> bool:
+        """
+        Acquire a document lock (starts editing).
+
+        Returns:
+            True if lock acquired, False if already locked by someone else
+        """
+        session = self.sessions.get(session_id)
+        if not session or agent_id not in session.document_locks:
+            return False
+
+        # Check if user has permission to edit
+        if not self.can_send_messages(session_id, user_id):
+            print(f"[SessionManager] User {user_id} not authorized to edit documents")
+            return False
+
+        # Check if document is already locked by someone else
+        current_lock = session.document_locks.get(agent_id)
+        if current_lock and current_lock != user_id:
+            print(f"[SessionManager] Document {agent_id} already locked by {current_lock}")
+            return False
+
+        # Acquire lock
+        session.document_locks[agent_id] = user_id
+        print(f"[SessionManager] User {user_id} acquired lock on {agent_id}")
+
+        # Audit log
+        self._add_audit_entry(session_id, user_id, 'lock_acquire', {'agent_id': agent_id})
+
+        return True
+
+    def release_document_lock(self, session_id: str, user_id: str, agent_id: str) -> bool:
+        """Release a document lock (stops editing)."""
+        session = self.sessions.get(session_id)
+        if not session or agent_id not in session.document_locks:
+            return False
+
+        # Only the lock holder can release
+        if session.document_locks.get(agent_id) == user_id:
+            session.document_locks[agent_id] = None
+            print(f"[SessionManager] User {user_id} released lock on {agent_id}")
+
+            # Audit log
+            self._add_audit_entry(session_id, user_id, 'lock_release', {'agent_id': agent_id})
+
             return True
 
         return False
