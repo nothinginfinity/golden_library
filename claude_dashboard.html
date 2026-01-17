@@ -2525,6 +2525,9 @@
             <button id="copy-invite-btn" onclick="copyInviteLink()" style="display: none; background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.4); color: #fbbf24; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
               📋 Copy Invite
             </button>
+            <button id="toggle-canvas-btn" onclick="toggleCanvasPanel()" style="display: none; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+              📄 Canvas
+            </button>
           </div>
         </div>
 
@@ -2731,6 +2734,51 @@
 
         </div>
         <!-- End Agent Panels Container -->
+
+        <!-- Canvas Panel (Phase 4C.2) -->
+        <div id="canvas-panel" style="display: none; width: 450px; background: rgba(15, 23, 42, 0.6); border-radius: 12px; flex-direction: column; border: 2px solid rgba(16, 185, 129, 0.4); max-height: calc(100vh - 200px);">
+          <!-- Canvas Header -->
+          <div style="padding: 12px 16px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 style="color: #34d399; font-size: 1rem; margin-bottom: 2px;">📄 Shared Canvas</h3>
+              <span id="canvas-doc-name" style="font-size: 0.75rem; color: #64748b;">No document loaded</span>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button onclick="createCanvasDocument()" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">+ New</button>
+              <button onclick="addCanvasSection()" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #a5b4fc; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">+ Section</button>
+              <button onclick="exportCanvasMarkdown()" style="background: rgba(148, 163, 184, 0.2); border: 1px solid rgba(148, 163, 184, 0.4); color: #94a3b8; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Export</button>
+            </div>
+          </div>
+
+          <!-- Canvas Sections List -->
+          <div id="canvas-sections-list" style="flex: 1; overflow-y: auto; padding: 12px;">
+            <div style="color: #94a3b8; font-size: 0.85rem; text-align: center; margin-top: 20px;">
+              Create a document to start collaborating
+            </div>
+          </div>
+
+          <!-- Active Section Editor -->
+          <div id="canvas-editor-container" style="display: none; border-top: 1px solid rgba(148, 163, 184, 0.2);">
+            <div style="padding: 8px 12px; background: rgba(30, 41, 59, 0.6); display: flex; justify-content: space-between; align-items: center;">
+              <span id="canvas-editor-section-name" style="color: #e2e8f0; font-size: 0.85rem; font-weight: 500;"></span>
+              <div style="display: flex; gap: 4px; align-items: center;">
+                <span id="canvas-editor-owner" style="font-size: 0.7rem; color: #64748b;"></span>
+                <span id="canvas-editor-version" style="font-size: 0.7rem; color: #94a3b8; background: rgba(99, 102, 241, 0.2); padding: 1px 6px; border-radius: 3px;"></span>
+              </div>
+            </div>
+            <textarea
+              id="canvas-editor-textarea"
+              style="width: 100%; height: 200px; padding: 12px; background: rgba(15, 23, 42, 0.8); border: none; border-top: 1px solid rgba(148, 163, 184, 0.1); color: #e2e8f0; font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; resize: vertical;"
+              placeholder="Start typing..."
+              oninput="onCanvasEditorInput()"
+            ></textarea>
+            <div style="padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(148, 163, 184, 0.1);">
+              <span id="canvas-editor-status" style="font-size: 0.7rem; color: #64748b;">Ready</span>
+              <button onclick="saveCanvasSection()" style="background: rgba(16, 185, 129, 0.3); border: 1px solid rgba(16, 185, 129, 0.5); color: #34d399; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Save</button>
+            </div>
+          </div>
+        </div>
+        <!-- End Canvas Panel -->
 
         <!-- Human Chat Sidebar -->
         <div id="human-chat-sidebar" style="width: 350px; background: rgba(15, 23, 42, 0.6); border-radius: 12px; display: none; flex-direction: column; border: 2px solid rgba(99, 102, 241, 0.4);">
@@ -4005,29 +4053,6 @@
     // DATA LOADING & API
     // =========================================================================
 
-    let currentFilter = 'all';
-    let compressionData = null;
-
-    // Initialize filter buttons
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        this.classList.add('active');
-        currentFilter = this.dataset.filter;
-      });
-    });
-
-    // Search on Enter key
-    document.getElementById('search-input').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        performSearch();
-      }
-    });
-
-    // =========================================================================
-    // LOAD STATS - Use API Backend
-    // =========================================================================
-
     const API_BASE = window.location.origin;
 
     // =========================================================================
@@ -4068,7 +4093,6 @@
         }
 
         const stats = await response.json();
-        compressionData = stats;
 
         updateStats(stats);
         updateStorageChart(stats);
@@ -4267,95 +4291,6 @@
     }
 
     // =========================================================================
-    // SEARCH - Use API Backend
-    // =========================================================================
-
-    async function performSearch() {
-      const query = document.getElementById('search-input').value.trim();
-      const resultsEl = document.getElementById('search-results');
-
-      if (!query) {
-        resultsEl.innerHTML = `
-          <div class="empty">
-            <div class="empty-icon">🔍</div>
-            <div>Enter a search query</div>
-          </div>
-        `;
-        return;
-      }
-
-      resultsEl.innerHTML = '<div class="loading">Searching...</div>';
-
-      try {
-        const response = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}&category=${currentFilter}`);
-        if (!response.ok) {
-          throw new Error('Search failed');
-        }
-
-        const searchResults = await response.json();
-        displaySearchResults(searchResults.results, query);
-      } catch (error) {
-        console.error('Search error:', error);
-        resultsEl.innerHTML = `
-          <div class="empty">
-            <div class="empty-icon">⚠️</div>
-            <div>Search failed: ${error.message}</div>
-          </div>
-        `;
-      }
-    }
-
-    function displaySearchResults(results, query) {
-      const resultsEl = document.getElementById('search-results');
-
-      if (results.length === 0) {
-        resultsEl.innerHTML = `
-          <div class="empty">
-            <div class="empty-icon">🔍</div>
-            <div>No results found for "${query}"</div>
-          </div>
-        `;
-        return;
-      }
-
-      const totalOriginal = results.reduce((sum, r) => sum + (r.original_tokens || 0), 0);
-      const totalCompressed = results.reduce((sum, r) => sum + (r.compressed_tokens || 0), 0);
-      const savings = totalOriginal > 0
-        ? (((totalOriginal - totalCompressed) / totalOriginal) * 100).toFixed(1)
-        : 0;
-
-      resultsEl.innerHTML = `
-        <div class="result-header">
-          <div>
-            <strong>${results.length}</strong> result${results.length !== 1 ? 's' : ''} found
-          </div>
-          <div style="color: #6ee7b7;">
-            ${formatNumber(totalCompressed)} tokens used (${savings}% savings)
-          </div>
-        </div>
-        ${results.map(result => `
-          <div class="result-item" onclick="viewConversation('${result.id}')">
-            <div class="result-title">${result.title || result.id}</div>
-            <div class="result-meta">
-              <span>📅 ${new Date(result.created).toLocaleDateString()}</span>
-              <span>📦 ${result.project || 'Unknown'}</span>
-              <span>📊 ${formatNumber(result.compressed_tokens)} tokens</span>
-            </div>
-            <div class="result-preview">
-              Original: ${formatNumber(result.original_tokens)} tokens →
-              Compressed: ${formatNumber(result.compressed_tokens)} tokens
-              (${(((result.original_tokens - result.compressed_tokens) / result.original_tokens) * 100).toFixed(1)}% reduction)
-            </div>
-          </div>
-        `).join('')}
-      `;
-    }
-
-    function viewConversation(id) {
-      alert(`View conversation: ${id}\n\nThis would open the compressed conversation file.\nIntegration with decompression coming soon!`);
-    }
-
-    // =========================================================================
     // TAB SWITCHING
     // =========================================================================
 
@@ -4367,6 +4302,13 @@
       document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
       });
+
+      // Hide dashboard panels when switching away from dashboard
+      if (tabName !== 'dashboard') {
+        document.querySelectorAll('.panel-content').forEach(panel => {
+          panel.classList.remove('active');
+        });
+      }
 
       // Show selected tab
       const tabElement = document.getElementById(`tab-${tabName}`);
@@ -6737,147 +6679,10 @@
     };
 
     // =========================================================================
-    // CONVERSATION HISTORY BROWSER
+    // CONVERSATION DETAIL MODAL (used by Unified History)
     // =========================================================================
 
     let currentConversation = null;
-    let allConversations = [];
-
-    // Load conversation history
-    window.loadConversationHistory = async function() {
-      try {
-        const listEl = document.getElementById('conversation-history-list');
-        const countEl = document.getElementById('history-count');
-
-        listEl.innerHTML = '<div class="loading">Loading conversations...</div>';
-
-        const response = await fetch(`${API_BASE}/api/history/list?limit=100`);
-        if (!response.ok) {
-          throw new Error('Failed to load conversation history');
-        }
-
-        const data = await response.json();
-        allConversations = data.conversations || [];
-
-        if (allConversations.length === 0) {
-          listEl.innerHTML = '<div class="empty">No conversations found</div>';
-          countEl.textContent = '0 conversations';
-          return;
-        }
-
-        countEl.textContent = `${data.total} conversations`;
-        renderConversationList(allConversations);
-
-      } catch (err) {
-        console.error('[History Browser] Load error:', err);
-        document.getElementById('conversation-history-list').innerHTML =
-          '<div class="empty">Error loading conversations</div>';
-      }
-    };
-
-    // Search conversations
-    window.searchConversationHistory = async function() {
-      const searchInput = document.getElementById('history-search-input');
-      const query = searchInput.value.trim();
-
-      if (!query) {
-        await loadConversationHistory();
-        return;
-      }
-
-      try {
-        const listEl = document.getElementById('conversation-history-list');
-        const countEl = document.getElementById('history-count');
-
-        listEl.innerHTML = '<div class="loading">Searching...</div>';
-
-        const response = await fetch(`${API_BASE}/api/history/search?q=${encodeURIComponent(query)}`);
-        if (!response.ok) {
-          throw new Error('Failed to search conversations');
-        }
-
-        const data = await response.json();
-        const results = data.conversations || [];
-
-        if (results.length === 0) {
-          listEl.innerHTML = `<div class="empty">No results found for "${query}"</div>`;
-          countEl.textContent = '0 results';
-          return;
-        }
-
-        countEl.textContent = `${results.length} results`;
-        renderConversationList(results);
-
-      } catch (err) {
-        console.error('[History Browser] Search error:', err);
-        document.getElementById('conversation-history-list').innerHTML =
-          '<div class="empty">Error searching conversations</div>';
-      }
-    };
-
-    // Render conversation list
-    function renderConversationList(conversations) {
-      const listEl = document.getElementById('conversation-history-list');
-      listEl.innerHTML = '';
-
-      conversations.forEach(conv => {
-        const item = document.createElement('div');
-        item.className = 'config-item';
-        item.style.cursor = 'pointer';
-        item.onclick = () => showConversationDetail(conv);
-
-        const time = document.createElement('div');
-        time.style.fontSize = '0.75rem';
-        time.style.color = '#64748b';
-        time.style.marginBottom = '4px';
-        time.textContent = conv.timeFormatted;
-
-        const project = document.createElement('div');
-        project.style.fontSize = '0.8rem';
-        project.style.color = '#a5b4fc';
-        project.style.marginBottom = '6px';
-        project.style.fontWeight = '600';
-        project.textContent = `📁 ${conv.project}`;
-
-        const preview = document.createElement('div');
-        preview.className = 'config-item-name';
-        preview.style.fontSize = '0.9rem';
-        preview.style.color = '#e2e8f0';
-        preview.style.whiteSpace = 'normal';
-        preview.style.wordBreak = 'break-word';
-        preview.textContent = conv.preview;
-
-        const meta = document.createElement('div');
-        meta.className = 'config-item-meta';
-        meta.style.marginTop = '8px';
-        meta.innerHTML = `
-          <span>Session: ${conv.sessionId.substring(0, 8)}</span>
-          ${conv.hasPaste ? '<span style="color: #f59e0b;">📎 Has paste</span>' : ''}
-        `;
-
-        item.appendChild(time);
-        item.appendChild(project);
-        item.appendChild(preview);
-        item.appendChild(meta);
-
-        listEl.appendChild(item);
-      });
-    }
-
-    // Show conversation detail
-    function showConversationDetail(conv) {
-      currentConversation = conv;
-
-      const modal = document.getElementById('conversation-detail-modal');
-      const title = document.getElementById('conversation-detail-title');
-      const content = document.getElementById('conversation-detail-content');
-
-      title.textContent = `Conversation - ${conv.timeFormatted}`;
-      content.textContent = conv.display;
-
-      modal.style.display = 'block';
-      modal.scrollIntoView({ behavior: 'smooth' });
-    }
 
     // Close conversation detail
     window.closeConversationDetail = function() {
@@ -9994,6 +9799,17 @@ ${currentConversation.display}
       } else if (event === 'context_shared') {
         handleContextShared(data.data);
       }
+      // Phase 4C.2: Canvas Collaboration Events
+      else if (event === 'canvas_edit' || event === 'canvas_section_added' || event === 'canvas_section_deleted' || event === 'canvas_section_locked' || event === 'canvas_section_unlocked') {
+        handleCanvasWebSocketEvent(event, data.data);
+      } else if (event === 'canvas_document_created') {
+        showNotification(`Canvas document created: ${data.data?.name || 'document'}`, 'success');
+        loadCanvasDocument();
+      } else if (event === 'task_delegated') {
+        showNotification(`Task delegated to ${data.data?.to_agent || 'agent'}`, 'info');
+      } else if (event === 'task_completed') {
+        showNotification(`Task completed by ${data.data?.agent || 'agent'}`, 'success');
+      }
     }
 
     // Phase 4B: Event Handlers
@@ -10556,6 +10372,34 @@ ${currentConversation.display}
             color = '#a855f7';
             actionText = `shared context: ${entry.details?.context_key || 'unknown'}`;
             break;
+          // Phase 4C.1: Task delegation events
+          case 'task_delegated':
+            icon = '📋';
+            color = '#10b981';
+            actionText = `task delegated to ${entry.details?.to_agent || 'agent'}`;
+            break;
+          case 'task_acknowledged':
+          case 'task_started':
+            icon = '▶';
+            color = '#3b82f6';
+            actionText = `task ${entry.details?.task_id?.substring(0, 12) || ''} started`;
+            break;
+          case 'task_completed':
+            icon = '✅';
+            color = '#10b981';
+            actionText = `task completed by ${entry.details?.agent || 'agent'}`;
+            break;
+          case 'task_blocked':
+            icon = '🚫';
+            color = '#ef4444';
+            actionText = `task blocked: ${entry.details?.blocker_description?.substring(0, 40) || 'issue'}`;
+            break;
+          // Phase 4C.2: Canvas events
+          case 'canvas_updated':
+            icon = '📝';
+            color = '#34d399';
+            actionText = `updated canvas: ${entry.details?.section_name || 'section'}`;
+            break;
         }
 
         const workflowBadge = entry.workflow_id ? `
@@ -10678,12 +10522,295 @@ ${currentConversation.display}
       });
     }
 
+    // =========================================================================
+    // CANVAS COLLABORATION (Phase 4C.2)
+    // =========================================================================
+
+    let canvasDocument = null;
+    let activeSectionName = null;
+    let canvasEditorDebounceTimer = null;
+
+    function toggleCanvasPanel() {
+      const canvasPanel = document.getElementById('canvas-panel');
+      if (!canvasPanel) return;
+
+      if (canvasPanel.style.display === 'none' || !canvasPanel.style.display) {
+        canvasPanel.style.display = 'flex';
+        // Load canvas document for session
+        loadCanvasDocument();
+      } else {
+        canvasPanel.style.display = 'none';
+      }
+    }
+
+    async function loadCanvasDocument() {
+      if (!currentSessionId) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/canvas/${currentSessionId}`);
+        if (response.ok) {
+          const data = await response.json();
+          canvasDocument = data.document;
+          renderCanvasSections();
+        }
+      } catch (error) {
+        console.error('Error loading canvas:', error);
+      }
+    }
+
+    async function createCanvasDocument() {
+      if (!currentSessionId) return;
+
+      const name = prompt('Document name:', 'Shared Document');
+      if (!name) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/canvas/${currentSessionId}/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          canvasDocument = data.document;
+          renderCanvasSections();
+          document.getElementById('canvas-doc-name').textContent = name;
+        }
+      } catch (error) {
+        console.error('Error creating canvas:', error);
+        alert('Failed to create document');
+      }
+    }
+
+    async function addCanvasSection() {
+      if (!canvasDocument) {
+        alert('Create a document first');
+        return;
+      }
+
+      const name = prompt('Section name:');
+      if (!name) return;
+
+      const sectionType = prompt('Section type (markdown/code/diagram):', 'markdown');
+
+      try {
+        const response = await fetch(`${API_BASE}/api/canvas/${currentSessionId}/section`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            document_id: canvasDocument.id,
+            section_name: name,
+            section_type: sectionType || 'markdown',
+            owner: currentUserId
+          })
+        });
+
+        if (response.ok) {
+          await loadCanvasDocument();
+        }
+      } catch (error) {
+        console.error('Error adding section:', error);
+        alert('Failed to add section');
+      }
+    }
+
+    function renderCanvasSections() {
+      const container = document.getElementById('canvas-sections-list');
+      if (!container || !canvasDocument) {
+        container.innerHTML = '<div style="color: #94a3b8; font-size: 0.85rem; text-align: center; margin-top: 20px;">Create a document to start collaborating</div>';
+        return;
+      }
+
+      document.getElementById('canvas-doc-name').textContent = canvasDocument.name || 'Shared Document';
+
+      const sections = canvasDocument.section_order || [];
+      if (sections.length === 0) {
+        container.innerHTML = '<div style="color: #94a3b8; font-size: 0.85rem; text-align: center; margin-top: 20px;">No sections yet. Add one!</div>';
+        return;
+      }
+
+      container.innerHTML = sections.map(sectionName => {
+        const section = canvasDocument.sections[sectionName] || {};
+        const isActive = sectionName === activeSectionName;
+        const ownerBadge = section.owner ? `<span style="font-size: 0.65rem; color: #64748b; margin-left: 4px;">(${section.owner})</span>` : '';
+        const typeBadge = section.section_type ? `<span style="font-size: 0.6rem; background: rgba(99, 102, 241, 0.2); color: #a5b4fc; padding: 1px 4px; border-radius: 2px; margin-left: 4px;">${section.section_type}</span>` : '';
+
+        return `
+          <div onclick="selectCanvasSection('${sectionName}')"
+               style="padding: 10px 12px; margin-bottom: 6px; background: ${isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(30, 41, 59, 0.5)'}; border: 1px solid ${isActive ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.2)'}; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <span style="color: ${isActive ? '#34d399' : '#e2e8f0'}; font-size: 0.85rem; font-weight: 500;">${sectionName}</span>
+                ${ownerBadge}
+                ${typeBadge}
+              </div>
+              <span style="font-size: 0.65rem; color: #64748b;">v${section.version || 1}</span>
+            </div>
+            <div style="color: #94a3b8; font-size: 0.75rem; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              ${(section.content || '').substring(0, 60)}${(section.content || '').length > 60 ? '...' : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectCanvasSection(sectionName) {
+      if (!canvasDocument || !canvasDocument.sections[sectionName]) return;
+
+      activeSectionName = sectionName;
+      const section = canvasDocument.sections[sectionName];
+
+      // Show editor
+      const editorContainer = document.getElementById('canvas-editor-container');
+      editorContainer.style.display = 'block';
+
+      document.getElementById('canvas-editor-section-name').textContent = sectionName;
+      document.getElementById('canvas-editor-owner').textContent = section.owner ? `Owner: ${section.owner}` : '';
+      document.getElementById('canvas-editor-version').textContent = `v${section.version || 1}`;
+      document.getElementById('canvas-editor-textarea').value = section.content || '';
+      document.getElementById('canvas-editor-status').textContent = 'Ready';
+
+      // Re-render sections list to update highlighting
+      renderCanvasSections();
+    }
+
+    function onCanvasEditorInput() {
+      document.getElementById('canvas-editor-status').textContent = 'Editing...';
+
+      // Debounce auto-save
+      clearTimeout(canvasEditorDebounceTimer);
+      canvasEditorDebounceTimer = setTimeout(() => {
+        // Auto-save after 2 seconds of inactivity
+        saveCanvasSection();
+      }, 2000);
+    }
+
+    async function saveCanvasSection() {
+      if (!canvasDocument || !activeSectionName) return;
+
+      const content = document.getElementById('canvas-editor-textarea').value;
+      const statusEl = document.getElementById('canvas-editor-status');
+
+      statusEl.textContent = 'Saving...';
+
+      try {
+        const response = await fetch(`${API_BASE}/api/canvas/${currentSessionId}/edit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            document_id: canvasDocument.id,
+            section_name: activeSectionName,
+            content: content,
+            author_id: currentUserId,
+            author_name: currentUserName
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Update local state
+          if (canvasDocument.sections[activeSectionName]) {
+            canvasDocument.sections[activeSectionName].content = content;
+            canvasDocument.sections[activeSectionName].version = data.version || (canvasDocument.sections[activeSectionName].version + 1);
+          }
+          document.getElementById('canvas-editor-version').textContent = `v${canvasDocument.sections[activeSectionName].version}`;
+          statusEl.textContent = 'Saved ✓';
+          renderCanvasSections();
+        } else {
+          statusEl.textContent = 'Save failed';
+        }
+      } catch (error) {
+        console.error('Error saving section:', error);
+        statusEl.textContent = 'Save failed';
+      }
+    }
+
+    async function exportCanvasMarkdown() {
+      if (!canvasDocument) {
+        alert('No document to export');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/canvas/${currentSessionId}/export?format=markdown&document_id=${canvasDocument.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          // Download as file
+          const blob = new Blob([data.content], { type: 'text/markdown' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${canvasDocument.name || 'document'}.md`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+      } catch (error) {
+        console.error('Error exporting:', error);
+        alert('Export failed');
+      }
+    }
+
+    // Handle canvas WebSocket events
+    function handleCanvasWebSocketEvent(event, data) {
+      if (!canvasDocument) return;
+
+      switch (event) {
+        case 'canvas_edit':
+          if (data.document_id === canvasDocument.id) {
+            // Update local section
+            const section = canvasDocument.sections[data.section_name];
+            if (section && data.edit.author_id !== currentUserId) {
+              section.content = data.new_content;
+              section.version = data.version;
+
+              // If this section is active, update editor (unless user is typing)
+              if (data.section_name === activeSectionName) {
+                const editor = document.getElementById('canvas-editor-textarea');
+                if (document.activeElement !== editor) {
+                  editor.value = data.new_content;
+                  document.getElementById('canvas-editor-version').textContent = `v${data.version}`;
+                }
+              }
+              renderCanvasSections();
+            }
+          }
+          break;
+
+        case 'canvas_section_added':
+          if (data.document_id === canvasDocument.id) {
+            loadCanvasDocument();
+          }
+          break;
+
+        case 'canvas_section_deleted':
+          if (data.document_id === canvasDocument.id) {
+            loadCanvasDocument();
+          }
+          break;
+      }
+    }
+
+    // Expose canvas functions to window
+    window.toggleCanvasPanel = toggleCanvasPanel;
+    window.createCanvasDocument = createCanvasDocument;
+    window.addCanvasSection = addCanvasSection;
+    window.selectCanvasSection = selectCanvasSection;
+    window.saveCanvasSection = saveCanvasSection;
+    window.exportCanvasMarkdown = exportCanvasMarkdown;
+    window.onCanvasEditorInput = onCanvasEditorInput;
+
+    // =========================================================================
+    // END CANVAS COLLABORATION
+    // =========================================================================
+
     function updateSessionUI(isInSession) {
       const statusEl = document.getElementById('session-status');
       const sessionIdEl = document.getElementById('session-id-display');
       const createBtn = document.getElementById('create-session-btn');
       const joinBtn = document.getElementById('join-session-btn');
       const copyBtn = document.getElementById('copy-invite-btn');
+      const canvasBtn = document.getElementById('toggle-canvas-btn');
       const userPresence = document.getElementById('user-presence');
       const chatSidebar = document.getElementById('human-chat-sidebar');
 
@@ -10693,6 +10820,7 @@ ${currentConversation.display}
         createBtn.style.display = 'none';
         joinBtn.style.display = 'none';
         copyBtn.style.display = 'block';
+        if (canvasBtn) canvasBtn.style.display = 'block';
         userPresence.style.display = 'block';
         if (chatSidebar) chatSidebar.style.display = 'flex';
       } else {
@@ -10700,6 +10828,7 @@ ${currentConversation.display}
         createBtn.style.display = 'block';
         joinBtn.style.display = 'block';
         copyBtn.style.display = 'none';
+        if (canvasBtn) canvasBtn.style.display = 'none';
         userPresence.style.display = 'none';
         if (chatSidebar) chatSidebar.style.display = 'none';
       }

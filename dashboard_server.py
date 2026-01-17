@@ -164,6 +164,17 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             session_id = path.split('/')[-1]
             self.serve_session_info(session_id)
             return
+        # Phase 4C.2: Canvas Collaboration GET endpoints
+        elif path.startswith('/api/canvas/') and '/export' in path:
+            parts = path.split('/')
+            session_id = parts[3]
+            self.serve_canvas_export(session_id, parsed_path.query)
+            return
+        elif path.startswith('/api/canvas/'):
+            # GET /api/canvas/{session_id}
+            session_id = path.split('/')[-1]
+            self.serve_canvas_document(session_id)
+            return
         elif path == '/' or path == '/index.html':
             self.serve_dashboard()
             return
@@ -269,6 +280,19 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             return
         elif path == '/api/workspace/sessions/join':
             self.join_workspace_session(data)
+            return
+        # Phase 4C.2: Canvas Collaboration API
+        elif path.startswith('/api/canvas/') and '/create' in path:
+            session_id = path.split('/')[3]
+            self.create_canvas_document(session_id, data)
+            return
+        elif path.startswith('/api/canvas/') and '/section' in path:
+            session_id = path.split('/')[3]
+            self.add_canvas_section(session_id, data)
+            return
+        elif path.startswith('/api/canvas/') and '/edit' in path:
+            session_id = path.split('/')[3]
+            self.edit_canvas_section(session_id, data)
             return
         else:
             self.send_error(404, "Not found")
@@ -2573,6 +2597,186 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
         except Exception as e:
             self.serve_json({'error': str(e)}, status=500)
+
+    # ===== Phase 4C.2: Canvas Collaboration API =====
+
+    def serve_canvas_document(self, session_id):
+        """Get canvas document for a session."""
+        try:
+            from src.canvas_sync_manager import get_canvas_sync_manager
+
+            canvas_manager = get_canvas_sync_manager(session_manager)
+
+            # Sync from session canvas_sections if exists
+            doc = canvas_manager.sync_from_session_canvas(session_id)
+
+            if not doc:
+                # Get any existing documents
+                docs = canvas_manager.get_session_documents(session_id)
+                doc = docs[0] if docs else None
+
+            if doc:
+                self.serve_json({
+                    'success': True,
+                    'document': doc.to_dict()
+                })
+            else:
+                self.serve_json({
+                    'success': True,
+                    'document': None,
+                    'message': 'No canvas document found. Create one to start.'
+                })
+
+        except Exception as e:
+            print(f"[Canvas] Error serving document: {e}")
+            self.serve_json({'error': str(e)}, status=500)
+
+    def create_canvas_document(self, session_id, data):
+        """Create a new canvas document."""
+        try:
+            from src.canvas_sync_manager import get_canvas_sync_manager
+
+            canvas_manager = get_canvas_sync_manager(session_manager)
+
+            name = data.get('name', 'Shared Document')
+            initial_sections = data.get('sections', [])
+
+            doc = canvas_manager.create_document(
+                session_id=session_id,
+                name=name,
+                initial_sections=initial_sections
+            )
+
+            self.serve_json({
+                'success': True,
+                'document': doc.to_dict()
+            })
+
+        except Exception as e:
+            print(f"[Canvas] Error creating document: {e}")
+            self.serve_json({'error': str(e)}, status=500)
+
+    def add_canvas_section(self, session_id, data):
+        """Add a section to a canvas document."""
+        try:
+            from src.canvas_sync_manager import get_canvas_sync_manager
+
+            canvas_manager = get_canvas_sync_manager(session_manager)
+
+            doc_id = data.get('document_id')
+            section_name = data.get('section_name')
+            section_type = data.get('section_type', 'markdown')
+            content = data.get('content', '')
+            owner = data.get('owner')
+
+            if not doc_id or not section_name:
+                self.serve_json({'error': 'document_id and section_name required'}, status=400)
+                return
+
+            section = canvas_manager.add_section(
+                doc_id=doc_id,
+                section_name=section_name,
+                section_type=section_type,
+                content=content,
+                owner=owner
+            )
+
+            if section:
+                self.serve_json({
+                    'success': True,
+                    'section': section.to_dict()
+                })
+            else:
+                self.serve_json({'error': 'Failed to add section'}, status=400)
+
+        except Exception as e:
+            print(f"[Canvas] Error adding section: {e}")
+            self.serve_json({'error': str(e)}, status=500)
+
+    def edit_canvas_section(self, session_id, data):
+        """Edit a canvas section."""
+        try:
+            from src.canvas_sync_manager import get_canvas_sync_manager
+
+            canvas_manager = get_canvas_sync_manager(session_manager)
+
+            doc_id = data.get('document_id')
+            section_name = data.get('section_name')
+            content = data.get('content', '')
+            author_id = data.get('author_id', 'unknown')
+            author_name = data.get('author_name', 'Unknown')
+
+            if not doc_id or not section_name:
+                self.serve_json({'error': 'document_id and section_name required'}, status=400)
+                return
+
+            success, edit = canvas_manager.apply_edit(
+                doc_id=doc_id,
+                section_name=section_name,
+                author_id=author_id,
+                author_name=author_name,
+                content=content,
+                operation='replace'
+            )
+
+            if success:
+                section = canvas_manager.get_section(doc_id, section_name)
+                self.serve_json({
+                    'success': True,
+                    'version': section.version if section else 1,
+                    'edit_id': edit.id if edit else None
+                })
+            else:
+                self.serve_json({'error': 'Edit failed (permission denied or section not found)'}, status=403)
+
+        except Exception as e:
+            print(f"[Canvas] Error editing section: {e}")
+            self.serve_json({'error': str(e)}, status=500)
+
+    def serve_canvas_export(self, session_id, query_string):
+        """Export canvas document."""
+        try:
+            from src.canvas_sync_manager import get_canvas_sync_manager
+            from urllib.parse import parse_qs
+
+            params = parse_qs(query_string)
+            doc_id = params.get('document_id', [''])[0]
+            format_type = params.get('format', ['markdown'])[0]
+
+            canvas_manager = get_canvas_sync_manager(session_manager)
+
+            # Get document
+            if doc_id:
+                doc = canvas_manager.get_document(doc_id)
+            else:
+                docs = canvas_manager.get_session_documents(session_id)
+                doc = docs[0] if docs else None
+
+            if not doc:
+                self.serve_json({'error': 'Document not found'}, status=404)
+                return
+
+            if format_type == 'markdown':
+                content = canvas_manager.export_markdown(doc.id)
+            elif format_type == 'html':
+                content = canvas_manager.export_html(doc.id)
+            elif format_type == 'json':
+                content = canvas_manager.export_json(doc.id)
+            else:
+                content = canvas_manager.export_markdown(doc.id)
+
+            self.serve_json({
+                'success': True,
+                'content': content,
+                'format': format_type,
+                'document_name': doc.name
+            })
+
+        except Exception as e:
+            print(f"[Canvas] Error exporting: {e}")
+            self.serve_json({'error': str(e)}, status=500)
+
+    # ===== End Canvas Collaboration API =====
 
     def serve_session_info(self, session_id):
         """Get information about a session."""
