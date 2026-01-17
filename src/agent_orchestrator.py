@@ -325,7 +325,7 @@ IMPORTANT: When responding to messages, you can distinguish between users by the
 
             base_prompt += "\n\n" + collab_context
 
-        # MCP Tools documentation (Phase 4B)
+        # MCP Tools documentation (Phase 4B + 4C.1)
         mcp_tools_doc = """
 
 AGENT COORDINATION TOOLS (Phase 4B - MCP Inbox):
@@ -362,6 +362,50 @@ You can coordinate with other agents using these tools. To use them, simply ment
 - "Set milestone 'Design complete' to completed (100%)"
 
 These tools enable true multi-agent collaboration where you can work together autonomously.
+
+---
+
+HIERARCHICAL TASK DELEGATION (Phase 4C.1):
+
+Prax can delegate formal tasks to Cairn and Koda. Delegated tasks have structure, success criteria, and track results.
+
+**Delegation Tools (Prax only):**
+- "Delegate to [agent]: [description] | Criteria: [success criteria] | Priority: [high/medium/low] | Canvas: [section name]"
+  Full delegation with all parameters
+
+- "Delegate to [agent]: [description]"
+  Simple delegation (defaults: medium priority, no canvas section)
+
+**Task Response Tools (Cairn/Koda):**
+- "Acknowledge task [task_id]" - Confirm receipt and readiness to start
+- "Start task [task_id]" - Signal beginning work
+- "Update progress on [task_id]: [percentage]% - [notes]" - Report progress
+- "Report blocker on [task_id]: [description]" - Report blocking issue
+- "Complete task [task_id]: [result_summary] | Canvas: [content]" - Mark done with results
+
+**Task Query Tools:**
+- "Get task status [task_id]" - Check task status
+- "List my tasks" - See assigned tasks (for Cairn/Koda)
+- "List all tasks" - See all session tasks (for Prax)
+
+**Delegation Examples:**
+
+1. Research task with canvas output:
+   "Delegate to cairn: Research HIPAA compliance requirements | Criteria: Comprehensive list of requirements with sources | Priority: high | Canvas: compliance_analysis"
+
+2. Implementation task:
+   "Delegate to koda: Implement user authentication endpoint | Criteria: Working endpoint with tests | Priority: high | Canvas: auth_implementation"
+
+3. Simple delegation:
+   "Delegate to cairn: Review the database schema design"
+
+**Hierarchical Workflow Pattern:**
+1. User requests feature → Prax receives
+2. Prax delegates design to Cairn with canvas section "design"
+3. Cairn acknowledges, researches, completes task writing to canvas
+4. Prax delegates implementation to Koda referencing Cairn's work
+5. Koda implements, writes to canvas section "implementation"
+6. Prax synthesizes results for user
 """
 
         role_prompts = {
@@ -395,33 +439,54 @@ You are Cairn, the Architect agent. Your focus is on design, architecture, and s
 """,
             'prax': """
 
-You are Prax, the Orchestrator agent. Your focus is on coordination and strategy.
+You are Prax, the Orchestrator agent. Your focus is on strategic coordination and hierarchical delegation.
 - Coordinate between multiple agents and users
-- Make strategic decisions
-- Think about the big picture
-- Track progress across workstreams
+- Make strategic decisions about task assignment
+- Think about the big picture while tracking details
+- Synthesize agent results for humans
 - Help facilitate collaboration between different users
 
-**Agent Coordination (You are the orchestrator!):**
-- Create workflows for complex tasks with multiple agents
-- Assign work to Cairn (design/architecture) and Koda (implementation/building)
-- Check agent workloads before assignment to avoid overload
-- Share context between agents to prevent re-explaining
-- Request status updates from agents via inbox
-- Escalate blockers to humans when needed
-- Track milestones and workflow progress
-- Reassign tasks if agents are blocked or overloaded
+**Your Role in the Delegation Pyramid:**
+You sit at the Strategic Layer, interacting with humans. You delegate execution to:
+- Cairn (Architect): Deep analysis, research, design, specifications
+- Koda (Builder): Implementation, coding, testing, building
 
-**Workflow Pattern:**
-1. User requests feature
-2. Check workload for Cairn and Koda
-3. Create workflow with ID
-4. Assign Cairn to design → send message with workflow ID
-5. Cairn shares design context
-6. Assign Koda to implement → reference shared context
-7. Track progress via inbox and milestones
-8. Escalate blockers if needed
-9. Report completion to user
+**Hierarchical Delegation (PRIMARY TOOL):**
+When users request work, use formal task delegation with success criteria:
+1. "Delegate to cairn: [description] | Criteria: [what success looks like] | Priority: [level] | Canvas: [section]"
+2. Monitor progress via task status updates
+3. Cairn/Koda complete and write to assigned canvas sections
+4. Synthesize and present results to user
+
+**Delegation Best Practices:**
+- Always include clear success criteria so agents know when they're done
+- Assign canvas sections for structured output (results go to shared document)
+- Use high priority for urgent/blocking tasks
+- Check agent workload before delegating heavy tasks
+- For complex work: delegate design to Cairn first, then implementation to Koda
+
+**Complete Workflow Example:**
+User: "Help us build a HIPAA-compliant authentication system"
+
+Your response:
+"I'll coordinate our team on this. Let me delegate the work:
+
+Delegate to cairn: Research HIPAA compliance requirements for authentication systems | Criteria: Comprehensive list of requirements with sources, security considerations, and recommendations | Priority: high | Canvas: hipaa_requirements
+
+Once Cairn completes the research, I'll delegate implementation to Koda.
+
+Create workflow 'hipaa_auth_system' with agents [cairn, koda]"
+
+**After Cairn Completes:**
+"Cairn has completed the HIPAA research. Now:
+
+Delegate to koda: Implement authentication endpoint following HIPAA requirements from canvas section 'hipaa_requirements' | Criteria: Working endpoint with JWT tokens, proper logging, and unit tests | Priority: high | Canvas: auth_implementation"
+
+**Key Behaviors:**
+- Don't do execution work yourself - delegate to specialists
+- Track all active tasks and their status
+- Escalate blockers promptly to keep work flowing
+- Report progress and results clearly to humans
 """,
         }
 
@@ -621,6 +686,204 @@ You are Prax, the Orchestrator agent. Your focus is on coordination and strategy
 
                 if blocker_id:
                     feedback_parts.append(f"🚨 Blocker escalated to humans (ID: {blocker_id[:8]})")
+
+        # ===== Phase 4C.1: Task Delegation Tools =====
+
+        # Import TaskDelegationManager
+        try:
+            from task_delegation_manager import get_task_delegation_manager, TaskDefinition
+            task_manager = get_task_delegation_manager(self.session_manager)
+        except ImportError:
+            task_manager = None
+
+        if task_manager:
+            # Pattern: Delegate to [agent]: [description] | Criteria: [criteria] | Priority: [priority] | Canvas: [section]
+            if from_agent == 'prax':  # Only Prax can delegate
+                # Full delegation pattern
+                full_delegate_pattern = r"Delegate to (cairn|koda):\s*(.+?)\s*\|\s*Criteria:\s*(.+?)\s*\|\s*Priority:\s*(critical|high|medium|low)\s*\|\s*Canvas:\s*(\w+)"
+                for match in re.finditer(full_delegate_pattern, response_text, re.IGNORECASE):
+                    to_agent = match.group(1).lower()
+                    description = match.group(2).strip()
+                    criteria = match.group(3).strip()
+                    priority = match.group(4).lower()
+                    canvas_section = match.group(5).strip()
+
+                    task = TaskDefinition(
+                        id="",  # Will be generated
+                        description=description,
+                        success_criteria=criteria,
+                        tools_allowed=['web_search', 'analysis'],
+                        canvas_section=canvas_section,
+                        priority=priority
+                    )
+
+                    try:
+                        task_id = task_manager.delegate_task(
+                            from_agent='prax',
+                            to_agent=to_agent,
+                            task=task,
+                            session_id=self.session_id
+                        )
+                        feedback_parts.append(f"📋 Task delegated to {to_agent} (ID: {task_id})")
+
+                        # Register in session
+                        self.session_manager.register_delegated_task(
+                            self.session_id,
+                            task_id,
+                            {
+                                'from_agent': 'prax',
+                                'to_agent': to_agent,
+                                'description': description,
+                                'status': 'pending',
+                                'canvas_section': canvas_section
+                            }
+                        )
+                    except Exception as e:
+                        feedback_parts.append(f"❌ Delegation failed: {str(e)}")
+
+                # Simple delegation pattern (without full parameters)
+                simple_delegate_pattern = r"Delegate to (cairn|koda):\s*([^|]+?)(?:\n|$)"
+                for match in re.finditer(simple_delegate_pattern, response_text, re.IGNORECASE):
+                    to_agent = match.group(1).lower()
+                    description = match.group(2).strip()
+
+                    # Skip if already matched by full pattern
+                    if "| Criteria:" in response_text[match.start():match.end()+50]:
+                        continue
+
+                    task = TaskDefinition(
+                        id="",
+                        description=description,
+                        success_criteria="Complete the task as described",
+                        priority="medium"
+                    )
+
+                    try:
+                        task_id = task_manager.delegate_task(
+                            from_agent='prax',
+                            to_agent=to_agent,
+                            task=task,
+                            session_id=self.session_id
+                        )
+                        feedback_parts.append(f"📋 Task delegated to {to_agent} (ID: {task_id})")
+
+                        self.session_manager.register_delegated_task(
+                            self.session_id,
+                            task_id,
+                            {
+                                'from_agent': 'prax',
+                                'to_agent': to_agent,
+                                'description': description,
+                                'status': 'pending'
+                            }
+                        )
+                    except Exception as e:
+                        feedback_parts.append(f"❌ Delegation failed: {str(e)}")
+
+            # Task acknowledgment (Cairn/Koda)
+            if from_agent in ['cairn', 'koda']:
+                # Pattern: Acknowledge task [task_id]
+                ack_pattern = r"Acknowledge task (task_\w+)"
+                for match in re.finditer(ack_pattern, response_text, re.IGNORECASE):
+                    task_id = match.group(1)
+                    if task_manager.acknowledge_task(task_id, from_agent):
+                        feedback_parts.append(f"✓ Task {task_id} acknowledged")
+
+                        self.session_manager.update_delegated_task(
+                            self.session_id, task_id, {'status': 'acknowledged'}
+                        )
+
+                # Pattern: Start task [task_id]
+                start_pattern = r"Start task (task_\w+)"
+                for match in re.finditer(start_pattern, response_text, re.IGNORECASE):
+                    task_id = match.group(1)
+                    if task_manager.start_task(task_id, from_agent):
+                        feedback_parts.append(f"▶ Task {task_id} started")
+
+                        self.session_manager.update_delegated_task(
+                            self.session_id, task_id, {'status': 'in_progress'}
+                        )
+
+                # Pattern: Update progress on [task_id]: [percentage]% - [notes]
+                progress_pattern = r"Update progress on (task_\w+):\s*(\d+)%\s*-\s*(.+?)(?:\n|$)"
+                for match in re.finditer(progress_pattern, response_text, re.IGNORECASE):
+                    task_id = match.group(1)
+                    percentage = int(match.group(2))
+                    notes = match.group(3).strip()
+
+                    if task_manager.update_progress(task_id, from_agent, percentage, notes):
+                        feedback_parts.append(f"📊 Task {task_id} progress: {percentage}%")
+
+                # Pattern: Report blocker on [task_id]: [description]
+                task_blocker_pattern = r"Report blocker on (task_\w+):\s*(.+?)(?:\n|$)"
+                for match in re.finditer(task_blocker_pattern, response_text, re.IGNORECASE):
+                    task_id = match.group(1)
+                    blocker_desc = match.group(2).strip()
+
+                    if task_manager.report_blocker(task_id, from_agent, blocker_desc, 'high'):
+                        feedback_parts.append(f"🚫 Blocker reported on {task_id}")
+
+                        self.session_manager.update_delegated_task(
+                            self.session_id, task_id, {'status': 'blocked', 'blocker': blocker_desc}
+                        )
+
+                # Pattern: Complete task [task_id]: [result_summary] | Canvas: [content]
+                complete_pattern = r"Complete task (task_\w+):\s*(.+?)\s*(?:\|\s*Canvas:\s*(.+))?(?:\n|$)"
+                for match in re.finditer(complete_pattern, response_text, re.IGNORECASE | re.DOTALL):
+                    task_id = match.group(1)
+                    result_summary = match.group(2).strip()
+                    canvas_content = match.group(3).strip() if match.group(3) else ""
+
+                    if task_manager.complete_task(task_id, from_agent, result_summary, result_summary, canvas_content):
+                        feedback_parts.append(f"✅ Task {task_id} completed")
+
+                        self.session_manager.update_delegated_task(
+                            self.session_id, task_id, {'status': 'completed', 'result': result_summary}
+                        )
+
+                        # Update canvas section if content provided
+                        if canvas_content:
+                            task_status = task_manager.get_task_status(task_id)
+                            if task_status:
+                                task_data = task_manager.tasks.get(task_id)
+                                if task_data and task_data.task_definition and task_data.task_definition.canvas_section:
+                                    self.session_manager.update_canvas_section(
+                                        self.session_id,
+                                        task_data.task_definition.canvas_section,
+                                        canvas_content,
+                                        from_agent
+                                    )
+                                    feedback_parts.append(f"📝 Canvas section '{task_data.task_definition.canvas_section}' updated")
+
+            # Pattern: Get task status [task_id]
+            status_pattern = r"Get task status (task_\w+)"
+            for match in re.finditer(status_pattern, response_text, re.IGNORECASE):
+                task_id = match.group(1)
+                status = task_manager.get_task_status(task_id)
+                if status:
+                    feedback_parts.append(f"📋 Task {task_id}: {status['status']} ({status['progress_percentage']}%)")
+                else:
+                    feedback_parts.append(f"❌ Task {task_id} not found")
+
+            # Pattern: List my tasks (for Cairn/Koda)
+            if re.search(r'List my tasks', response_text, re.IGNORECASE) and from_agent in ['cairn', 'koda']:
+                tasks = task_manager.get_tasks_for_agent(self.session_id, from_agent)
+                if tasks:
+                    feedback_parts.append(f"📋 Your tasks ({len(tasks)}):")
+                    for t in tasks[:5]:
+                        feedback_parts.append(f"  - {t['task_id']}: {t['status']}")
+                else:
+                    feedback_parts.append("📭 No tasks assigned")
+
+            # Pattern: List all tasks (for Prax)
+            if re.search(r'List all tasks', response_text, re.IGNORECASE) and from_agent == 'prax':
+                tasks = task_manager.get_all_session_tasks(self.session_id)
+                if tasks:
+                    feedback_parts.append(f"📋 All tasks ({len(tasks)}):")
+                    for t in tasks[:10]:
+                        feedback_parts.append(f"  - {t['id']} → {t['to_agent']}: {t['status']}")
+                else:
+                    feedback_parts.append("📭 No tasks in session")
 
         # Return combined feedback if any tools were executed
         if feedback_parts:

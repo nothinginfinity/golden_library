@@ -74,7 +74,7 @@ class AuditEntry:
     session_id: str
     timestamp: str
     user_id: str
-    action: str  # 'join', 'leave', 'message', 'claim_control', 'release_control', 'role_change', 'lock_acquire', 'lock_release', 'agent_message_sent', 'blocker_escalated', 'milestone_updated', 'context_shared'
+    action: str  # 'join', 'leave', 'message', 'claim_control', 'release_control', 'role_change', 'lock_acquire', 'lock_release', 'agent_message_sent', 'blocker_escalated', 'milestone_updated', 'context_shared', 'task_delegated', 'task_acknowledged', 'task_started', 'task_completed', 'task_blocked', 'task_failed', 'canvas_updated'
     details: Dict[str, Any] = field(default_factory=dict)
     workflow_id: Optional[str] = None  # Link to workflow if applicable
 
@@ -191,6 +191,10 @@ class WorkspaceSession:
         'koda': {'active_tasks': 0, 'status': 'idle'}
     })
 
+    # Phase 4C.1: Hierarchical Delegation
+    delegated_tasks: Dict[str, Any] = field(default_factory=dict)  # task_id -> task_info
+    canvas_sections: Dict[str, Dict] = field(default_factory=dict)  # section_name -> {content, owner, updated_at}
+
     def to_dict(self):
         """Convert to dict for JSON serialization (excluding orchestrator)."""
         return {
@@ -213,7 +217,10 @@ class WorkspaceSession:
             'shared_contexts': self.shared_contexts,
             'workflows': {wid: wf.to_dict() for wid, wf in self.workflows.items()},
             'agent_capabilities': self.agent_capabilities,
-            'agent_workload': self.agent_workload
+            'agent_workload': self.agent_workload,
+            # Phase 4C.1 fields
+            'delegated_tasks': self.delegated_tasks,
+            'canvas_sections': self.canvas_sections
             # orchestrator excluded (not JSON serializable)
         }
 
@@ -1478,6 +1485,369 @@ class WorkspaceSessionManager:
         print(f"[SessionManager] Deadline set for {task_id}: {deadline}")
 
         return True
+
+    # ===== Phase 4C.1: Canvas Section Management =====
+
+    def create_canvas_section(
+        self,
+        session_id: str,
+        section_name: str,
+        owner: Optional[str] = None,
+        initial_content: str = ""
+    ) -> bool:
+        """
+        Create a new canvas section.
+
+        Args:
+            session_id: Session ID
+            section_name: Unique section name
+            owner: Optional owner agent ID (cairn, koda) or None for shared
+            initial_content: Optional initial content
+
+        Returns:
+            True if created, False if section exists or session not found
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return False
+
+        if section_name in session.canvas_sections:
+            print(f"[SessionManager] Canvas section '{section_name}' already exists")
+            return False
+
+        session.canvas_sections[section_name] = {
+            'content': initial_content,
+            'owner': owner,
+            'created_at': datetime.utcnow().isoformat(),
+            'updated_at': datetime.utcnow().isoformat(),
+            'version': 1,
+            'history': [{
+                'version': 1,
+                'content': initial_content,
+                'updated_by': owner or 'system',
+                'timestamp': datetime.utcnow().isoformat()
+            }]
+        }
+
+        print(f"[SessionManager] Canvas section created: {section_name} (owner: {owner})")
+
+        # Queue WebSocket event
+        self._queue_ws_event(session_id, 'canvas_section_created', {
+            'section_name': section_name,
+            'owner': owner
+        })
+
+        return True
+
+    def update_canvas_section(
+        self,
+        session_id: str,
+        section_name: str,
+        content: str,
+        updated_by: str
+    ) -> bool:
+        """
+        Update content of a canvas section.
+
+        Args:
+            session_id: Session ID
+            section_name: Section name to update
+            content: New content
+            updated_by: Agent or user ID making the update
+
+        Returns:
+            True if updated, False if section not found or permission denied
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return False
+
+        if section_name not in session.canvas_sections:
+            # Auto-create section if it doesn't exist
+            self.create_canvas_section(session_id, section_name, updated_by)
+
+        section = session.canvas_sections[section_name]
+
+        # Check ownership (if section has owner, only owner can update)
+        if section['owner'] and section['owner'] != updated_by:
+            print(f"[SessionManager] Permission denied: {updated_by} cannot update section owned by {section['owner']}")
+            return False
+
+        # Update section
+        section['content'] = content
+        section['updated_at'] = datetime.utcnow().isoformat()
+        section['version'] += 1
+
+        # Add to history (keep last 10 versions)
+        section['history'].append({
+            'version': section['version'],
+            'content': content[:1000] + '...' if len(content) > 1000 else content,  # Truncate for history
+            'updated_by': updated_by,
+            'timestamp': section['updated_at']
+        })
+        if len(section['history']) > 10:
+            section['history'] = section['history'][-10:]
+
+        # Audit log
+        self._add_audit_entry(
+            session_id,
+            updated_by,
+            'canvas_updated',
+            {
+                'section_name': section_name,
+                'version': section['version'],
+                'content_length': len(content)
+            }
+        )
+
+        print(f"[SessionManager] Canvas section updated: {section_name} (v{section['version']})")
+
+        # Queue WebSocket event
+        self._queue_ws_event(session_id, 'canvas_section_updated', {
+            'section_name': section_name,
+            'updated_by': updated_by,
+            'version': section['version'],
+            'content_preview': content[:200] if content else ''
+        })
+
+        return True
+
+    def get_canvas_section(
+        self,
+        session_id: str,
+        section_name: str
+    ) -> Optional[Dict]:
+        """
+        Get canvas section content.
+
+        Args:
+            session_id: Session ID
+            section_name: Section name
+
+        Returns:
+            Section dict or None
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return None
+
+        return session.canvas_sections.get(section_name)
+
+    def list_canvas_sections(self, session_id: str) -> List[Dict]:
+        """
+        List all canvas sections for a session.
+
+        Args:
+            session_id: Session ID
+
+        Returns:
+            List of section info dicts
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return []
+
+        return [
+            {
+                'name': name,
+                'owner': info['owner'],
+                'updated_at': info['updated_at'],
+                'version': info['version'],
+                'content_length': len(info['content'])
+            }
+            for name, info in session.canvas_sections.items()
+        ]
+
+    def assign_canvas_section(
+        self,
+        session_id: str,
+        section_name: str,
+        agent_id: str
+    ) -> bool:
+        """
+        Assign ownership of a canvas section to an agent.
+
+        Args:
+            session_id: Session ID
+            section_name: Section name
+            agent_id: Agent to assign ('cairn' or 'koda')
+
+        Returns:
+            True if assigned
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return False
+
+        if section_name not in session.canvas_sections:
+            # Create section with owner
+            return self.create_canvas_section(session_id, section_name, agent_id)
+
+        session.canvas_sections[section_name]['owner'] = agent_id
+        print(f"[SessionManager] Canvas section '{section_name}' assigned to {agent_id}")
+
+        self._queue_ws_event(session_id, 'canvas_section_assigned', {
+            'section_name': section_name,
+            'agent_id': agent_id
+        })
+
+        return True
+
+    def get_canvas_section_history(
+        self,
+        session_id: str,
+        section_name: str
+    ) -> List[Dict]:
+        """
+        Get version history for a canvas section.
+
+        Args:
+            session_id: Session ID
+            section_name: Section name
+
+        Returns:
+            List of version history entries
+        """
+        session = self.sessions.get(session_id)
+        if not session or section_name not in session.canvas_sections:
+            return []
+
+        return session.canvas_sections[section_name].get('history', [])
+
+    # ===== Phase 4C.1: Task Delegation Integration =====
+
+    def register_delegated_task(
+        self,
+        session_id: str,
+        task_id: str,
+        task_info: Dict
+    ) -> bool:
+        """
+        Register a delegated task in the session.
+
+        Args:
+            session_id: Session ID
+            task_id: Task ID
+            task_info: Task information dict
+
+        Returns:
+            True if registered
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return False
+
+        session.delegated_tasks[task_id] = task_info
+
+        # Update agent workload
+        to_agent = task_info.get('to_agent')
+        if to_agent in session.agent_workload:
+            session.agent_workload[to_agent]['active_tasks'] += 1
+            session.agent_workload[to_agent]['status'] = 'working'
+
+        # Audit log
+        self._add_audit_entry(
+            session_id,
+            task_info.get('from_agent', 'prax'),
+            'task_delegated',
+            {
+                'task_id': task_id,
+                'to_agent': to_agent,
+                'description': task_info.get('description', '')[:100]
+            }
+        )
+
+        print(f"[SessionManager] Task registered: {task_id}")
+        return True
+
+    def update_delegated_task(
+        self,
+        session_id: str,
+        task_id: str,
+        updates: Dict
+    ) -> bool:
+        """
+        Update a delegated task in the session.
+
+        Args:
+            session_id: Session ID
+            task_id: Task ID
+            updates: Updates to apply
+
+        Returns:
+            True if updated
+        """
+        session = self.sessions.get(session_id)
+        if not session or task_id not in session.delegated_tasks:
+            return False
+
+        session.delegated_tasks[task_id].update(updates)
+
+        # If task completed/failed, update workload
+        status = updates.get('status')
+        if status in ['completed', 'failed', 'cancelled']:
+            to_agent = session.delegated_tasks[task_id].get('to_agent')
+            if to_agent in session.agent_workload:
+                session.agent_workload[to_agent]['active_tasks'] = max(
+                    0,
+                    session.agent_workload[to_agent]['active_tasks'] - 1
+                )
+                if session.agent_workload[to_agent]['active_tasks'] == 0:
+                    session.agent_workload[to_agent]['status'] = 'idle'
+
+        return True
+
+    def get_delegated_task(
+        self,
+        session_id: str,
+        task_id: str
+    ) -> Optional[Dict]:
+        """
+        Get a delegated task by ID.
+
+        Args:
+            session_id: Session ID
+            task_id: Task ID
+
+        Returns:
+            Task info dict or None
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return None
+
+        return session.delegated_tasks.get(task_id)
+
+    def list_delegated_tasks(
+        self,
+        session_id: str,
+        agent_id: Optional[str] = None,
+        status: Optional[str] = None
+    ) -> List[Dict]:
+        """
+        List delegated tasks for a session.
+
+        Args:
+            session_id: Session ID
+            agent_id: Optional filter by agent
+            status: Optional filter by status
+
+        Returns:
+            List of task info dicts
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return []
+
+        tasks = list(session.delegated_tasks.values())
+
+        if agent_id:
+            tasks = [t for t in tasks if t.get('to_agent') == agent_id]
+
+        if status:
+            tasks = [t for t in tasks if t.get('status') == status]
+
+        return tasks
 
 
 # Global session manager instance
