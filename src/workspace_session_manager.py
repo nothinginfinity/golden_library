@@ -41,6 +41,14 @@ except ImportError:
     HAS_DEMO_RECORDER = False
     print("[WorkspaceSessionManager] Warning: DemoRecorder not available")
 
+# Import WorkspaceConfig for configuration & hooks (Phase 4C.6)
+try:
+    from workspace_config import WorkspaceConfig, HookEvent, get_workspace_config
+    HAS_WORKSPACE_CONFIG = True
+except ImportError:
+    HAS_WORKSPACE_CONFIG = False
+    print("[WorkspaceSessionManager] Warning: WorkspaceConfig not available")
+
 
 class UserRole(Enum):
     """User roles in a session."""
@@ -255,7 +263,7 @@ class WorkspaceSession:
 class WorkspaceSessionManager:
     """Manages all workspace sessions."""
 
-    def __init__(self, session_duration_hours: int = 24, database_url: Optional[str] = None):
+    def __init__(self, session_duration_hours: int = 24, database_url: Optional[str] = None, workspace_dir: Optional[str] = None):
         self.sessions: Dict[str, WorkspaceSession] = {}
         self.session_duration_hours = session_duration_hours
         self.cleanup_task = None
@@ -265,6 +273,13 @@ class WorkspaceSessionManager:
         self._conversation_db: Optional[Any] = None
         self._database_url = database_url
         self._db_initialized = False
+
+        # Phase 4C.6: Workspace Configuration
+        self._workspace_config: Optional[Any] = None
+        self._workspace_dir = workspace_dir
+        if HAS_WORKSPACE_CONFIG and workspace_dir:
+            self._workspace_config = WorkspaceConfig(workspace_dir)
+            print(f"[SessionManager] Loaded workspace config: {self._workspace_config.settings.workspace_name}")
 
     def _add_audit_entry(self, session_id: str, user_id: str, action: str, details: Dict[str, Any] = None, workflow_id: Optional[str] = None):
         """Add an entry to the audit log."""
@@ -853,6 +868,92 @@ class WorkspaceSessionManager:
         except Exception as e:
             print(f"[SessionManager] Error exporting JSON: {e}")
             return None
+
+    # ===== Phase 4C.6: Configuration & Hooks Methods =====
+
+    def get_workspace_config(self) -> Optional[Any]:
+        """Get the workspace configuration object."""
+        return self._workspace_config
+
+    def get_workspace_settings(self) -> Dict[str, Any]:
+        """Get all workspace settings."""
+        if not self._workspace_config:
+            return {}
+        return self._workspace_config.get_all_settings()
+
+    def get_user_preferences(self, user_id: str) -> Dict[str, Any]:
+        """Get preferences for a user."""
+        if not self._workspace_config:
+            return {'user_id': user_id, 'theme': 'dark'}  # Defaults
+
+        prefs = self._workspace_config.get_user_preferences(user_id)
+        return prefs.to_dict()
+
+    def update_user_preferences(self, user_id: str, **updates) -> Dict[str, Any]:
+        """Update user preferences."""
+        if not self._workspace_config:
+            return {'error': 'Config not available'}
+
+        prefs = self._workspace_config.update_user_preferences(user_id, **updates)
+        return prefs.to_dict()
+
+    def register_hook(
+        self,
+        event: str,
+        callback,
+        priority: int = 0,
+        description: str = ""
+    ) -> Optional[str]:
+        """Register a hook for workspace events."""
+        if not self._workspace_config:
+            return None
+
+        try:
+            hook_event = HookEvent(event)
+            return self._workspace_config.register_hook(
+                hook_event, callback, priority, description
+            )
+        except ValueError:
+            print(f"[SessionManager] Unknown hook event: {event}")
+            return None
+
+    def fire_hook(self, event: str, data: Dict[str, Any]):
+        """Fire hooks for an event (sync version)."""
+        if not self._workspace_config:
+            return
+
+        try:
+            hook_event = HookEvent(event)
+            self._workspace_config.fire_hook_sync(hook_event, data)
+        except ValueError:
+            pass
+
+    async def fire_hook_async(self, event: str, data: Dict[str, Any]) -> List[Any]:
+        """Fire hooks for an event (async version)."""
+        if not self._workspace_config:
+            return []
+
+        try:
+            hook_event = HookEvent(event)
+            return await self._workspace_config.fire_hook(hook_event, data)
+        except ValueError:
+            return []
+
+    def get_agent_config(self, agent_id: str) -> Dict[str, Any]:
+        """Get configuration for a specific agent."""
+        if not self._workspace_config:
+            return {
+                'personality': 'neutral',
+                'temperature': 0.5,
+                'max_tokens': 4096
+            }
+        return self._workspace_config.get_agent_config(agent_id)
+
+    def reload_config(self):
+        """Reload workspace configuration from disk."""
+        if self._workspace_config:
+            self._workspace_config.reload()
+            print("[SessionManager] Workspace config reloaded")
 
     def update_user_presence(self, session_id: str, user_id: str, **kwargs):
         """Update user presence info (cursor, typing, etc)."""

@@ -5179,6 +5179,51 @@ async def websocket_handler(websocket):
                             'content': content
                         }))
 
+                # Phase 4C.6: Configuration & Preferences
+                elif msg_type == 'config:get':
+                    if session_manager:
+                        settings = session_manager.get_workspace_settings()
+                        await websocket.send(json.dumps({
+                            'event': 'workspace_settings',
+                            'settings': settings
+                        }))
+
+                elif msg_type == 'preferences:get':
+                    if session_manager and user_id:
+                        prefs = session_manager.get_user_preferences(user_id)
+                        await websocket.send(json.dumps({
+                            'event': 'user_preferences',
+                            'preferences': prefs
+                        }))
+
+                elif msg_type == 'preferences:update':
+                    if session_manager and user_id:
+                        updates = data.get('preferences', {})
+                        prefs = session_manager.update_user_preferences(user_id, **updates)
+                        await websocket.send(json.dumps({
+                            'event': 'preferences_updated',
+                            'preferences': prefs
+                        }))
+
+                elif msg_type == 'config:reload':
+                    if session_manager:
+                        session_manager.reload_config()
+                        settings = session_manager.get_workspace_settings()
+                        await websocket.send(json.dumps({
+                            'event': 'config_reloaded',
+                            'settings': settings
+                        }))
+
+                elif msg_type == 'config:agent':
+                    if session_manager:
+                        agent_id = data.get('agent_id', 'prax')
+                        config = session_manager.get_agent_config(agent_id)
+                        await websocket.send(json.dumps({
+                            'event': 'agent_config',
+                            'agent_id': agent_id,
+                            'config': config
+                        }))
+
             except json.JSONDecodeError:
                 pass
             except Exception as e:
