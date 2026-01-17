@@ -49,6 +49,20 @@ except ImportError:
     HAS_WORKSPACE_CONFIG = False
     print("[WorkspaceSessionManager] Warning: WorkspaceConfig not available")
 
+# Import error codes (Phase 4C - Day 2 consolidation)
+try:
+    from error_codes import (
+        make_error_response, session_not_found, db_not_initialized,
+        demo_not_available, demo_already_active, demo_not_active,
+        config_not_available, internal_error
+    )
+    HAS_ERROR_CODES = True
+except ImportError:
+    HAS_ERROR_CODES = False
+    # Fallback error function
+    def make_error_response(code, details=None, **kwargs):
+        return {'error': details or code}
+
 
 class UserRole(Enum):
     """User roles in a session."""
@@ -688,14 +702,14 @@ class WorkspaceSessionManager:
             Recording info or None
         """
         if not HAS_DEMO_RECORDER:
-            return {'error': 'DemoRecorder not available'}
+            return demo_not_available() if HAS_ERROR_CODES else {'error': 'DemoRecorder not available'}
 
         session = self.sessions.get(session_id)
         if not session:
-            return {'error': 'Session not found'}
+            return session_not_found(session_id) if HAS_ERROR_CODES else {'error': 'Session not found'}
 
         if session.demo_mode:
-            return {'error': 'Demo mode already active'}
+            return demo_already_active() if HAS_ERROR_CODES else {'error': 'Demo mode already active'}
 
         try:
             recorder = get_demo_recorder()
@@ -739,14 +753,14 @@ class WorkspaceSessionManager:
             Recording summary or None
         """
         if not HAS_DEMO_RECORDER:
-            return {'error': 'DemoRecorder not available'}
+            return demo_not_available() if HAS_ERROR_CODES else {'error': 'DemoRecorder not available'}
 
         session = self.sessions.get(session_id)
         if not session:
-            return {'error': 'Session not found'}
+            return session_not_found(session_id) if HAS_ERROR_CODES else {'error': 'Session not found'}
 
         if not session.demo_mode:
-            return {'error': 'Demo mode not active'}
+            return demo_not_active() if HAS_ERROR_CODES else {'error': 'Demo mode not active'}
 
         try:
             recorder = get_demo_recorder()

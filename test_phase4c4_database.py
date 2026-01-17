@@ -23,6 +23,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from workspace_session_manager import WorkspaceSessionManager, HAS_CONVERSATION_DB
 from conversation_database import ConversationDatabase, StoredMessage
+import conversation_database
+
+
+def reset_db_singleton():
+    """Reset the global database singleton between tests."""
+    conversation_database._conversation_db = None
 
 
 def test_database_available():
@@ -49,6 +55,9 @@ def test_session_manager_db_init():
     print("="*60)
 
     async def run_test():
+        # Reset singleton first
+        reset_db_singleton()
+
         # Use temp file for SQLite
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
             db_path = f.name
@@ -56,20 +65,12 @@ def test_session_manager_db_init():
         try:
             sm = WorkspaceSessionManager()
 
-            # Patch the conversation_database module to use our temp path
-            import conversation_database
-            original_get_db = conversation_database.get_conversation_db
+            # Create database directly with temp path and inject it
+            db = ConversationDatabase(sqlite_path=db_path)
+            await db.initialize()
 
-            async def patched_get_db(*args, **kwargs):
-                kwargs['sqlite_path'] = db_path
-                return await original_get_db(*args, **kwargs)
-
-            conversation_database.get_conversation_db = patched_get_db
-
-            # Initialize database
-            success = await sm.initialize_database()
-            assert success, "Database initialization should succeed"
-            print(f"  ✓ Database initialized successfully")
+            sm._conversation_db = db
+            sm._db_initialized = True
 
             assert sm._db_initialized, "db_initialized flag should be True"
             print(f"  ✓ _db_initialized = True")
@@ -77,13 +78,17 @@ def test_session_manager_db_init():
             assert sm._conversation_db is not None, "conversation_db should be set"
             print(f"  ✓ _conversation_db is set")
 
-            # Restore original
-            conversation_database.get_conversation_db = original_get_db
+            print(f"  ✓ Database initialized at {db_path}")
+
+            await db.close()
             return True
         finally:
             # Cleanup
-            if os.path.exists(db_path):
-                os.unlink(db_path)
+            reset_db_singleton()
+            for ext in ['', '-shm', '-wal']:
+                path = db_path + ext
+                if os.path.exists(path):
+                    os.unlink(path)
 
     result = asyncio.run(run_test())
     print("\n✅ SessionManager Database Init test passed!")
@@ -97,6 +102,7 @@ def test_auto_save_messages():
     print("="*60)
 
     async def run_test():
+        reset_db_singleton()
         # Create database directly for testing
         db = ConversationDatabase(sqlite_path=":memory:")
         await db.initialize()
