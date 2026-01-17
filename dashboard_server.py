@@ -4991,6 +4991,7 @@ async def websocket_handler(websocket):
 async def broadcast_notifications():
     """Broadcast pending notifications to all connected clients."""
     while True:
+        # Broadcast general pending notifications
         if pending_notifications and connected_clients:
             notification = pending_notifications.pop(0)
             disconnected = set()
@@ -5005,6 +5006,21 @@ async def broadcast_notifications():
             # Remove disconnected clients
             for client in disconnected:
                 connected_clients.discard(client)
+
+        # Broadcast Phase 4B workspace events (agent messages, workflows, blockers)
+        if session_manager:
+            ws_events = session_manager.get_and_clear_ws_events()
+            for event in ws_events:
+                session_id = event.get('session_id')
+                event_type = event.get('event')
+                event_data = event.get('data', {})
+
+                # Broadcast to specific session
+                await session_manager.broadcast_to_session(
+                    session_id,
+                    event_type,
+                    event_data
+                )
 
         await asyncio.sleep(0.1)
 

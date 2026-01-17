@@ -329,6 +329,58 @@
       display: block;
     }
 
+    /* Dashboard Panels */
+    .dashboard-panels {
+      margin-top: 24px;
+      padding: 16px;
+      background: rgba(30, 41, 59, 0.6);
+      border-radius: 8px;
+    }
+
+    .panel-selector {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .panel-btn {
+      padding: 12px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      border-radius: 6px;
+      color: #94a3b8;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      font-size: 0.85rem;
+    }
+
+    .panel-btn:hover {
+      background: rgba(30, 41, 59, 0.9);
+      border-color: rgba(148, 163, 184, 0.5);
+    }
+
+    .panel-btn.active {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: rgba(59, 130, 246, 0.6);
+      color: #60a5fa;
+    }
+
+    .panel-content {
+      display: none;
+      animation: fadeIn 0.2s;
+    }
+
+    .panel-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
     /* Config styles */
     .config-grid {
       display: grid;
@@ -2394,16 +2446,6 @@
     <div class="tabs">
       <button class="tab-btn active" onclick="showTab('dashboard')">📊 Dashboard</button>
       <button class="tab-btn" onclick="showTab('workspace')">🚀 Workspace</button>
-      <button class="tab-btn" onclick="showTab('search')">🔍 Search</button>
-      <button class="tab-btn" onclick="showTab('config')">⚙️ Config</button>
-      <button class="tab-btn" onclick="showTab('arsenal')">🎯 Arsenal</button>
-      <button class="tab-btn" onclick="showTab('mcp')">🔌 MCP</button>
-      <button class="tab-btn" onclick="showTab('daemons')">🤖 Daemons</button>
-      <button class="tab-btn" onclick="showTab('charts')">📈 Charts</button>
-      <button class="tab-btn" onclick="showTab('3dview')">🌐 3D View</button>
-      <button class="tab-btn" onclick="showTab('comparison')">⚖️ Comparison</button>
-      <button class="tab-btn" onclick="showTab('patterns')">🔍 Patterns</button>
-      <button class="tab-btn" onclick="showTab('storage')">💾 Storage</button>
     </div>
 
     <!-- Dashboard Tab -->
@@ -2432,6 +2474,29 @@
         <div class="card-title">Last Compressed</div>
         <div class="card-value" id="stat-last" style="font-size: 1.5rem;">-</div>
         <div class="card-subtitle" id="stat-last-detail">-</div>
+      </div>
+    </div>
+
+    <!-- Dashboard Panels -->
+    <div class="dashboard-panels">
+      <h3 style="color: #a5b4fc; font-size: 1.2rem; margin-bottom: 16px;">🎛️ Dashboard Panels</h3>
+
+      <!-- Panel Selector -->
+      <div class="panel-selector">
+        <button class="panel-btn" onclick="showDashboardPanel('config')">⚙️ Config</button>
+        <button class="panel-btn" onclick="showDashboardPanel('arsenal')">🎯 Arsenal</button>
+        <button class="panel-btn" onclick="showDashboardPanel('mcp')">🔌 MCP</button>
+        <button class="panel-btn" onclick="showDashboardPanel('daemons')">🤖 Daemons</button>
+        <button class="panel-btn" onclick="showDashboardPanel('charts')">📈 Charts</button>
+        <button class="panel-btn" onclick="showDashboardPanel('3dview')">🌐 3D View</button>
+        <button class="panel-btn" onclick="showDashboardPanel('comparison')">⚖️ Comparison</button>
+        <button class="panel-btn" onclick="showDashboardPanel('patterns')">🔍 Patterns</button>
+        <button class="panel-btn" onclick="showDashboardPanel('storage')">💾 Storage</button>
+      </div>
+
+      <!-- Panel Content Container -->
+      <div id="dashboard-panel-content">
+        <!-- Panel content will be loaded here dynamically -->
       </div>
     </div>
 
@@ -2513,7 +2578,12 @@
           <div id="top-panels" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; height: 500px; position: relative;">
 
         <!-- Panel A (Agent A - Koda) -->
-        <div style="background: rgba(15, 23, 42, 0.6); border-radius: 12px; display: flex; flex-direction: column; border: 2px solid rgba(59, 130, 246, 0.4);">
+        <div id="agent-a-panel" style="background: rgba(15, 23, 42, 0.6); border-radius: 12px; display: flex; flex-direction: column; border: 2px solid rgba(59, 130, 246, 0.4); position: relative;">
+          <!-- Inbox Badge -->
+          <div id="agent-koda-inbox-badge" style="display: none; position: absolute; top: 8px; right: 8px; background: rgba(234, 179, 8, 0.3); border: 1px solid #fbbf24; border-radius: 50%; width: 32px; height: 32px; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; z-index: 10;" onclick="showAgentInbox('koda')" title="Agent inbox (unread messages)">
+            📬
+          </div>
+
           <div style="padding: 16px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h3 style="color: #60a5fa; font-size: 1.1rem; margin-bottom: 4px;">🅰️ Agent A (Koda)</h3>
@@ -2557,7 +2627,12 @@
         </div>
 
         <!-- Panel B (Agent B - Cairn) -->
-        <div style="background: rgba(15, 23, 42, 0.6); border-radius: 12px; display: flex; flex-direction: column; border: 2px solid rgba(168, 85, 247, 0.4);">
+        <div id="agent-b-panel" style="background: rgba(15, 23, 42, 0.6); border-radius: 12px; display: flex; flex-direction: column; border: 2px solid rgba(168, 85, 247, 0.4); position: relative;">
+          <!-- Inbox Badge -->
+          <div id="agent-cairn-inbox-badge" style="display: none; position: absolute; top: 8px; right: 8px; background: rgba(234, 179, 8, 0.3); border: 1px solid #fbbf24; border-radius: 50%; width: 32px; height: 32px; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; z-index: 10;" onclick="showAgentInbox('cairn')" title="Agent inbox (unread messages)">
+            📬
+          </div>
+
           <div style="padding: 16px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h3 style="color: #c084fc; font-size: 1.1rem; margin-bottom: 4px;">🅱️ Agent B (Cairn)</h3>
@@ -2607,7 +2682,12 @@
           </div>
 
       <!-- Moderator Panel (Full Width) -->
-      <div style="background: rgba(15, 23, 42, 0.6); border-radius: 12px; display: flex; flex-direction: column; border: 2px solid rgba(234, 179, 8, 0.4); height: 300px;">
+      <div id="moderator-panel" style="background: rgba(15, 23, 42, 0.6); border-radius: 12px; display: flex; flex-direction: column; border: 2px solid rgba(234, 179, 8, 0.4); height: 300px; position: relative;">
+        <!-- Inbox Badge -->
+        <div id="agent-prax-inbox-badge" style="display: none; position: absolute; top: 8px; right: 8px; background: rgba(234, 179, 8, 0.3); border: 1px solid #fbbf24; border-radius: 50%; width: 32px; height: 32px; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; z-index: 10;" onclick="showAgentInbox('prax')" title="Agent inbox (unread messages)">
+          📬
+        </div>
+
         <div style="padding: 16px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: space-between; align-items: center;">
           <div>
             <h3 style="color: #fbbf24; font-size: 1.1rem; margin-bottom: 4px;">🎭 Moderator (Prax)</h3>
@@ -2694,40 +2774,8 @@
     <!-- End Collaborative Workspace Tab -->
 
     <!-- Search Tab -->
-    <div id="tab-search" class="tab-content">
-    <!-- Search Section -->
-    <div class="search-section">
-      <div class="search-box">
-        <input
-          type="text"
-          class="search-input"
-          id="search-input"
-          placeholder="Search all Claude memory... (e.g., 'authentication', 'bug fix', 'phi_proxy')"
-        />
-        <button class="search-btn" onclick="performSearch()">Search</button>
-      </div>
-
-      <div class="filters">
-        <button class="filter-btn active" data-filter="all">All</button>
-        <button class="filter-btn" data-filter="conversations">Conversations</button>
-        <button class="filter-btn" data-filter="history">History</button>
-        <button class="filter-btn" data-filter="todos">Todos</button>
-        <button class="filter-btn" data-filter="debug">Debug</button>
-        <button class="filter-btn" data-filter="logs">Logs</button>
-      </div>
-
-      <div class="results" id="search-results">
-        <div class="empty">
-          <div class="empty-icon">🔍</div>
-          <div>Enter a search query to find across all Claude data</div>
-        </div>
-      </div>
-    </div>
-    </div>
-    <!-- End Search Tab -->
-
-    <!-- Config Tab -->
-    <div id="tab-config" class="tab-content">
+    <!-- Config Panel -->
+    <div id="panel-config" class="panel-content">
       <!-- Model Selection -->
       <div class="chart-container" style="margin-bottom: 24px;">
         <div class="chart-title">🤖 Model Selection</div>
@@ -3088,7 +3136,7 @@
     <!-- End Config Tab -->
 
     <!-- Arsenal Tab -->
-    <div id="tab-arsenal" class="tab-content">
+    <div id="panel-arsenal" class="panel-content">
       <div class="chart-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
           <div>
@@ -3142,7 +3190,7 @@
     <!-- End Arsenal Tab -->
 
     <!-- MCP Servers Tab -->
-    <div id="tab-mcp" class="tab-content">
+    <div id="panel-mcp" class="panel-content">
       <div class="chart-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
           <div class="chart-title">MCP Server Management</div>
@@ -3180,7 +3228,7 @@
     <!-- End MCP Tab -->
 
     <!-- Daemons Tab -->
-    <div id="tab-daemons" class="tab-content">
+    <div id="panel-daemons" class="panel-content">
       <div class="chart-container">
         <div class="chart-title">Daemon Manager</div>
 
@@ -3192,7 +3240,7 @@
     <!-- End Daemons Tab -->
 
     <!-- Charts Tab -->
-    <div id="tab-charts" class="tab-content">
+    <div id="panel-charts" class="panel-content">
     <!-- Chart Section -->
     <div class="chart-container">
       <div class="chart-title">Storage by Category</div>
@@ -3210,7 +3258,7 @@
     <!-- End Charts Tab -->
 
     <!-- 3D View Tab -->
-    <div id="tab-3dview" class="tab-content">
+    <div id="panel-3dview" class="panel-content">
       <div class="viewer-3d-container">
         <!-- Left Control Panel -->
         <div class="viewer-panel-3d">
@@ -3523,7 +3571,7 @@
     <!-- End 3D View Tab -->
 
     <!-- Comparison Tab -->
-    <div id="tab-comparison" class="tab-content">
+    <div id="panel-comparison" class="panel-content">
       <div class="chart-container" style="margin-bottom: 24px;">
         <div class="chart-title">⚖️ Handoff Comparison</div>
         <p style="color: #94a3b8; font-size: 0.9rem; margin-top: 8px;">
@@ -3663,7 +3711,7 @@
     <!-- End Comparison Tab -->
 
     <!-- Patterns Tab -->
-    <div id="tab-patterns" class="tab-content">
+    <div id="panel-patterns" class="panel-content">
       <div class="patterns-header">
         <h2>🔍 Pattern Library</h2>
         <p>Searchable cross-repository patterns from 3869 handoffs across all projects</p>
@@ -3706,7 +3754,7 @@
     <!-- End Patterns Tab -->
 
     <!-- Storage Manager Tab -->
-    <div id="tab-storage" class="tab-content">
+    <div id="panel-storage" class="panel-content">
       <div class="chart-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
           <div>
@@ -4334,38 +4382,48 @@
           btn.classList.add('active');
         }
       });
+    }
 
-      // Load config data if switching to config tab
-      if (tabName === 'config') {
+    function showDashboardPanel(panelName) {
+      // Hide all panels
+      document.querySelectorAll('.panel-content').forEach(panel => {
+        panel.classList.remove('active');
+      });
+      document.querySelectorAll('.panel-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+
+      // Show selected panel
+      const panelElement = document.getElementById(`panel-${panelName}`);
+      if (!panelElement) {
+        console.error(`Panel not found: panel-${panelName}`);
+        return;
+      }
+      panelElement.classList.add('active');
+
+      // Activate the corresponding button
+      document.querySelectorAll('.panel-btn').forEach(btn => {
+        if (btn.getAttribute('onclick')?.includes(`'${panelName}'`)) {
+          btn.classList.add('active');
+        }
+      });
+
+      // Load panel-specific data
+      if (panelName === 'config') {
         loadConfigData();
         loadModelSelection();
         loadTemplates();
-      }
-
-      // Load MCP data if switching to MCP tab
-      if (tabName === 'mcp') {
+      } else if (panelName === 'mcp') {
         loadMCPServers();
-      }
-
-      // Load daemon data if switching to daemons tab
-      if (tabName === 'daemons') {
+      } else if (panelName === 'daemons') {
         loadDaemons();
-      }
-
-      // Initialize 3D viewer if switching to 3D view tab
-      if (tabName === '3dview') {
+      } else if (panelName === '3dview') {
         if (typeof window.init3DViewer === 'function') {
           window.init3DViewer();
         }
-      }
-
-      // Load arsenal data if switching to arsenal tab
-      if (tabName === 'arsenal') {
+      } else if (panelName === 'arsenal') {
         loadArsenal();
-      }
-
-      // Load storage data if switching to storage tab
-      if (tabName === 'storage') {
+      } else if (panelName === 'storage') {
         loadStorageManager();
       }
     }
@@ -9924,6 +9982,336 @@ ${currentConversation.display}
       } else if (event === 'handoff_failed') {
         showNotification(data.data.message || 'Failed to hand off control', 'error');
       }
+      // Phase 4B: Agent-to-Agent Communication Events
+      else if (event === 'agent_message_sent') {
+        handleAgentMessageSent(data.data);
+      } else if (event === 'blocker_escalated') {
+        handleBlockerEscalated(data.data);
+      } else if (event === 'workflow_created') {
+        handleWorkflowCreated(data.data);
+      } else if (event === 'workflow_milestone_updated') {
+        handleWorkflowMilestoneUpdated(data.data);
+      } else if (event === 'context_shared') {
+        handleContextShared(data.data);
+      }
+    }
+
+    // Phase 4B: Event Handlers
+
+    function handleAgentMessageSent(data) {
+      const { from_agent, to_agent, priority, unread_count } = data;
+
+      // Update inbox badge for target agent
+      updateInboxBadge(to_agent, unread_count > 0);
+
+      // Show notification if high priority
+      if (priority === 'high') {
+        showNotification(`🚨 High priority: ${from_agent} → ${to_agent}`, 'warning');
+      }
+
+      // Add to audit log (will be picked up on next refresh)
+      console.log(`[Agent Message] ${from_agent} → ${to_agent} (priority: ${priority})`);
+    }
+
+    function handleBlockerEscalated(data) {
+      const { blocker_id, description, severity, requires_human_input, affected_agents } = data;
+
+      // Show prominent blocker banner
+      showBlockerBanner(blocker_id, description, severity, affected_agents, requires_human_input);
+
+      // Notification
+      showNotification(`🚨 Blocker: ${description}`, 'error');
+    }
+
+    function handleWorkflowCreated(data) {
+      const { workflow_id, name, assigned_agents } = data;
+      showNotification(`Workflow created: ${name}`, 'success');
+
+      // Update workflow display if visible
+      updateWorkflowDisplay();
+    }
+
+    function handleWorkflowMilestoneUpdated(data) {
+      const { workflow_id, milestone, status, completion_percentage } = data;
+
+      // Update workflow progress bar
+      updateWorkflowProgress(workflow_id, milestone, status, completion_percentage);
+
+      // Notification for completed milestones
+      if (status === 'completed') {
+        showNotification(`✓ Milestone complete: ${milestone} (${completion_percentage}%)`, 'success');
+      }
+    }
+
+    function handleContextShared(data) {
+      const { context_key, from_agent, target } = data;
+      showNotification(`📚 ${from_agent} shared context: ${context_key}`, 'info');
+    }
+
+    function updateInboxBadge(agentId, hasUnread) {
+      const badgeId = `agent-${agentId}-inbox-badge`;
+      const badge = document.getElementById(badgeId);
+
+      if (badge) {
+        badge.style.display = hasUnread ? 'flex' : 'none';
+      }
+    }
+
+    function showBlockerBanner(blockerId, description, severity, affectedAgents, requiresHumanInput) {
+      // Create blocker banner element
+      const bannerId = `blocker-banner-${blockerId}`;
+
+      // Check if banner already exists
+      if (document.getElementById(bannerId)) return;
+
+      const banner = document.createElement('div');
+      banner.id = bannerId;
+      banner.style.cssText = `
+        position: fixed;
+        top: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${severity === 'high' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(234, 179, 8, 0.95)'};
+        border: 2px solid ${severity === 'high' ? '#ef4444' : '#fbbf24'};
+        border-radius: 8px;
+        padding: 16px 24px;
+        max-width: 600px;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      `;
+
+      banner.innerHTML = `
+        <div style="display: flex; align-items: start; gap: 12px;">
+          <div style="font-size: 1.5rem;">🚨</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600; margin-bottom: 4px; color: white;">
+              ${severity === 'high' ? 'CRITICAL BLOCKER' : 'BLOCKER'}
+              ${requiresHumanInput ? ' - Human Input Required' : ''}
+            </div>
+            <div style="color: rgba(255, 255, 255, 0.9); font-size: 0.9rem;">${description}</div>
+            <div style="margin-top: 8px; font-size: 0.75rem; color: rgba(255, 255, 255, 0.7);">
+              Affected: ${affectedAgents.join(', ')}
+            </div>
+          </div>
+          <button onclick="dismissBlockerBanner('${bannerId}')" style="background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">
+            Dismiss
+          </button>
+        </div>
+      `;
+
+      document.body.appendChild(banner);
+
+      // Auto-dismiss after 30 seconds for medium/low severity
+      if (severity !== 'high') {
+        setTimeout(() => dismissBlockerBanner(bannerId), 30000);
+      }
+    }
+
+    function dismissBlockerBanner(bannerId) {
+      const banner = document.getElementById(bannerId);
+      if (banner) {
+        banner.style.transition = 'opacity 0.3s';
+        banner.style.opacity = '0';
+        setTimeout(() => banner.remove(), 300);
+      }
+    }
+
+    function updateWorkflowProgress(workflowId, milestone, status, completionPercentage) {
+      // Update or create workflow progress display
+      let progressContainer = document.getElementById('workflow-progress-container');
+
+      if (!progressContainer) {
+        // Create container in session info area
+        const sessionInfo = document.getElementById('session-info');
+        if (!sessionInfo) return;
+
+        progressContainer = document.createElement('div');
+        progressContainer.id = 'workflow-progress-container';
+        progressContainer.style.cssText = `
+          margin-top: 16px;
+          padding: 12px;
+          background: rgba(15, 23, 42, 0.6);
+          border-radius: 8px;
+          border: 1px solid rgba(148, 163, 184, 0.2);
+        `;
+
+        progressContainer.innerHTML = `
+          <div style="font-size: 0.9rem; font-weight: 600; color: #94a3b8; margin-bottom: 8px;">
+            📊 Workflow Progress
+          </div>
+          <div id="workflow-milestones" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        `;
+
+        sessionInfo.appendChild(progressContainer);
+      }
+
+      const milestonesContainer = document.getElementById('workflow-milestones');
+      if (!milestonesContainer) return;
+
+      // Find or create milestone element
+      const milestoneId = `milestone-${workflowId}-${milestone.replace(/\s+/g, '-')}`;
+      let milestoneEl = document.getElementById(milestoneId);
+
+      if (!milestoneEl) {
+        milestoneEl = document.createElement('div');
+        milestoneEl.id = milestoneId;
+        milestonesContainer.appendChild(milestoneEl);
+      }
+
+      const statusColor = {
+        'completed': '#10b981',
+        'in_progress': '#3b82f6',
+        'blocked': '#ef4444',
+        'pending': '#94a3b8'
+      }[status] || '#94a3b8';
+
+      milestoneEl.innerHTML = `
+        <div style="font-size: 0.85rem; color: #cbd5e1; margin-bottom: 4px;">
+          ${milestone}
+          <span style="color: ${statusColor}; margin-left: 8px;">● ${status}</span>
+        </div>
+        <div style="background: rgba(30, 41, 59, 0.8); height: 8px; border-radius: 4px; overflow: hidden;">
+          <div style="background: ${statusColor}; height: 100%; width: ${completionPercentage}%; transition: width 0.3s;"></div>
+        </div>
+        <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px; text-align: right;">
+          ${completionPercentage}%
+        </div>
+      `;
+    }
+
+    function updateWorkflowDisplay() {
+      // Refresh workflow data from session
+      fetchSession().then(session => {
+        if (session && session.workflows) {
+          Object.entries(session.workflows).forEach(([workflowId, workflow]) => {
+            // Update each workflow's milestones
+            Object.entries(workflow.milestones || {}).forEach(([milestone, data]) => {
+              updateWorkflowProgress(
+                workflowId,
+                milestone,
+                data.status,
+                data.completion_percentage
+              );
+            });
+          });
+        }
+      });
+    }
+
+    async function showAgentInbox(agentId) {
+      // Fetch current session data
+      const session = await fetchSession();
+      if (!session || !session.agent_inboxes) {
+        showNotification('No inbox data available', 'warning');
+        return;
+      }
+
+      const inbox = session.agent_inboxes[agentId] || [];
+
+      // Create modal
+      const modal = document.createElement('div');
+      modal.id = 'agent-inbox-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+      `;
+
+      const agentNames = {
+        'prax': 'Prax (Orchestrator)',
+        'cairn': 'Cairn (Architect)',
+        'koda': 'Koda (Builder)'
+      };
+
+      const modalContent = document.createElement('div');
+      modalContent.style.cssText = `
+        background: rgba(15, 23, 42, 0.98);
+        border: 2px solid rgba(148, 163, 184, 0.3);
+        border-radius: 12px;
+        max-width: 700px;
+        width: 90%;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+      `;
+
+      // Count unread
+      const unreadCount = inbox.filter(m => !m.read).length;
+
+      modalContent.innerHTML = `
+        <div style="padding: 20px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h2 style="color: #e2e8f0; margin: 0; font-size: 1.3rem;">
+              📬 ${agentNames[agentId]} Inbox
+            </h2>
+            <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">
+              ${inbox.length} message${inbox.length !== 1 ? 's' : ''}
+              ${unreadCount > 0 ? `(${unreadCount} unread)` : ''}
+            </div>
+          </div>
+          <button onclick="closeAgentInbox()" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
+            Close
+          </button>
+        </div>
+        <div id="inbox-messages" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px;">
+          ${inbox.length === 0 ? `
+            <div style="text-align: center; color: #64748b; padding: 40px; font-size: 0.95rem;">
+              📭 No messages in inbox
+            </div>
+          ` : inbox.map(msg => `
+            <div style="background: ${msg.read ? 'rgba(30, 41, 59, 0.6)' : 'rgba(59, 130, 246, 0.1)'}; border: 1px solid ${msg.read ? 'rgba(148, 163, 184, 0.2)' : 'rgba(59, 130, 246, 0.3)'}; border-radius: 8px; padding: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-weight: 600; color: #60a5fa; font-size: 0.9rem;">From: ${msg.from_agent}</span>
+                  ${msg.priority === 'high' ? '<span style="background: rgba(239, 68, 68, 0.3); border: 1px solid #ef4444; color: #fca5a5; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">HIGH</span>' : ''}
+                  ${!msg.read ? '<span style="background: rgba(59, 130, 246, 0.3); border: 1px solid #3b82f6; color: #93c5fd; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">UNREAD</span>' : ''}
+                </div>
+                <div style="font-size: 0.75rem; color: #64748b;">
+                  ${new Date(msg.timestamp).toLocaleTimeString()}
+                </div>
+              </div>
+              <div style="color: #cbd5e1; font-size: 0.9rem; line-height: 1.5;">
+                ${msg.content}
+              </div>
+              ${msg.metadata && msg.metadata.workflow_id ? `
+                <div style="margin-top: 8px; font-size: 0.75rem; color: #64748b;">
+                  Workflow: ${msg.metadata.workflow_id}
+                  ${msg.metadata.task_type ? ` | Type: ${msg.metadata.task_type}` : ''}
+                </div>
+              ` : ''}
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      modal.appendChild(modalContent);
+      document.body.appendChild(modal);
+
+      // Mark badge as viewed (messages stay unread until explicitly marked)
+      updateInboxBadge(agentId, false);
+
+      // Close on background click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          closeAgentInbox();
+        }
+      });
+    }
+
+    function closeAgentInbox() {
+      const modal = document.getElementById('agent-inbox-modal');
+      if (modal) {
+        modal.style.transition = 'opacity 0.2s';
+        modal.style.opacity = '0';
+        setTimeout(() => modal.remove(), 200);
+      }
     }
 
     function updateAgentControlDisplay(agentControl) {
@@ -10147,7 +10535,34 @@ ${currentConversation.display}
             color = '#64748b';
             actionText = `stopped editing ${entry.details?.agent_id || 'document'}`;
             break;
+          // Phase 4B: Agent coordination events
+          case 'agent_message_sent':
+            icon = '📨';
+            color = entry.details?.priority === 'high' ? '#f59e0b' : '#3b82f6';
+            actionText = `${entry.details?.from_agent || entry.user_id} → ${entry.details?.to_agent || 'agent'}`;
+            break;
+          case 'blocker_escalated':
+            icon = '🚨';
+            color = '#ef4444';
+            actionText = `BLOCKER: ${entry.details?.description?.substring(0, 50) || 'Issue escalated'}`;
+            break;
+          case 'milestone_updated':
+            icon = '📊';
+            color = entry.details?.status === 'completed' ? '#10b981' : '#3b82f6';
+            actionText = `${entry.details?.milestone}: ${entry.details?.status} (${entry.details?.completion_percentage || 0}%)`;
+            break;
+          case 'context_shared':
+            icon = '📚';
+            color = '#a855f7';
+            actionText = `shared context: ${entry.details?.context_key || 'unknown'}`;
+            break;
         }
+
+        const workflowBadge = entry.workflow_id ? `
+          <span style="background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; padding: 2px 6px; border-radius: 3px; font-size: 0.65rem; margin-left: 8px;">
+            ${entry.workflow_id}
+          </span>
+        ` : '';
 
         return `
           <div style="padding: 6px 8px; border-left: 2px solid ${color}; margin-bottom: 4px; background: rgba(15, 23, 42, 0.4); border-radius: 4px;">
@@ -10156,6 +10571,7 @@ ${currentConversation.display}
                 <span style="font-size: 0.75rem;">
                   <span style="margin-right: 4px;">${icon}</span>
                   <span style="color: ${color}; font-weight: 500;">${actionText}</span>
+                  ${workflowBadge}
                 </span>
               </div>
               <div style="color: #64748b; font-size: 0.65rem; white-space: nowrap;">${timeStr}</div>

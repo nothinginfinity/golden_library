@@ -34,14 +34,49 @@ class UserRole(Enum):
 
 
 @dataclass
+class AgentMessage:
+    """Agent-to-agent message with orchestration metadata."""
+    id: str
+    from_agent: str  # 'prax', 'cairn', 'koda'
+    to_agent: str    # 'prax', 'cairn', 'koda'
+    content: str
+    timestamp: str
+    priority: str = 'medium'  # 'high', 'medium', 'low'
+    read: bool = False
+    metadata: Dict[str, Any] = field(default_factory=dict)  # workflow_id, task_type, deadline, depends_on, context_keys
+
+    def to_dict(self):
+        """Convert to dict for JSON serialization."""
+        return asdict(self)
+
+
+@dataclass
+class WorkflowState:
+    """Tracks multi-agent workflow state."""
+    id: str
+    name: str
+    status: str  # 'active', 'completed', 'blocked'
+    milestones: Dict[str, Dict] = field(default_factory=dict)  # milestone -> {status, completion%}
+    dependencies: List[str] = field(default_factory=list)
+    assigned_agents: List[str] = field(default_factory=list)
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    deadline: Optional[str] = None
+
+    def to_dict(self):
+        """Convert to dict for JSON serialization."""
+        return asdict(self)
+
+
+@dataclass
 class AuditEntry:
     """Represents an audit log entry."""
     id: str
     session_id: str
     timestamp: str
     user_id: str
-    action: str  # 'join', 'leave', 'message', 'claim_control', 'release_control', 'role_change', 'lock_acquire', 'lock_release'
+    action: str  # 'join', 'leave', 'message', 'claim_control', 'release_control', 'role_change', 'lock_acquire', 'lock_release', 'agent_message_sent', 'blocker_escalated', 'milestone_updated', 'context_shared'
     details: Dict[str, Any] = field(default_factory=dict)
+    workflow_id: Optional[str] = None  # Link to workflow if applicable
 
     def to_dict(self):
         """Convert to dict for JSON serialization."""
@@ -137,6 +172,25 @@ class WorkspaceSession:
     audit_log: List[AuditEntry] = field(default_factory=list)
     orchestrator: Any = None  # AgentOrchestrator instance for this session
 
+    # Phase 4B: Agent-to-Agent Communication
+    agent_inboxes: Dict[str, List[AgentMessage]] = field(default_factory=lambda: {
+        'prax': [],
+        'cairn': [],
+        'koda': []
+    })
+    shared_contexts: Dict[str, Any] = field(default_factory=dict)  # context_key -> content
+    workflows: Dict[str, WorkflowState] = field(default_factory=dict)  # workflow_id -> state
+    agent_capabilities: Dict[str, List[str]] = field(default_factory=lambda: {
+        'prax': ['orchestration', 'coordination', 'strategy'],
+        'cairn': ['architecture', 'design', 'code_review'],
+        'koda': ['implementation', 'testing', 'debugging']
+    })
+    agent_workload: Dict[str, Dict] = field(default_factory=lambda: {
+        'prax': {'active_tasks': 0, 'status': 'idle'},
+        'cairn': {'active_tasks': 0, 'status': 'idle'},
+        'koda': {'active_tasks': 0, 'status': 'idle'}
+    })
+
     def to_dict(self):
         """Convert to dict for JSON serialization (excluding orchestrator)."""
         return {
@@ -150,7 +204,16 @@ class WorkspaceSession:
             'documents': self.documents,
             'agent_control': self.agent_control,
             'document_locks': self.document_locks,
-            'audit_log': [entry.to_dict() for entry in self.audit_log]
+            'audit_log': [entry.to_dict() for entry in self.audit_log],
+            # Phase 4B fields
+            'agent_inboxes': {
+                agent: [msg.to_dict() for msg in msgs]
+                for agent, msgs in self.agent_inboxes.items()
+            },
+            'shared_contexts': self.shared_contexts,
+            'workflows': {wid: wf.to_dict() for wid, wf in self.workflows.items()},
+            'agent_capabilities': self.agent_capabilities,
+            'agent_workload': self.agent_workload
             # orchestrator excluded (not JSON serializable)
         }
 
@@ -167,8 +230,9 @@ class WorkspaceSessionManager:
         self.sessions: Dict[str, WorkspaceSession] = {}
         self.session_duration_hours = session_duration_hours
         self.cleanup_task = None
+        self.ws_event_queue: List[Dict] = []  # Queue for WebSocket events to broadcast
 
-    def _add_audit_entry(self, session_id: str, user_id: str, action: str, details: Dict[str, Any] = None):
+    def _add_audit_entry(self, session_id: str, user_id: str, action: str, details: Dict[str, Any] = None, workflow_id: Optional[str] = None):
         """Add an entry to the audit log."""
         session = self.sessions.get(session_id)
         if not session:
@@ -180,7 +244,8 @@ class WorkspaceSessionManager:
             timestamp=datetime.utcnow().isoformat(),
             user_id=user_id,
             action=action,
-            details=details or {}
+            details=details or {},
+            workflow_id=workflow_id
         )
 
         session.audit_log.append(entry)
@@ -249,11 +314,15 @@ class WorkspaceSessionManager:
             users={owner_id: owner}
         )
 
-        # Initialize AgentOrchestrator for this session
+        # Initialize AgentOrchestrator for this session (with MCP tools support)
         if AgentOrchestrator:
             try:
-                session.orchestrator = AgentOrchestrator(session_users=session.users)
-                print(f"[SessionManager] Initialized AgentOrchestrator for session {session_id}")
+                session.orchestrator = AgentOrchestrator(
+                    session_users=session.users,
+                    session_manager=self,  # Pass session manager for MCP tools
+                    session_id=session_id   # Pass session ID for MCP tool calls
+                )
+                print(f"[SessionManager] Initialized AgentOrchestrator for session {session_id} with MCP tools")
             except Exception as e:
                 print(f"[SessionManager] Warning: Could not initialize orchestrator: {e}")
 
@@ -444,6 +513,33 @@ class WorkspaceSessionManager:
             session_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
             if session_id not in self.sessions:
                 return session_id
+
+    def _queue_ws_event(self, session_id: str, event_type: str, data: Dict):
+        """
+        Queue a WebSocket event for broadcast.
+
+        Args:
+            session_id: Session ID to broadcast to
+            event_type: Event type name
+            data: Event data
+        """
+        self.ws_event_queue.append({
+            'session_id': session_id,
+            'event': event_type,
+            'data': data,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+
+    def get_and_clear_ws_events(self) -> List[Dict]:
+        """
+        Get all pending WebSocket events and clear the queue.
+
+        Returns:
+            List of event dicts
+        """
+        events = self.ws_event_queue.copy()
+        self.ws_event_queue.clear()
+        return events
 
     def can_control_agent(self, session_id: str, user_id: str) -> bool:
         """Check if user has permission to control agents (OWNER or EDITOR)."""
@@ -679,6 +775,709 @@ class WorkspaceSessionManager:
                 for s in self.sessions.values()
             ]
         }
+
+    # ===== Phase 4B: MCP Inbox Tools =====
+
+    def send_agent_message(
+        self,
+        session_id: str,
+        from_agent: str,
+        to_agent: str,
+        content: str,
+        priority: str = 'medium',
+        metadata: Optional[Dict] = None
+    ) -> Optional[AgentMessage]:
+        """
+        Send message from one agent to another via inbox.
+
+        Args:
+            session_id: Session ID
+            from_agent: Source agent ('prax', 'cairn', 'koda')
+            to_agent: Target agent ('prax', 'cairn', 'koda')
+            content: Message content
+            priority: 'high', 'medium', or 'low'
+            metadata: Optional metadata dict with workflow_id, task_type, etc.
+
+        Returns:
+            AgentMessage if successful, None otherwise
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return None
+
+        # Validate agent IDs
+        valid_agents = ['prax', 'cairn', 'koda']
+        if from_agent not in valid_agents or to_agent not in valid_agents:
+            print(f"[SessionManager] Invalid agent ID: {from_agent} -> {to_agent}")
+            return None
+
+        # Create message
+        message = AgentMessage(
+            id=str(uuid.uuid4()),
+            from_agent=from_agent,
+            to_agent=to_agent,
+            content=content,
+            timestamp=datetime.utcnow().isoformat(),
+            priority=priority,
+            read=False,
+            metadata=metadata or {}
+        )
+
+        # Add to target agent's inbox
+        session.agent_inboxes[to_agent].append(message)
+
+        # Update agent workload
+        session.agent_workload[to_agent]['active_tasks'] += 1
+
+        # Audit log
+        self._add_audit_entry(
+            session_id,
+            from_agent,  # Using from_agent as user_id for agent actions
+            'agent_message_sent',
+            {
+                'from_agent': from_agent,
+                'to_agent': to_agent,
+                'priority': priority,
+                'message_preview': content[:100],
+                'workflow_id': metadata.get('workflow_id') if metadata else None
+            },
+            workflow_id=metadata.get('workflow_id') if metadata else None
+        )
+
+        print(f"[SessionManager] Agent message: {from_agent} → {to_agent} (priority: {priority})")
+
+        # Queue WebSocket event for broadcast (will be picked up by async task)
+        self._queue_ws_event(session_id, 'agent_message_sent', {
+            'message_id': message.id,
+            'from_agent': from_agent,
+            'to_agent': to_agent,
+            'priority': priority,
+            'content_preview': content[:100],
+            'workflow_id': metadata.get('workflow_id') if metadata else None,
+            'unread_count': len([m for m in session.agent_inboxes[to_agent] if not m.read])
+        })
+
+        return message
+
+    def check_inbox(
+        self,
+        session_id: str,
+        agent_id: str,
+        from_agent: Optional[str] = None,
+        unread_only: bool = False,
+        limit: int = 10,
+        workflow_id: Optional[str] = None
+    ) -> List[AgentMessage]:
+        """
+        Check agent's inbox for messages.
+
+        Args:
+            session_id: Session ID
+            agent_id: Agent checking inbox ('prax', 'cairn', 'koda')
+            from_agent: Optional filter by sender
+            unread_only: Only return unread messages
+            limit: Max messages to return
+            workflow_id: Optional filter by workflow
+
+        Returns:
+            List of AgentMessages
+        """
+        session = self.sessions.get(session_id)
+        if not session or agent_id not in session.agent_inboxes:
+            return []
+
+        messages = session.agent_inboxes[agent_id]
+
+        # Apply filters
+        filtered = messages
+        if from_agent:
+            filtered = [m for m in filtered if m.from_agent == from_agent]
+        if unread_only:
+            filtered = [m for m in filtered if not m.read]
+        if workflow_id:
+            filtered = [m for m in filtered if m.metadata.get('workflow_id') == workflow_id]
+
+        # Return most recent first, limited
+        return list(reversed(filtered))[:limit]
+
+    def mark_read(self, session_id: str, agent_id: str, message_id: str) -> bool:
+        """
+        Mark an agent message as read.
+
+        Args:
+            session_id: Session ID
+            agent_id: Agent who read the message
+            message_id: Message ID
+
+        Returns:
+            True if successful
+        """
+        session = self.sessions.get(session_id)
+        if not session or agent_id not in session.agent_inboxes:
+            return False
+
+        for msg in session.agent_inboxes[agent_id]:
+            if msg.id == message_id:
+                msg.read = True
+                return True
+
+        return False
+
+    def search_messages(
+        self,
+        session_id: str,
+        agent_id: str,
+        query: str,
+        from_agent: Optional[str] = None,
+        workflow_id: Optional[str] = None,
+        task_type: Optional[str] = None
+    ) -> List[AgentMessage]:
+        """
+        Search agent inbox for messages matching query.
+
+        Args:
+            session_id: Session ID
+            agent_id: Agent searching inbox
+            query: Keyword or phrase to search
+            from_agent: Optional filter by sender
+            workflow_id: Optional filter by workflow
+            task_type: Optional filter by task type
+
+        Returns:
+            List of matching AgentMessages
+        """
+        session = self.sessions.get(session_id)
+        if not session or agent_id not in session.agent_inboxes:
+            return []
+
+        messages = session.agent_inboxes[agent_id]
+
+        # Apply filters
+        filtered = messages
+        if from_agent:
+            filtered = [m for m in filtered if m.from_agent == from_agent]
+        if workflow_id:
+            filtered = [m for m in filtered if m.metadata.get('workflow_id') == workflow_id]
+        if task_type:
+            filtered = [m for m in filtered if m.metadata.get('task_type') == task_type]
+
+        # Search content
+        query_lower = query.lower()
+        results = [m for m in filtered if query_lower in m.content.lower()]
+
+        return results
+
+    # ===== Phase 4B: Orchestration Tools =====
+
+    def broadcast_status_request(
+        self,
+        session_id: str,
+        targets: List[str],
+        workflow_id: str,
+        request_type: str = 'progress'
+    ) -> List[AgentMessage]:
+        """
+        Prax broadcasts status request to multiple agents.
+
+        Args:
+            session_id: Session ID
+            targets: List of agent IDs to request from
+            workflow_id: Workflow ID
+            request_type: 'progress', 'blockers', 'eta', 'capabilities'
+
+        Returns:
+            List of sent messages
+        """
+        sent_messages = []
+
+        for agent in targets:
+            msg = self.send_agent_message(
+                session_id,
+                from_agent='prax',
+                to_agent=agent,
+                content=f"Status request: {request_type} for workflow {workflow_id}",
+                priority='medium',
+                metadata={
+                    'workflow_id': workflow_id,
+                    'task_type': 'status_request',
+                    'request_type': request_type
+                }
+            )
+            if msg:
+                sent_messages.append(msg)
+
+        return sent_messages
+
+    def get_workflow_status(self, session_id: str, workflow_id: str) -> Optional[WorkflowState]:
+        """
+        Get current workflow state.
+
+        Args:
+            session_id: Session ID
+            workflow_id: Workflow ID
+
+        Returns:
+            WorkflowState or None
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return None
+
+        return session.workflows.get(workflow_id)
+
+    def create_workflow(
+        self,
+        session_id: str,
+        workflow_id: str,
+        name: str,
+        assigned_agents: List[str],
+        deadline: Optional[str] = None
+    ) -> Optional[WorkflowState]:
+        """
+        Create a new workflow.
+
+        Args:
+            session_id: Session ID
+            workflow_id: Unique workflow ID
+            name: Workflow name
+            assigned_agents: List of agent IDs
+            deadline: Optional deadline (ISO format)
+
+        Returns:
+            WorkflowState or None
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return None
+
+        workflow = WorkflowState(
+            id=workflow_id,
+            name=name,
+            status='active',
+            assigned_agents=assigned_agents,
+            deadline=deadline
+        )
+
+        session.workflows[workflow_id] = workflow
+
+        print(f"[SessionManager] Created workflow {workflow_id}: {name}")
+
+        # Queue WebSocket event
+        self._queue_ws_event(session_id, 'workflow_created', {
+            'workflow_id': workflow_id,
+            'name': name,
+            'assigned_agents': assigned_agents,
+            'deadline': deadline
+        })
+
+        return workflow
+
+    def set_milestone(
+        self,
+        session_id: str,
+        workflow_id: str,
+        milestone: str,
+        status: str = 'in_progress',
+        completion_percentage: int = 0
+    ) -> bool:
+        """
+        Set or update a workflow milestone.
+
+        Args:
+            session_id: Session ID
+            workflow_id: Workflow ID
+            milestone: Milestone name
+            status: 'pending', 'in_progress', 'completed', 'blocked'
+            completion_percentage: 0-100
+
+        Returns:
+            True if successful
+        """
+        session = self.sessions.get(session_id)
+        if not session or workflow_id not in session.workflows:
+            return False
+
+        workflow = session.workflows[workflow_id]
+        workflow.milestones[milestone] = {
+            'status': status,
+            'completion_percentage': completion_percentage,
+            'updated_at': datetime.utcnow().isoformat()
+        }
+
+        # Audit log
+        self._add_audit_entry(
+            session_id,
+            'system',
+            'milestone_updated',
+            {
+                'workflow_id': workflow_id,
+                'milestone': milestone,
+                'status': status,
+                'completion_percentage': completion_percentage
+            },
+            workflow_id=workflow_id
+        )
+
+        print(f"[SessionManager] Milestone updated: {milestone} → {status} ({completion_percentage}%)")
+
+        # Queue WebSocket event
+        self._queue_ws_event(session_id, 'workflow_milestone_updated', {
+            'workflow_id': workflow_id,
+            'milestone': milestone,
+            'status': status,
+            'completion_percentage': completion_percentage
+        })
+
+        return True
+
+    def get_dependencies(self, session_id: str, workflow_id: str) -> List[str]:
+        """
+        Get workflow dependencies.
+
+        Args:
+            session_id: Session ID
+            workflow_id: Workflow ID
+
+        Returns:
+            List of dependency workflow IDs
+        """
+        session = self.sessions.get(session_id)
+        if not session or workflow_id not in session.workflows:
+            return []
+
+        return session.workflows[workflow_id].dependencies
+
+    def escalate_blocker(
+        self,
+        session_id: str,
+        blocker_description: str,
+        affected_agents: List[str],
+        severity: str = 'medium',
+        requires_human_input: bool = False
+    ) -> str:
+        """
+        Escalate blocker to humans via UI notification.
+
+        Args:
+            session_id: Session ID
+            blocker_description: Description of blocker
+            affected_agents: List of affected agent IDs
+            severity: 'high', 'medium', 'low'
+            requires_human_input: Whether human intervention needed
+
+        Returns:
+            Blocker ID
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return ""
+
+        blocker_id = str(uuid.uuid4())
+
+        # Audit log
+        self._add_audit_entry(
+            session_id,
+            'system',
+            'blocker_escalated',
+            {
+                'blocker_id': blocker_id,
+                'description': blocker_description,
+                'affected_agents': affected_agents,
+                'severity': severity,
+                'requires_human_input': requires_human_input
+            }
+        )
+
+        print(f"[SessionManager] Blocker escalated: {blocker_description} (severity: {severity})")
+
+        # Queue WebSocket event
+        self._queue_ws_event(session_id, 'blocker_escalated', {
+            'blocker_id': blocker_id,
+            'description': blocker_description,
+            'affected_agents': affected_agents,
+            'severity': severity,
+            'requires_human_input': requires_human_input
+        })
+
+        return blocker_id
+
+    def reassign_task(
+        self,
+        session_id: str,
+        workflow_id: str,
+        from_agent: str,
+        to_agent: str,
+        task_context: str,
+        reason: str
+    ) -> bool:
+        """
+        Reassign task from one agent to another.
+
+        Args:
+            session_id: Session ID
+            workflow_id: Workflow ID
+            from_agent: Current agent
+            to_agent: New agent
+            task_context: Task description
+            reason: Reason for reassignment
+
+        Returns:
+            True if successful
+        """
+        session = self.sessions.get(session_id)
+        if not session or workflow_id not in session.workflows:
+            return False
+
+        # Send message to new agent
+        self.send_agent_message(
+            session_id,
+            from_agent='prax',
+            to_agent=to_agent,
+            content=f"Task reassigned from {from_agent}: {task_context}\nReason: {reason}",
+            priority='high',
+            metadata={
+                'workflow_id': workflow_id,
+                'task_type': 'reassignment',
+                'original_agent': from_agent
+            }
+        )
+
+        # Update workload
+        session.agent_workload[from_agent]['active_tasks'] -= 1
+        session.agent_workload[to_agent]['active_tasks'] += 1
+
+        print(f"[SessionManager] Task reassigned: {from_agent} → {to_agent} ({reason})")
+
+        return True
+
+    # ===== Phase 4B: Context Sharing Tools =====
+
+    def share_context(
+        self,
+        session_id: str,
+        from_agent: str,
+        target: str,
+        context_key: str,
+        content: Any,
+        workflow_id: str
+    ) -> bool:
+        """
+        Share context/knowledge between agents.
+
+        Args:
+            session_id: Session ID
+            from_agent: Agent sharing context
+            target: Target agent or 'all'
+            context_key: Unique context key
+            content: Context content (any JSON-serializable data)
+            workflow_id: Workflow ID
+
+        Returns:
+            True if successful
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return False
+
+        # Store in shared contexts with workflow scope
+        full_key = f"{workflow_id}:{context_key}"
+        session.shared_contexts[full_key] = {
+            'content': content,
+            'from_agent': from_agent,
+            'target': target,
+            'workflow_id': workflow_id,
+            'created_at': datetime.utcnow().isoformat()
+        }
+
+        # Audit log
+        self._add_audit_entry(
+            session_id,
+            from_agent,
+            'context_shared',
+            {
+                'context_key': context_key,
+                'target': target,
+                'workflow_id': workflow_id
+            },
+            workflow_id=workflow_id
+        )
+
+        # Notify target agent(s)
+        if target == 'all':
+            agents = ['prax', 'cairn', 'koda']
+        else:
+            agents = [target]
+
+        for agent in agents:
+            if agent != from_agent:
+                self.send_agent_message(
+                    session_id,
+                    from_agent=from_agent,
+                    to_agent=agent,
+                    content=f"Shared context available: {context_key}",
+                    priority='medium',
+                    metadata={
+                        'workflow_id': workflow_id,
+                        'task_type': 'context_share',
+                        'context_keys': [context_key]
+                    }
+                )
+
+        print(f"[SessionManager] Context shared: {context_key} by {from_agent} to {target}")
+
+        # Queue WebSocket event
+        self._queue_ws_event(session_id, 'context_shared', {
+            'context_key': context_key,
+            'from_agent': from_agent,
+            'target': target,
+            'workflow_id': workflow_id
+        })
+
+        return True
+
+    def get_shared_context(
+        self,
+        session_id: str,
+        context_key: str,
+        workflow_id: str
+    ) -> Optional[Dict]:
+        """
+        Retrieve shared context.
+
+        Args:
+            session_id: Session ID
+            context_key: Context key
+            workflow_id: Workflow ID
+
+        Returns:
+            Context data or None
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return None
+
+        full_key = f"{workflow_id}:{context_key}"
+        return session.shared_contexts.get(full_key)
+
+    def list_shared_contexts(self, session_id: str, workflow_id: str) -> List[str]:
+        """
+        List all shared contexts for a workflow.
+
+        Args:
+            session_id: Session ID
+            workflow_id: Workflow ID
+
+        Returns:
+            List of context keys
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return []
+
+        prefix = f"{workflow_id}:"
+        return [
+            key.split(':', 1)[1]
+            for key in session.shared_contexts.keys()
+            if key.startswith(prefix)
+        ]
+
+    # ===== Phase 4B: Agent Discovery & Coordination =====
+
+    def get_agent_capabilities(self, session_id: str, agent_id: str) -> List[str]:
+        """
+        Get agent's capabilities.
+
+        Args:
+            session_id: Session ID
+            agent_id: Agent ID
+
+        Returns:
+            List of capability strings
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return []
+
+        return session.agent_capabilities.get(agent_id, [])
+
+    def get_agent_workload(self, session_id: str, agent_id: str) -> Dict:
+        """
+        Get agent's current workload status.
+
+        Args:
+            session_id: Session ID
+            agent_id: Agent ID
+
+        Returns:
+            Workload dict with active_tasks and status
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return {}
+
+        return session.agent_workload.get(agent_id, {})
+
+    def check_timeline_conflicts(
+        self,
+        session_id: str,
+        agent_id: str,
+        new_task: Dict
+    ) -> bool:
+        """
+        Check if agent has timeline conflicts for new task.
+
+        Args:
+            session_id: Session ID
+            agent_id: Agent ID
+            new_task: Dict with 'estimated_duration', 'deadline', 'priority'
+
+        Returns:
+            True if conflict exists
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            return False
+
+        workload = session.agent_workload.get(agent_id, {})
+
+        # Simple conflict detection: if agent has more than 3 active tasks, flag conflict
+        # In production, would parse deadlines and check actual timeline
+        return workload.get('active_tasks', 0) >= 3
+
+    def set_deadline(
+        self,
+        session_id: str,
+        workflow_id: str,
+        task_id: str,
+        deadline: str
+    ) -> bool:
+        """
+        Set deadline for a task in workflow.
+
+        Args:
+            session_id: Session ID
+            workflow_id: Workflow ID
+            task_id: Task ID
+            deadline: ISO format datetime string
+
+        Returns:
+            True if successful
+        """
+        session = self.sessions.get(session_id)
+        if not session or workflow_id not in session.workflows:
+            return False
+
+        workflow = session.workflows[workflow_id]
+
+        # Store in workflow metadata
+        if not hasattr(workflow, 'task_deadlines'):
+            workflow.task_deadlines = {}
+
+        workflow.task_deadlines[task_id] = deadline
+
+        print(f"[SessionManager] Deadline set for {task_id}: {deadline}")
+
+        return True
 
 
 # Global session manager instance

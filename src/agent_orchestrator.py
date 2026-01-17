@@ -19,13 +19,15 @@ import json
 class AgentOrchestrator:
     """Orchestrates multiple Claude agents for collaborative workspace."""
 
-    def __init__(self, api_key: Optional[str] = None, session_users: Optional[Dict] = None):
+    def __init__(self, api_key: Optional[str] = None, session_users: Optional[Dict] = None, session_manager=None, session_id: Optional[str] = None):
         """
         Initialize orchestrator with API key.
 
         Args:
             api_key: Anthropic API key (defaults to ANTHROPIC_API_KEY env var or ~/.claude/api_keys.json)
             session_users: Dict of users in the collaborative session (user_id -> User object)
+            session_manager: WorkspaceSessionManager instance for MCP tools
+            session_id: Current session ID for MCP tool calls
         """
         # Try to get API key from multiple sources
         if api_key:
@@ -58,6 +60,10 @@ class AgentOrchestrator:
 
         # Store session users for collaborative context
         self.session_users = session_users or {}
+
+        # Store session manager and ID for MCP tools
+        self.session_manager = session_manager
+        self.session_id = session_id
 
         # Initialize 3 agents with separate contexts
         self.agents = {
@@ -178,12 +184,19 @@ class AgentOrchestrator:
                     yield text
 
                 # Save complete assistant response to context
+                complete_response = ''.join(full_response)
                 agent['context'].append({
                     'role': 'assistant',
-                    'content': ''.join(full_response)
+                    'content': complete_response
                 })
 
                 agent['status'] = 'idle'
+
+                # Parse and execute MCP tool calls (Phase 4B)
+                tool_feedback = self._parse_and_execute_mcp_tools(agent_id, complete_response)
+                if tool_feedback:
+                    # Yield tool execution feedback as a separate message
+                    yield f"\n\n---\n**MCP Tool Execution:**\n{tool_feedback}\n---"
 
         except Exception as e:
             agent['status'] = 'error'
@@ -312,6 +325,45 @@ IMPORTANT: When responding to messages, you can distinguish between users by the
 
             base_prompt += "\n\n" + collab_context
 
+        # MCP Tools documentation (Phase 4B)
+        mcp_tools_doc = """
+
+AGENT COORDINATION TOOLS (Phase 4B - MCP Inbox):
+
+You can coordinate with other agents using these tools. To use them, simply mention the action in your response:
+
+**Basic Messaging:**
+- "Send message to [agent]: [content]" - Send a message to another agent (cairn, koda, or prax)
+- "Check my inbox" - Check for messages from other agents
+- "Check messages from [agent]" - Check messages from specific agent
+- "Mark message [id] as read" - Mark a message as read
+
+**Workflow Management (Prax only):**
+- "Create workflow '[name]' with agents [list]" - Create a new workflow
+- "Set milestone '[name]' to [status] ([percentage]%)" - Update workflow milestone
+- "Request status from [agents] for workflow [id]" - Broadcast status request
+- "Get workflow status for [id]" - Get current workflow state
+
+**Context Sharing:**
+- "Share context '[key]': [content] with [agent|all]" - Share knowledge/specs with other agents
+- "Get shared context '[key]'" - Retrieve shared context
+- "List shared contexts for workflow [id]" - See available contexts
+
+**Coordination (Prax only):**
+- "Escalate blocker: [description] affecting [agents]" - Escalate issue to humans
+- "Reassign task from [agent1] to [agent2]: [context]" - Move task between agents
+- "Check workload for [agent]" - See agent's current task load
+- "Check capabilities for [agent]" - See what agent can do
+
+**Examples:**
+- "Send message to koda: Please implement the API endpoint we discussed"
+- "Share context 'api_spec': [specification] with all"
+- "Escalate blocker: Database schema needs clarification affecting koda"
+- "Set milestone 'Design complete' to completed (100%)"
+
+These tools enable true multi-agent collaboration where you can work together autonomously.
+"""
+
         role_prompts = {
             'koda': """
 
@@ -320,6 +372,12 @@ You are Koda, the Builder agent. Your focus is on implementation, coding, and bu
 - Be direct and results-oriented
 - Test after building
 - Report blockers clearly
+
+**Agent Coordination:**
+- Check your inbox regularly for messages from Prax (coordinator) or Cairn (architect)
+- Report progress and blockers to Prax via messages
+- Request design clarification from Cairn when needed
+- Share implementation updates with other agents
 """,
             'cairn': """
 
@@ -328,6 +386,12 @@ You are Cairn, the Architect agent. Your focus is on design, architecture, and s
 - Design before building
 - Document decisions with rationale
 - Review implementations for issues
+
+**Agent Coordination:**
+- Check your inbox for coordination requests from Prax
+- Share design specs and architecture decisions with Koda and Prax
+- Provide guidance to Koda when implementation questions arise
+- Review and validate implementations
 """,
             'prax': """
 
@@ -337,10 +401,37 @@ You are Prax, the Orchestrator agent. Your focus is on coordination and strategy
 - Think about the big picture
 - Track progress across workstreams
 - Help facilitate collaboration between different users
+
+**Agent Coordination (You are the orchestrator!):**
+- Create workflows for complex tasks with multiple agents
+- Assign work to Cairn (design/architecture) and Koda (implementation/building)
+- Check agent workloads before assignment to avoid overload
+- Share context between agents to prevent re-explaining
+- Request status updates from agents via inbox
+- Escalate blockers to humans when needed
+- Track milestones and workflow progress
+- Reassign tasks if agents are blocked or overloaded
+
+**Workflow Pattern:**
+1. User requests feature
+2. Check workload for Cairn and Koda
+3. Create workflow with ID
+4. Assign Cairn to design → send message with workflow ID
+5. Cairn shares design context
+6. Assign Koda to implement → reference shared context
+7. Track progress via inbox and milestones
+8. Escalate blockers if needed
+9. Report completion to user
 """,
         }
 
-        return base_prompt + "\n\n" + role_prompts.get(role, base_prompt)
+        role_specific = role_prompts.get(role, base_prompt)
+
+        # Only add MCP tools doc if session manager is available
+        if self.session_manager and self.session_id:
+            return base_prompt + "\n\n" + mcp_tools_doc + "\n\n" + role_specific
+        else:
+            return base_prompt + "\n\n" + role_specific
 
     def export_session(self) -> Dict[str, Any]:
         """
@@ -372,6 +463,170 @@ You are Prax, the Orchestrator agent. Your focus is on coordination and strategy
             for agent_id, data in session_data['agents'].items():
                 if agent_id in self.agents:
                     self.agents[agent_id].update(data)
+
+    def _parse_and_execute_mcp_tools(self, agent_id: str, response_text: str) -> Optional[str]:
+        """
+        Parse agent response for MCP tool calls and execute them.
+
+        Args:
+            agent_id: Agent who generated the response
+            response_text: Agent's text response
+
+        Returns:
+            Optional feedback string if tools were executed
+        """
+        if not self.session_manager or not self.session_id:
+            return None
+
+        import re
+
+        # Map agent panel IDs to MCP agent names
+        agent_map = {'a': 'koda', 'b': 'cairn', 'moderator': 'prax'}
+        from_agent = agent_map.get(agent_id, agent_id)
+
+        feedback_parts = []
+
+        # Pattern: Send message to [agent]: [content]
+        msg_pattern = r'Send message to (cairn|koda|prax):\s*(.+?)(?:\n|$)'
+        for match in re.finditer(msg_pattern, response_text, re.IGNORECASE | re.DOTALL):
+            to_agent = match.group(1).lower()
+            content = match.group(2).strip()
+
+            result = self.session_manager.send_agent_message(
+                self.session_id,
+                from_agent=from_agent,
+                to_agent=to_agent,
+                content=content,
+                priority='medium'
+            )
+
+            if result:
+                feedback_parts.append(f"✓ Message sent to {to_agent}")
+
+        # Pattern: Check my inbox / Check inbox
+        if re.search(r'check (my )?inbox', response_text, re.IGNORECASE):
+            messages = self.session_manager.check_inbox(
+                self.session_id,
+                agent_id=from_agent,
+                unread_only=True,
+                limit=5
+            )
+
+            if messages:
+                feedback_parts.append(f"📬 You have {len(messages)} unread message(s):")
+                for msg in messages[:3]:
+                    feedback_parts.append(f"  - From {msg.from_agent}: {msg.content[:60]}...")
+            else:
+                feedback_parts.append("📭 No unread messages")
+
+        # Pattern: Share context '[key]': [content] with [agent|all]
+        share_pattern = r"Share context ['\"]([^'\"]+)['\"]:\s*(.+?)\s+with (cairn|koda|prax|all)"
+        for match in re.finditer(share_pattern, response_text, re.IGNORECASE | re.DOTALL):
+            context_key = match.group(1)
+            content = match.group(2).strip()
+            target = match.group(3).lower()
+
+            # Use current workflow if available (simplified for MVP)
+            workflow_id = 'default'
+
+            result = self.session_manager.share_context(
+                self.session_id,
+                from_agent=from_agent,
+                target=target,
+                context_key=context_key,
+                content=content,
+                workflow_id=workflow_id
+            )
+
+            if result:
+                feedback_parts.append(f"✓ Context '{context_key}' shared with {target}")
+
+        # Pattern: Get shared context '[key]'
+        get_context_pattern = r"Get shared context ['\"]([^'\"]+)['\"]"
+        for match in re.finditer(get_context_pattern, response_text, re.IGNORECASE):
+            context_key = match.group(1)
+            workflow_id = 'default'
+
+            context = self.session_manager.get_shared_context(
+                self.session_id,
+                context_key=context_key,
+                workflow_id=workflow_id
+            )
+
+            if context:
+                feedback_parts.append(f"📚 Retrieved context '{context_key}': {str(context.get('content'))[:100]}...")
+            else:
+                feedback_parts.append(f"❌ Context '{context_key}' not found")
+
+        # Pattern: Create workflow '[name]' with agents [list]
+        if from_agent == 'prax':  # Only Prax can create workflows
+            workflow_pattern = r"Create workflow ['\"]([^'\"]+)['\"] with agents \[([\w, ]+)\]"
+            for match in re.finditer(workflow_pattern, response_text, re.IGNORECASE):
+                workflow_name = match.group(1)
+                agents_str = match.group(2)
+                assigned_agents = [a.strip() for a in agents_str.split(',')]
+
+                workflow_id = workflow_name.lower().replace(' ', '_')
+
+                result = self.session_manager.create_workflow(
+                    self.session_id,
+                    workflow_id=workflow_id,
+                    name=workflow_name,
+                    assigned_agents=assigned_agents
+                )
+
+                if result:
+                    feedback_parts.append(f"✓ Workflow '{workflow_name}' created (ID: {workflow_id})")
+
+            # Pattern: Set milestone '[name]' to [status] ([percentage]%)
+            milestone_pattern = r"Set milestone ['\"]([^'\"]+)['\"] to (completed|in_progress|blocked) \((\d+)%\)"
+            for match in re.finditer(milestone_pattern, response_text, re.IGNORECASE):
+                milestone = match.group(1)
+                status = match.group(2)
+                percentage = int(match.group(3))
+
+                # Use default workflow for MVP
+                workflow_id = 'default'
+
+                result = self.session_manager.set_milestone(
+                    self.session_id,
+                    workflow_id=workflow_id,
+                    milestone=milestone,
+                    status=status,
+                    completion_percentage=percentage
+                )
+
+                if result:
+                    feedback_parts.append(f"✓ Milestone '{milestone}' → {status} ({percentage}%)")
+
+            # Pattern: Escalate blocker: [description]
+            blocker_pattern = r"Escalate blocker:\s*(.+?)(?:\n|$)"
+            for match in re.finditer(blocker_pattern, response_text, re.IGNORECASE):
+                description = match.group(1).strip()
+
+                # Extract affected agents if mentioned
+                affected = ['all']
+                for agent in ['cairn', 'koda', 'prax']:
+                    if agent in description.lower():
+                        if affected == ['all']:
+                            affected = []
+                        affected.append(agent)
+
+                blocker_id = self.session_manager.escalate_blocker(
+                    self.session_id,
+                    blocker_description=description,
+                    affected_agents=affected,
+                    severity='high'
+                )
+
+                if blocker_id:
+                    feedback_parts.append(f"🚨 Blocker escalated to humans (ID: {blocker_id[:8]})")
+
+        # Return combined feedback if any tools were executed
+        if feedback_parts:
+            return "\n".join(feedback_parts)
+
+        return None
 
 
 # Example usage and testing
