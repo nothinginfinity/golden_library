@@ -5109,6 +5109,76 @@ async def websocket_handler(websocket):
                                 'error': str(e)
                             }))
 
+                # Phase 4C.5: Demo Mode Controls
+                elif msg_type == 'demo:start':
+                    if session_manager and session_id:
+                        result = session_manager.start_demo_mode(
+                            session_id=session_id,
+                            title=data.get('title', 'Demo Recording'),
+                            description=data.get('description', ''),
+                            branding=data.get('branding')
+                        )
+                        await websocket.send(json.dumps({
+                            'event': 'demo_started',
+                            **result
+                        }))
+                        # Broadcast to all session users
+                        await session_manager.broadcast_to_session(
+                            session_id,
+                            'demo_mode_changed',
+                            {'demo_mode': True, 'title': data.get('title')}
+                        )
+
+                elif msg_type == 'demo:stop':
+                    if session_manager and session_id:
+                        result = session_manager.stop_demo_mode(session_id)
+                        await websocket.send(json.dumps({
+                            'event': 'demo_stopped',
+                            **result
+                        }))
+                        await session_manager.broadcast_to_session(
+                            session_id,
+                            'demo_mode_changed',
+                            {'demo_mode': False}
+                        )
+
+                elif msg_type == 'demo:highlight':
+                    if session_manager and session_id:
+                        success = session_manager.add_demo_highlight(
+                            session_id=session_id,
+                            label=data.get('label', 'Highlight'),
+                            description=data.get('description')
+                        )
+                        await websocket.send(json.dumps({
+                            'event': 'highlight_added',
+                            'success': success
+                        }))
+
+                elif msg_type == 'demo:list':
+                    if session_manager:
+                        recordings = session_manager.get_demo_recordings()
+                        await websocket.send(json.dumps({
+                            'event': 'demo_recordings',
+                            'recordings': recordings
+                        }))
+
+                elif msg_type == 'demo:export':
+                    if session_manager:
+                        recording_id = data.get('recording_id')
+                        format_type = data.get('format', 'html')
+
+                        if format_type == 'json':
+                            content = session_manager.export_demo_json(recording_id)
+                        else:
+                            content = session_manager.export_demo_html(recording_id)
+
+                        await websocket.send(json.dumps({
+                            'event': 'demo_export',
+                            'recording_id': recording_id,
+                            'format': format_type,
+                            'content': content
+                        }))
+
             except json.JSONDecodeError:
                 pass
             except Exception as e:

@@ -33,6 +33,14 @@ except ImportError:
     HAS_CONVERSATION_DB = False
     print("[WorkspaceSessionManager] Warning: ConversationDatabase not available")
 
+# Import DemoRecorder for live demo mode (Phase 4C.5)
+try:
+    from demo_recorder import DemoRecorder, EventType, BrandingConfig, get_demo_recorder
+    HAS_DEMO_RECORDER = True
+except ImportError:
+    HAS_DEMO_RECORDER = False
+    print("[WorkspaceSessionManager] Warning: DemoRecorder not available")
+
 
 class UserRole(Enum):
     """User roles in a session."""
@@ -202,6 +210,12 @@ class WorkspaceSession:
     # Phase 4C.1: Hierarchical Delegation
     delegated_tasks: Dict[str, Any] = field(default_factory=dict)  # task_id -> task_info
     canvas_sections: Dict[str, Dict] = field(default_factory=dict)  # section_name -> {content, owner, updated_at}
+
+    # Phase 4C.5: Demo Mode
+    demo_mode: bool = False
+    demo_recording_id: Optional[str] = None
+    demo_title: Optional[str] = None
+    demo_branding: Optional[Dict] = None
 
     def to_dict(self):
         """Convert to dict for JSON serialization (excluding orchestrator)."""
@@ -456,6 +470,16 @@ class WorkspaceSessionManager:
         if HAS_CONVERSATION_DB and self._db_initialized:
             asyncio.create_task(self._save_message_to_db(message))
 
+        # Phase 4C.5: Record to demo if active
+        if HAS_DEMO_RECORDER and session.demo_mode:
+            event_type = 'agent_response' if agent_id else 'message'
+            self.record_demo_event(
+                session_id=session_id,
+                event_type=event_type,
+                actor=agent_id or user_id,
+                content={'message': content, 'agent_id': agent_id}
+            )
+
         return message
 
     # ===== Phase 4C.4: Conversation Database Methods =====
@@ -626,6 +650,209 @@ class WorkspaceSessionManager:
             return await self._conversation_db.get_statistics()
         except Exception as e:
             return {'error': str(e)}
+
+    # ===== Phase 4C.5: Demo Mode Methods =====
+
+    def start_demo_mode(
+        self,
+        session_id: str,
+        title: str = "Demo Recording",
+        description: str = "",
+        branding: Optional[Dict] = None
+    ) -> Optional[Dict]:
+        """
+        Start demo mode for a session.
+
+        Args:
+            session_id: Session to record
+            title: Demo title
+            description: Demo description
+            branding: Custom branding config
+
+        Returns:
+            Recording info or None
+        """
+        if not HAS_DEMO_RECORDER:
+            return {'error': 'DemoRecorder not available'}
+
+        session = self.sessions.get(session_id)
+        if not session:
+            return {'error': 'Session not found'}
+
+        if session.demo_mode:
+            return {'error': 'Demo mode already active'}
+
+        try:
+            recorder = get_demo_recorder()
+
+            # Convert branding dict to BrandingConfig if provided
+            branding_config = None
+            if branding:
+                branding_config = BrandingConfig(**branding)
+
+            recording = recorder.start_recording(
+                session_id=session_id,
+                title=title,
+                description=description,
+                branding=branding_config
+            )
+
+            session.demo_mode = True
+            session.demo_recording_id = recording.id
+            session.demo_title = title
+            session.demo_branding = branding
+
+            print(f"[SessionManager] Demo mode started for session {session_id}: {recording.id}")
+
+            return {
+                'recording_id': recording.id,
+                'title': title,
+                'started_at': recording.started_at
+            }
+        except Exception as e:
+            print(f"[SessionManager] Error starting demo mode: {e}")
+            return {'error': str(e)}
+
+    def stop_demo_mode(self, session_id: str) -> Optional[Dict]:
+        """
+        Stop demo mode for a session.
+
+        Args:
+            session_id: Session to stop recording
+
+        Returns:
+            Recording summary or None
+        """
+        if not HAS_DEMO_RECORDER:
+            return {'error': 'DemoRecorder not available'}
+
+        session = self.sessions.get(session_id)
+        if not session:
+            return {'error': 'Session not found'}
+
+        if not session.demo_mode:
+            return {'error': 'Demo mode not active'}
+
+        try:
+            recorder = get_demo_recorder()
+            recording = recorder.stop_recording(session_id)
+
+            session.demo_mode = False
+            recording_id = session.demo_recording_id
+            session.demo_recording_id = None
+            session.demo_title = None
+
+            if recording:
+                print(f"[SessionManager] Demo mode stopped: {recording.id} ({recording.duration_ms}ms)")
+                return {
+                    'recording_id': recording.id,
+                    'duration_ms': recording.duration_ms,
+                    'event_count': len(recording.events),
+                    'highlight_count': len(recording.highlights)
+                }
+            return {'recording_id': recording_id, 'status': 'stopped'}
+        except Exception as e:
+            print(f"[SessionManager] Error stopping demo mode: {e}")
+            return {'error': str(e)}
+
+    def add_demo_highlight(
+        self,
+        session_id: str,
+        label: str,
+        description: Optional[str] = None
+    ) -> bool:
+        """
+        Add a highlight marker to the current demo recording.
+
+        Args:
+            session_id: Session ID
+            label: Short label for the highlight
+            description: Optional longer description
+
+        Returns:
+            True if added successfully
+        """
+        if not HAS_DEMO_RECORDER:
+            return False
+
+        session = self.sessions.get(session_id)
+        if not session or not session.demo_mode:
+            return False
+
+        try:
+            recorder = get_demo_recorder()
+            event = recorder.add_highlight(session_id, label, description)
+            return event is not None
+        except Exception as e:
+            print(f"[SessionManager] Error adding highlight: {e}")
+            return False
+
+    def record_demo_event(
+        self,
+        session_id: str,
+        event_type: str,
+        actor: str,
+        content: Dict[str, Any]
+    ):
+        """
+        Record an event to the demo (internal use).
+
+        Called automatically when messages are sent, etc.
+        """
+        if not HAS_DEMO_RECORDER:
+            return
+
+        session = self.sessions.get(session_id)
+        if not session or not session.demo_mode:
+            return
+
+        try:
+            recorder = get_demo_recorder()
+            recorder.record_event(
+                session_id=session_id,
+                event_type=EventType(event_type),
+                actor=actor,
+                content=content
+            )
+        except Exception as e:
+            # Don't let recording errors affect normal operation
+            pass
+
+    def get_demo_recordings(self) -> List[Dict]:
+        """List all saved demo recordings."""
+        if not HAS_DEMO_RECORDER:
+            return []
+
+        try:
+            recorder = get_demo_recorder()
+            return recorder.list_recordings()
+        except Exception as e:
+            print(f"[SessionManager] Error listing recordings: {e}")
+            return []
+
+    def export_demo_html(self, recording_id: str) -> Optional[str]:
+        """Export a demo recording as HTML."""
+        if not HAS_DEMO_RECORDER:
+            return None
+
+        try:
+            recorder = get_demo_recorder()
+            return recorder.export_html(recording_id)
+        except Exception as e:
+            print(f"[SessionManager] Error exporting HTML: {e}")
+            return None
+
+    def export_demo_json(self, recording_id: str) -> Optional[str]:
+        """Export a demo recording as JSON."""
+        if not HAS_DEMO_RECORDER:
+            return None
+
+        try:
+            recorder = get_demo_recorder()
+            return recorder.export_json(recording_id)
+        except Exception as e:
+            print(f"[SessionManager] Error exporting JSON: {e}")
+            return None
 
     def update_user_presence(self, session_id: str, user_id: str, **kwargs):
         """Update user presence info (cursor, typing, etc)."""
