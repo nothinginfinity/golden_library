@@ -937,25 +937,115 @@ Prax (Orchestrator) needs to coordinate Cairn (Architect) and Koda (Builder) dir
 **Implementation Details:**
 
 **MCP Tool Definitions:**
+
+**Basic Messaging Tools:**
 ```json
 {
   "send_message": {
     "target": "prax|cairn|koda",
     "content": "Message content (supports markdown)",
     "priority": "high|medium|low",
-    "context": "Optional context/metadata"
+    "metadata": {
+      "workflow_id": "feature_x_build",
+      "task_type": "design|implementation|review|coordination",
+      "deadline": "2024-01-15T10:00:00Z",
+      "depends_on": ["task_123", "task_456"],
+      "context_keys": ["api_spec", "user_requirements"]
+    }
   },
   "check_inbox": {
     "from": "prax|cairn|koda",  // optional filter
     "unread_only": true,
-    "limit": 10
+    "limit": 10,
+    "workflow_id": "feature_x_build"  // optional filter by workflow
   },
   "mark_read": {
     "message_id": "uuid"
   },
   "search_messages": {
     "query": "keyword or phrase",
-    "from": "prax|cairn|koda"  // optional
+    "from": "prax|cairn|koda",  // optional
+    "workflow_id": "feature_x_build",  // optional
+    "task_type": "design|implementation|review"  // optional
+  }
+}
+```
+
+**Orchestration Tools (Prax-specific):**
+```json
+{
+  "broadcast_status_request": {
+    "targets": ["cairn", "koda"],
+    "workflow_id": "feature_x_build",
+    "request_type": "progress|blockers|eta|capabilities"
+  },
+  "get_workflow_status": {
+    "workflow_id": "feature_x_build"
+  },
+  "set_milestone": {
+    "workflow_id": "feature_x_build",
+    "milestone": "Design complete",
+    "status": "in_progress|completed|blocked",
+    "completion_percentage": 75
+  },
+  "get_dependencies": {
+    "workflow_id": "feature_x_build"
+  },
+  "escalate_blocker": {
+    "blocker_description": "API spec needs user clarification",
+    "affected_agents": ["cairn", "koda"],
+    "severity": "high|medium|low",
+    "requires_human_input": true
+  },
+  "reassign_task": {
+    "from_agent": "cairn",
+    "to_agent": "koda",
+    "task_context": "Complete UI implementation based on existing design",
+    "reason": "workload_balancing|capability_match|blocker"
+  }
+}
+```
+
+**Context Sharing Tools:**
+```json
+{
+  "share_context": {
+    "target": "cairn|koda|all",
+    "context_key": "api_spec_v2",
+    "content": "Shared knowledge, specs, or data",
+    "workflow_id": "feature_x_build"
+  },
+  "get_shared_context": {
+    "context_key": "api_spec_v2",
+    "workflow_id": "feature_x_build"
+  },
+  "list_shared_contexts": {
+    "workflow_id": "feature_x_build"
+  }
+}
+```
+
+**Agent Discovery & Coordination:**
+```json
+{
+  "get_agent_capabilities": {
+    "target": "cairn|koda"
+  },
+  "get_agent_workload": {
+    "target": "cairn|koda"
+  },
+  "check_timeline_conflicts": {
+    "agent": "koda",
+    "new_task": {
+      "estimated_duration": "2h",
+      "deadline": "2024-01-15T18:00:00Z",
+      "priority": "high"
+    }
+  },
+  "set_deadline": {
+    "workflow_id": "feature_x_build",
+    "task_id": "task_123",
+    "deadline": "2024-01-15T18:00:00Z"
   }
 }
 ```
@@ -964,49 +1054,211 @@ Prax (Orchestrator) needs to coordinate Cairn (Architect) and Koda (Builder) dir
 ```python
 # src/workspace_session_manager.py
 class WorkspaceSession:
-    agent_inboxes: Dict[str, List[Message]] = field(default_factory=lambda: {
+    agent_inboxes: Dict[str, List[AgentMessage]] = field(default_factory=lambda: {
         'prax': [],
         'cairn': [],
         'koda': []
     })
+    shared_contexts: Dict[str, Any] = field(default_factory=dict)  # workflow_id:context_key -> content
+    workflows: Dict[str, WorkflowState] = field(default_factory=dict)  # workflow_id -> state
+    agent_capabilities: Dict[str, List[str]] = field(default_factory=lambda: {
+        'prax': ['orchestration', 'coordination', 'strategy'],
+        'cairn': ['architecture', 'design', 'code_review'],
+        'koda': ['implementation', 'testing', 'debugging']
+    })
+    agent_workload: Dict[str, Dict] = field(default_factory=lambda: {
+        'prax': {'active_tasks': 0, 'status': 'idle'},
+        'cairn': {'active_tasks': 0, 'status': 'idle'},
+        'koda': {'active_tasks': 0, 'status': 'idle'}
+    })
 
-    def send_agent_message(self, from_agent: str, to_agent: str, content: str, priority: str = 'medium'):
+@dataclass
+class AgentMessage:
+    """Agent-to-agent message with orchestration metadata."""
+    id: str
+    from_agent: str
+    to_agent: str
+    content: str
+    timestamp: str
+    priority: str = 'medium'
+    read: bool = False
+    metadata: Dict = field(default_factory=dict)  # workflow_id, task_type, deadline, depends_on
+
+@dataclass
+class WorkflowState:
+    """Tracks multi-agent workflow state."""
+    id: str
+    name: str
+    status: str  # 'active', 'completed', 'blocked'
+    milestones: Dict[str, Dict] = field(default_factory=dict)  # milestone -> {status, completion%}
+    dependencies: List[str] = field(default_factory=list)
+    assigned_agents: List[str] = field(default_factory=list)
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    deadline: Optional[str] = None
+
+# Orchestration methods
+class WorkspaceSessionManager:
+    def send_agent_message(self, from_agent: str, to_agent: str, content: str,
+                          priority: str = 'medium', metadata: Dict = None):
         """Send message from one agent to another via inbox."""
-        # Create message
+        # Create AgentMessage with metadata
         # Add to target agent's inbox
-        # Broadcast 'agent_message_sent' event to UI
-        # Log to audit trail
+        # Broadcast 'agent_message_sent' WebSocket event to UI
+        # Log to audit trail with workflow context
+        # Update agent workload counters
+
+    def broadcast_status_request(self, targets: List[str], workflow_id: str, request_type: str):
+        """Prax broadcasts status request to multiple agents."""
+        # Send status request message to all targets
+        # Track pending responses
+
+    def get_workflow_status(self, workflow_id: str) -> WorkflowState:
+        """Get current workflow state."""
+
+    def share_context(self, from_agent: str, target: str, context_key: str,
+                     content: Any, workflow_id: str):
+        """Share context/knowledge between agents."""
+        # Store in shared_contexts with workflow scope
+        # Notify target agent via WebSocket
+
+    def get_agent_workload(self, agent_id: str) -> Dict:
+        """Get agent's current workload status."""
+
+    def escalate_blocker(self, blocker_description: str, affected_agents: List[str],
+                        severity: str, requires_human_input: bool):
+        """Escalate blocker to humans via UI notification."""
+        # Create high-priority notification in UI
+        # Add to audit log with 'blocker_escalated' action
+        # Broadcast to all users in session
 ```
 
 **Frontend Changes:**
 ```javascript
 // claude_dashboard.html
-function displayAgentInboxBadge(agentId, unreadCount) {
-  // Show badge on agent panel
-  // Update on 'agent_message_received' WebSocket event
+
+// WebSocket event handlers
+function handleAgentMessageEvent(data) {
+  const { event, from_agent, to_agent, priority, workflow_id } = data;
+
+  if (event === 'agent_message_sent') {
+    // Update inbox badge for target agent
+    updateAgentInboxBadge(to_agent, true);
+
+    // Add to audit log with agent-specific styling
+    addAuditLogEntry({
+      icon: '📨',
+      color: priority === 'high' ? '#f59e0b' : '#3b82f6',
+      text: `${from_agent} → ${to_agent}`,
+      workflow: workflow_id
+    });
+
+    // Show toast notification if high priority
+    if (priority === 'high') {
+      showNotification(`High priority: ${from_agent} messaged ${to_agent}`, 'warning');
+    }
+  }
+
+  if (event === 'blocker_escalated') {
+    // Show prominent blocker notification
+    showBlockerAlert(data);
+  }
+
+  if (event === 'workflow_milestone_updated') {
+    // Update workflow progress bar in UI
+    updateWorkflowProgress(data);
+  }
 }
 
-function showAgentConversationThread(fromAgent, toAgent) {
-  // Optional: Show agent-to-agent message history
-  // Filterable in audit log
+// UI components
+function updateAgentInboxBadge(agentId, hasUnread) {
+  const badge = document.getElementById(`agent-${agentId}-inbox-badge`);
+  if (!badge) {
+    // Create badge element
+    const agentPanel = document.querySelector(`#agent-${agentId}-panel`);
+    const newBadge = document.createElement('div');
+    newBadge.id = `agent-${agentId}-inbox-badge`;
+    newBadge.className = 'inbox-badge';
+    newBadge.innerHTML = '📬';
+    newBadge.style.cssText = `
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(234, 179, 8, 0.3);
+      border: 1px solid #fbbf24;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      cursor: pointer;
+    `;
+    newBadge.onclick = () => showAgentInbox(agentId);
+    agentPanel.appendChild(newBadge);
+  }
+
+  badge.style.display = hasUnread ? 'flex' : 'none';
+}
+
+function showAgentInbox(agentId) {
+  // Open modal showing agent's inbox messages
+  // Grouped by workflow
+  // Mark messages as read when viewed
+}
+
+function showAgentConversationThread(fromAgent, toAgent, workflowId) {
+  // Filter audit log to show conversation between specific agents
+  // Can filter by workflow_id
+  // Shows message content, priority, timestamps
+}
+
+function updateWorkflowProgress(workflowData) {
+  // Show workflow progress bar in session info panel
+  // Display milestones with completion %
+  // Highlight blockers in red
+}
+
+function showBlockerAlert(blockerData) {
+  // Show prominent red banner for escalated blockers
+  // Include "Requires Human Input" badge if needed
+  // Link to affected agents and workflow context
+}
+
+// Workflow visualization
+function displayWorkflowDependencyGraph(workflowId) {
+  // Optional: Visual graph showing task dependencies
+  // Nodes = agents/tasks
+  // Edges = dependencies
+  // Color-coded by status
 }
 ```
 
 **Deliverables:**
-- MCP inbox-collab tools integrated into agent orchestrator
-- Agent-specific inboxes with persistence
-- UI badges/indicators for agent inbox activity
-- Audit log entries for agent-to-agent messages
-- System prompts include tool usage guidance
-- Working example workflows (parallel, handoff, status gathering)
+- ✅ **Basic Messaging**: MCP inbox-collab tools integrated (send_message, check_inbox, mark_read, search_messages)
+- ✅ **Agent-specific inboxes** with FSL persistence in session-scoped directories
+- ✅ **Orchestration Tools**: Workflow state management, status broadcasts, blocker escalation, task reassignment
+- ✅ **Context Sharing**: Shared knowledge base accessible to all agents in workflow
+- ✅ **Agent Discovery**: Capability and workload tracking for intelligent task assignment
+- ✅ **Timeline Coordination**: Deadline management and conflict detection
+- ✅ **UI Badges**: 📬 inbox indicators on agent panels with unread counts
+- ✅ **WebSocket Updates**: Real-time notifications for agent messages, blockers, workflow milestones
+- ✅ **Audit Log Integration**: Agent-to-agent messages logged with workflow context
+- ✅ **Workflow Progress UI**: Visual progress bars, milestone tracking, dependency graphs
+- ✅ **System prompts** include orchestration tool usage guidance
+- ✅ **Working example workflows** (parallel, handoff, status gathering, blocker escalation)
 
 **Success Criteria:**
-- Prax can send messages to Cairn and Koda
-- Cairn and Koda can check their inboxes and respond
-- Messages persist across page refreshes
-- Audit log shows agent communication timeline
-- Agents proactively use inbox tools for coordination
-- Example: User says "Build feature X" → Prax coordinates → Cairn designs → Koda implements
+- ✅ **Basic Messaging**: Prax can send messages to Cairn and Koda; they can check inboxes and respond
+- ✅ **Message Persistence**: Messages persist across page refreshes and session reconnects
+- ✅ **Audit Visibility**: Audit log shows agent communication timeline with workflow context
+- ✅ **Proactive Coordination**: Agents use inbox tools autonomously for coordination
+- ✅ **Workflow Orchestration**: Prax tracks workflow state, sets milestones, gathers status from multiple agents
+- ✅ **Context Efficiency**: Agents share context via shared knowledge base (no re-explaining)
+- ✅ **Blocker Escalation**: Agents escalate blockers to humans with severity and context
+- ✅ **Workload Balancing**: Prax queries agent workload before task assignment
+- ✅ **UI Transparency**: Users see inbox badges, workflow progress, and agent coordination in real-time
+- ✅ **End-to-End Example**: User says "Build feature X" → Prax creates workflow → assigns Cairn (design) + Koda (implement) → monitors via status requests → escalates blocker if needed → reports progress to user
 
 **Testing Scenarios:**
 
@@ -1029,12 +1281,73 @@ function showAgentConversationThread(fromAgent, toAgent) {
    - Cairn provides guidance to Koda
    - Workflow continues
 
+4. **Advanced Orchestration Workflow**
+   - User: "Build authentication system with OAuth2"
+   - Prax: `get_agent_workload('cairn')` → checks availability
+   - Prax: `get_agent_workload('koda')` → checks availability
+   - Prax creates workflow: `workflow_id = "auth_system_oauth2"`
+   - Prax: `send_message(target='cairn', workflow_id='auth_system_oauth2', task_type='design', deadline='2024-01-15T18:00')`
+   - Cairn designs OAuth2 architecture
+   - Cairn: `share_context(target='all', context_key='oauth2_spec', content='[spec]', workflow_id='auth_system_oauth2')`
+   - Prax: `check_inbox(workflow_id='auth_system_oauth2')` → sees Cairn complete
+   - Prax: `set_milestone(workflow_id='auth_system_oauth2', milestone='Design complete', status='completed', completion_percentage=50)`
+   - Prax: `send_message(target='koda', workflow_id='auth_system_oauth2', metadata={'context_keys': ['oauth2_spec']})`
+   - Koda: `get_shared_context(context_key='oauth2_spec')` → retrieves spec
+   - Koda implements based on spec
+   - Koda encounters issue: Database schema unclear
+   - Koda: `send_message(target='prax', priority='high', content='Need database schema for OAuth tokens')`
+   - Prax: `escalate_blocker(blocker_description='DB schema needed for OAuth', affected_agents=['koda'], severity='medium', requires_human_input=False)`
+   - Prax: `send_message(target='cairn', priority='high', content='Koda needs database schema for OAuth tokens')`
+   - Cairn provides schema
+   - Cairn: `share_context(target='koda', context_key='oauth2_db_schema', content='[schema]')`
+   - Koda completes implementation
+   - Prax: `set_milestone(workflow_id='auth_system_oauth2', milestone='Implementation complete', status='completed', completion_percentage=100)`
+   - Prax: `get_workflow_status('auth_system_oauth2')` → synthesizes final report
+   - Prax reports to user: "OAuth2 authentication system complete. Cairn designed the architecture, Koda implemented. Minor blocker resolved via DB schema clarification. Ready for testing."
+   - UI shows: Workflow progress bar at 100%, all milestones green, audit log shows full agent conversation thread
+
 **Integration with Existing Phase 4 Features:**
 - **@mentions**: Humans can @mention agents, agents can reference humans by name in messages
 - **Permissions**: Viewer-role users can observe agent conversations in audit log but can't interrupt
-- **Audit log**: All agent-to-agent messages logged with timestamps, priority, read status
-- **Session settings**: Configure agent inbox retention, auto-cleanup policies
+- **Audit log**: All agent-to-agent messages logged with timestamps, priority, read status, workflow context
+- **Session settings**: Configure agent inbox retention, auto-cleanup policies, workflow tracking
 - **User awareness**: Agents include human context when coordinating ("Alice requested feature X")
+
+**Key Orchestration Enhancements (Prax-driven):**
+
+1. **Workflow State Management** 🎯
+   - Track overall project state across multiple agents
+   - Set and monitor milestones with completion percentages
+   - Visualize dependencies and blockers
+   - Automatic timeline conflict detection
+
+2. **Context Sharing** 📚
+   - Shared knowledge base prevents re-explaining concepts
+   - Workflow-scoped contexts (specs, designs, decisions)
+   - Agents can reference shared context by key
+   - Eliminates redundant communication overhead
+
+3. **Intelligent Coordination** 🧠
+   - Agent capability discovery (know what each agent can do)
+   - Workload tracking (assign to available agents)
+   - Dynamic task reassignment based on blockers or capacity
+   - Deadline management with conflict detection
+
+4. **Proactive Escalation** 🚨
+   - Agents escalate blockers with severity levels
+   - Automatic human notification for critical issues
+   - Blocker tracking in workflow state
+   - UI alerts for high-priority escalations
+
+5. **UI Transparency** 👁️
+   - Real-time inbox badges (📬) on agent panels
+   - WebSocket updates for all agent coordination events
+   - Workflow progress bars with milestone tracking
+   - Audit log filterable by workflow, agent, priority
+   - Optional dependency graph visualization
+
+**The Vision:**
+This transforms the collaborative workspace from "humans coordinate agents" to "agents coordinate themselves with strategic human oversight." Prax becomes a true orchestrator, Cairn and Koda become autonomous specialists, and humans become strategic directors who can observe and guide at a high level.
 
 ---
 
