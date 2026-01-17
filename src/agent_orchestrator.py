@@ -422,6 +422,21 @@ You are Koda, the Builder agent. Your focus is on implementation, coding, and bu
 - Report progress and blockers to Prax via messages
 - Request design clarification from Cairn when needed
 - Share implementation updates with other agents
+
+**External Tools (Phase 4C.3):**
+You have access to external tools. To use them, include in your response:
+`Use tool [tool_name]: {"param": "value"}`
+
+Available tools:
+- **openai**: GPT-4 for complex reasoning tasks
+- **claude_haiku**: Fast responses for quick lookups
+- **web_search**: Search the web for current information
+- **url_fetch**: Fetch content from a URL
+- **code_analysis**: Analyze code for bugs and improvements
+
+Examples:
+- `Use tool web_search: {"query": "React best practices 2024"}`
+- `Use tool code_analysis: {"code": "def foo()...", "language": "python"}`
 """,
             'cairn': """
 
@@ -436,6 +451,23 @@ You are Cairn, the Architect agent. Your focus is on design, architecture, and s
 - Share design specs and architecture decisions with Koda and Prax
 - Provide guidance to Koda when implementation questions arise
 - Review and validate implementations
+
+**External Tools (Phase 4C.3):**
+You have access to external tools for research and analysis. To use them, include in your response:
+`Use tool [tool_name]: {"param": "value"}`
+
+Available tools:
+- **deepseek**: DeepSeek AI for deep code analysis and technical tasks
+- **openai**: GPT-4 for complex reasoning and analysis
+- **claude_haiku**: Fast responses for quick lookups
+- **web_search**: Search the web for current information
+- **url_fetch**: Fetch content from a URL
+- **code_analysis**: Analyze code for bugs, security issues, improvements
+
+Examples:
+- `Use tool deepseek: {"prompt": "Analyze this architecture for scalability issues: ..."}`
+- `Use tool web_search: {"query": "HIPAA compliance requirements 2024"}`
+- `Use tool code_analysis: {"code": "class AuthService...", "language": "python"}`
 """,
             'prax': """
 
@@ -884,6 +916,77 @@ Delegate to koda: Implement authentication endpoint following HIPAA requirements
                         feedback_parts.append(f"  - {t['id']} → {t['to_agent']}: {t['status']}")
                 else:
                     feedback_parts.append("📭 No tasks in session")
+
+        # ===== Phase 4C.3: External Tool Execution =====
+
+        # Pattern: Use tool [tool_name]: {params}
+        tool_pattern = r'Use tool (\w+):\s*(\{[^}]+\})'
+        for match in re.finditer(tool_pattern, response_text, re.IGNORECASE):
+            tool_name = match.group(1).lower()
+            params_str = match.group(2)
+
+            try:
+                params = json.loads(params_str)
+            except json.JSONDecodeError:
+                feedback_parts.append(f"❌ Invalid JSON for tool {tool_name}")
+                continue
+
+            # Execute tool via ToolGateway
+            try:
+                from tool_gateway import get_tool_gateway
+                import asyncio
+
+                tool_gateway = get_tool_gateway(session_manager=self.session_manager)
+
+                # Run async tool execution
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    result = loop.run_until_complete(
+                        tool_gateway.execute_tool(
+                            tool_name=tool_name,
+                            params=params,
+                            requesting_agent=from_agent,
+                            session_id=self.session_id
+                        )
+                    )
+                finally:
+                    loop.close()
+
+                if result.status.value == 'success':
+                    # Format result based on tool type
+                    if tool_name in ['deepseek', 'openai', 'claude_haiku']:
+                        result_preview = str(result.result)[:500] + '...' if len(str(result.result)) > 500 else str(result.result)
+                        feedback_parts.append(f"🤖 {tool_name} response:\n{result_preview}")
+                    elif tool_name == 'web_search':
+                        results = result.result.get('results', [])
+                        feedback_parts.append(f"🔍 Web search ({len(results)} results):")
+                        for r in results[:3]:
+                            feedback_parts.append(f"  - {r.get('title', 'No title')}")
+                            feedback_parts.append(f"    {r.get('snippet', '')[:100]}...")
+                    elif tool_name == 'url_fetch':
+                        content = result.result.get('content', '')[:300]
+                        feedback_parts.append(f"🌐 Fetched URL:\n{content}...")
+                    elif tool_name == 'code_analysis':
+                        analysis = result.result
+                        feedback_parts.append(f"🔬 Code analysis: {analysis.get('summary', '')}")
+                        for issue in analysis.get('issues', [])[:3]:
+                            feedback_parts.append(f"  ⚠️ {issue.get('message', '')}")
+                    else:
+                        feedback_parts.append(f"✓ Tool {tool_name} executed successfully")
+
+                    if result.cost_usd > 0:
+                        feedback_parts.append(f"  💰 Cost: ${result.cost_usd:.4f}")
+
+                elif result.status.value == 'denied':
+                    feedback_parts.append(f"🚫 Permission denied: {from_agent} cannot use {tool_name}")
+                else:
+                    feedback_parts.append(f"❌ Tool {tool_name} failed: {result.error}")
+
+            except ImportError:
+                feedback_parts.append(f"⚠️ ToolGateway not available")
+            except Exception as e:
+                feedback_parts.append(f"❌ Tool execution error: {str(e)}")
 
         # Return combined feedback if any tools were executed
         if feedback_parts:
