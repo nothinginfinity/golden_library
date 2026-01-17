@@ -25,6 +25,14 @@ except ImportError:
     AgentOrchestrator = None
     print("[WorkspaceSessionManager] Warning: AgentOrchestrator not available")
 
+# Import ConversationDatabase for persistent storage (Phase 4C.4)
+try:
+    from conversation_database import ConversationDatabase, StoredMessage, get_conversation_db
+    HAS_CONVERSATION_DB = True
+except ImportError:
+    HAS_CONVERSATION_DB = False
+    print("[WorkspaceSessionManager] Warning: ConversationDatabase not available")
+
 
 class UserRole(Enum):
     """User roles in a session."""
@@ -233,11 +241,16 @@ class WorkspaceSession:
 class WorkspaceSessionManager:
     """Manages all workspace sessions."""
 
-    def __init__(self, session_duration_hours: int = 24):
+    def __init__(self, session_duration_hours: int = 24, database_url: Optional[str] = None):
         self.sessions: Dict[str, WorkspaceSession] = {}
         self.session_duration_hours = session_duration_hours
         self.cleanup_task = None
         self.ws_event_queue: List[Dict] = []  # Queue for WebSocket events to broadcast
+
+        # Phase 4C.4: Conversation Database
+        self._conversation_db: Optional[Any] = None
+        self._database_url = database_url
+        self._db_initialized = False
 
     def _add_audit_entry(self, session_id: str, user_id: str, action: str, details: Dict[str, Any] = None, workflow_id: Optional[str] = None):
         """Add an entry to the audit log."""
@@ -439,7 +452,180 @@ class WorkspaceSessionManager:
                 }
             )
 
+        # Phase 4C.4: Auto-save to database
+        if HAS_CONVERSATION_DB and self._db_initialized:
+            asyncio.create_task(self._save_message_to_db(message))
+
         return message
+
+    # ===== Phase 4C.4: Conversation Database Methods =====
+
+    async def initialize_database(self, database_url: Optional[str] = None):
+        """Initialize the conversation database."""
+        if not HAS_CONVERSATION_DB:
+            print("[SessionManager] ConversationDatabase not available, skipping DB init")
+            return False
+
+        try:
+            self._conversation_db = await get_conversation_db(
+                database_url=database_url or self._database_url
+            )
+            self._db_initialized = True
+            print("[SessionManager] ConversationDatabase initialized")
+            return True
+        except Exception as e:
+            print(f"[SessionManager] Failed to initialize database: {e}")
+            return False
+
+    async def _save_message_to_db(self, message: Message):
+        """Save a message to the conversation database."""
+        if not self._conversation_db:
+            return
+
+        try:
+            stored_msg = StoredMessage(
+                id=message.id,
+                session_id=message.session_id,
+                user_id=message.user_id,
+                agent_id=message.agent_id,
+                role=message.role,
+                content=message.content,
+                timestamp=message.timestamp,
+                mentions=message.mentions
+            )
+            await self._conversation_db.save_message(stored_msg)
+        except Exception as e:
+            print(f"[SessionManager] Error saving message to DB: {e}")
+
+    async def search_conversation_history(
+        self,
+        query: str,
+        session_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        limit: int = 20
+    ) -> List[Dict]:
+        """
+        Search conversation history. Available to agents via query interface.
+
+        Args:
+            query: Search query
+            session_id: Limit to specific session
+            agent_id: Limit to specific agent's messages
+            limit: Max results
+
+        Returns:
+            List of matching messages with relevance scores
+        """
+        if not self._conversation_db:
+            return []
+
+        try:
+            results = await self._conversation_db.search_messages(
+                query=query,
+                session_id=session_id,
+                agent_id=agent_id,
+                limit=limit
+            )
+            return [
+                {'message': msg.to_dict(), 'score': score}
+                for msg, score in results
+            ]
+        except Exception as e:
+            print(f"[SessionManager] Error searching history: {e}")
+            return []
+
+    async def search_decisions(
+        self,
+        query: str,
+        session_id: Optional[str] = None,
+        limit: int = 10
+    ) -> List[Dict]:
+        """
+        Search for decision-related messages.
+
+        Args:
+            query: Topic to search for
+            session_id: Limit to specific session
+            limit: Max results
+
+        Returns:
+            List of decision messages
+        """
+        if not self._conversation_db:
+            return []
+
+        try:
+            results = await self._conversation_db.search_decisions(
+                query=query,
+                session_id=session_id,
+                limit=limit
+            )
+            return [
+                {'message': msg.to_dict(), 'score': score}
+                for msg, score in results
+            ]
+        except Exception as e:
+            print(f"[SessionManager] Error searching decisions: {e}")
+            return []
+
+    async def get_context_for_prax(self, session_id: str) -> Dict[str, Any]:
+        """
+        Get context for a new Prax instance to resume work.
+
+        Args:
+            session_id: Session to recover context from
+
+        Returns:
+            Context dict with messages, summary, and recovery instructions
+        """
+        if not self._conversation_db:
+            # Fallback: return in-memory messages
+            session = self.sessions.get(session_id)
+            if not session:
+                return {'error': 'Session not found'}
+
+            return {
+                'session_id': session_id,
+                'messages': [m.to_dict() for m in session.messages[-50:]],
+                'summary': None,
+                'recovery_instructions': ['Database not available, using in-memory messages']
+            }
+
+        try:
+            return await self._conversation_db.get_context_for_prax(session_id)
+        except Exception as e:
+            print(f"[SessionManager] Error getting Prax context: {e}")
+            return {'error': str(e)}
+
+    async def update_session_summary(
+        self,
+        session_id: str,
+        key_topics: Optional[List[str]] = None,
+        decisions: Optional[List[str]] = None
+    ) -> bool:
+        """Update session summary with key topics and decisions."""
+        if not self._conversation_db:
+            return False
+
+        try:
+            return await self._conversation_db.update_session_summary(
+                session_id=session_id,
+                key_topics=key_topics,
+                decisions=decisions
+            )
+        except Exception as e:
+            print(f"[SessionManager] Error updating summary: {e}")
+            return False
+
+    async def get_database_stats(self) -> Dict[str, Any]:
+        """Get database statistics."""
+        if not self._conversation_db:
+            return {'error': 'Database not initialized'}
+
+        try:
+            return await self._conversation_db.get_statistics()
+        except Exception as e:
+            return {'error': str(e)}
 
     def update_user_presence(self, session_id: str, user_id: str, **kwargs):
         """Update user presence info (cursor, typing, etc)."""

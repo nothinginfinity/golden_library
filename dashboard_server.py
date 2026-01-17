@@ -5057,6 +5057,58 @@ async def websocket_handler(websocket):
                                     {'document_locks': session.document_locks}
                                 )
 
+                # Phase 4C.4: Conversation Search
+                elif msg_type == 'conversation:search':
+                    if session_manager:
+                        query = data.get('query', '')
+                        search_type = data.get('search_type', 'all')  # 'all', 'decisions', 'agent'
+                        target_session = data.get('target_session', session_id)
+                        agent_filter = data.get('agent_id')
+                        limit = data.get('limit', 20)
+
+                        try:
+                            if search_type == 'decisions':
+                                results = await session_manager.search_decisions(
+                                    query=query,
+                                    session_id=target_session,
+                                    limit=limit
+                                )
+                            else:
+                                results = await session_manager.search_conversation_history(
+                                    query=query,
+                                    session_id=target_session,
+                                    agent_id=agent_filter,
+                                    limit=limit
+                                )
+
+                            await websocket.send(json.dumps({
+                                'event': 'search_results',
+                                'query': query,
+                                'search_type': search_type,
+                                'results': results,
+                                'total': len(results)
+                            }))
+                        except Exception as e:
+                            await websocket.send(json.dumps({
+                                'event': 'search_error',
+                                'error': str(e)
+                            }))
+
+                elif msg_type == 'conversation:get_context':
+                    # Get context for Prax recovery
+                    if session_manager and session_id:
+                        try:
+                            context = await session_manager.get_context_for_prax(session_id)
+                            await websocket.send(json.dumps({
+                                'event': 'prax_context',
+                                'context': context
+                            }))
+                        except Exception as e:
+                            await websocket.send(json.dumps({
+                                'event': 'context_error',
+                                'error': str(e)
+                            }))
+
             except json.JSONDecodeError:
                 pass
             except Exception as e:
