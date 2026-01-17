@@ -4341,6 +4341,13 @@
         console.error(`Panel not found: panel-${panelName}`);
         return;
       }
+
+      // Move panel into the dashboard container so it shows in the right place
+      const container = document.getElementById('dashboard-panel-content');
+      if (container && panelElement.parentNode !== container) {
+        container.appendChild(panelElement);
+      }
+
       panelElement.classList.add('active');
 
       // Activate the corresponding button
