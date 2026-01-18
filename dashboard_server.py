@@ -9041,12 +9041,80 @@ class AiohttpHandler:
             except Exception as e:
                 return web.json_response({'error': str(e)}, status=500)
 
+        # Agent chat with SSE streaming
+        if path == '/api/agent/chat':
+            return await self._handle_agent_chat(request, body)
+
         # Canvas endpoints
         if '/canvas/' in path:
             return web.json_response({'ok': True, 'success': True, 'message': 'Canvas endpoint'})
 
         # Default - allow unknown POST endpoints to succeed
         return web.json_response({'ok': True, 'success': True, 'path': path})
+
+    async def _handle_agent_chat(self, request, body):
+        """Handle agent chat with SSE streaming."""
+        global AGENT_ORCHESTRATOR
+
+        agent_id = body.get('agent_id')
+        message = body.get('message')
+        document = body.get('document')
+
+        if not agent_id or not message:
+            return web.json_response({'error': 'Missing agent_id or message'}, status=400)
+
+        # Initialize orchestrator on first use
+        if AGENT_ORCHESTRATOR is None:
+            try:
+                # Try to get API key from environment first (for Railway)
+                api_key = os.environ.get('ANTHROPIC_API_KEY')
+                if not api_key and API_KEYS_FILE.exists():
+                    try:
+                        with open(API_KEYS_FILE, 'r') as f:
+                            keys = json.load(f)
+                        api_key = keys.get('claude')
+                    except:
+                        pass
+
+                if not api_key:
+                    return web.json_response({
+                        'error': 'ANTHROPIC_API_KEY not configured. Set it in Railway environment variables or save in Config tab.'
+                    }, status=500)
+
+                AGENT_ORCHESTRATOR = AgentOrchestrator(api_key=api_key)
+            except Exception as e:
+                return web.json_response({'error': str(e)}, status=500)
+
+        # Load document if provided
+        if document and AGENT_ORCHESTRATOR.agents.get(agent_id, {}).get('document') is None:
+            AGENT_ORCHESTRATOR.load_document(agent_id, document)
+
+        # Create SSE streaming response
+        response = web.StreamResponse(
+            status=200,
+            headers={
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Access-Control-Allow-Origin': '*'
+            }
+        )
+        await response.prepare(request)
+
+        try:
+            # Stream response chunks
+            for chunk in AGENT_ORCHESTRATOR.send_message(agent_id, message):
+                data = f'data: {json.dumps({"chunk": chunk})}\n\n'
+                await response.write(data.encode())
+
+            # Send completion marker
+            await response.write(f'data: {json.dumps({"done": True})}\n\n'.encode())
+
+        except Exception as e:
+            await response.write(f'data: {json.dumps({"error": str(e)})}\n\n'.encode())
+
+        await response.write_eof()
+        return response
 
 
 class MockHandler:
