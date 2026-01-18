@@ -10175,6 +10175,11 @@ ${currentConversation.display}
       const messagesId = agentId === 'moderator' ? 'moderator-messages' : `agent-${agentId}-messages`;
       const messagesContainer = document.getElementById(messagesId);
 
+      if (!messagesContainer) {
+        console.warn('[Workspace] Message container not found:', messagesId);
+        return null;
+      }
+
       // Remove placeholder if exists
       const placeholder = messagesContainer.querySelector('[style*="text-align: center"]');
       if (placeholder) {
@@ -10421,10 +10426,24 @@ ${currentConversation.display}
       workspaceWebSocket.onopen = () => {
         console.log('[Workspace] WebSocket connected');
 
-        // Auto-join session if session ID in URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const sessionId = urlParams.get('session');
+        // Auto-join session if session ID in URL (check both search and hash params)
+        let urlParams = new URLSearchParams(window.location.search);
+        let sessionId = urlParams.get('session');
+
+        // Also check hash params (for demo redirect URLs like /#workspace?session=...)
+        if (!sessionId && window.location.hash.includes('?')) {
+          const hashQuery = window.location.hash.split('?')[1];
+          const hashParams = new URLSearchParams(hashQuery);
+          sessionId = hashParams.get('session');
+          // Update user name from hash params if provided
+          const nameFromHash = hashParams.get('name');
+          if (nameFromHash) {
+            currentUserName = nameFromHash;
+          }
+        }
+
         if (sessionId) {
+          console.log('[Workspace] Auto-joining session:', sessionId, 'as', currentUserName);
           joinWorkspaceSessionViaWS(sessionId);
         }
       };
@@ -10481,9 +10500,10 @@ ${currentConversation.display}
         // Fetch updated user list
         fetchSessionUsers();
       } else if (event === 'user_message') {
-        // Display message from other user
+        // Display message from other user with their name
         if (data.data.user_id !== currentUserId) {
-          appendMessage(data.data.agent_id, 'user', data.data.content);
+          const senderName = data.data.user_name || 'User';
+          appendMessage(data.data.agent_id, 'user', `[${senderName}] ${data.data.content}`);
         }
       } else if (event === 'user_typing') {
         // Update typing indicator
@@ -13790,9 +13810,9 @@ ${currentConversation.display}
     }
 
     async function changeUserRole(targetUserId, newRole) {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (!workspaceWebSocket || workspaceWebSocket.readyState !== WebSocket.OPEN) return;
 
-      ws.send(JSON.stringify({
+      workspaceWebSocket.send(JSON.stringify({
         type: 'change_user_role',
         target_user_id: targetUserId,
         new_role: newRole
@@ -13800,7 +13820,7 @@ ${currentConversation.display}
     }
 
     function handleDocumentLock(inputId, acquire) {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (!workspaceWebSocket || workspaceWebSocket.readyState !== WebSocket.OPEN) return;
 
       let agentId;
       if (inputId === 'agent-a-input') agentId = 'a';
@@ -13808,7 +13828,7 @@ ${currentConversation.display}
       else if (inputId === 'moderator-input') agentId = 'moderator';
       else return;
 
-      ws.send(JSON.stringify({
+      workspaceWebSocket.send(JSON.stringify({
         type: acquire ? 'acquire_document_lock' : 'release_document_lock',
         agent_id: agentId
       }));
@@ -13856,17 +13876,27 @@ ${currentConversation.display}
       const userListEl = document.getElementById('user-list');
       if (!userListEl) return;
 
+      // Convert users object to array if needed (server sends {uid: {name: ...}})
+      let usersArray = users;
+      if (!Array.isArray(users)) {
+        usersArray = Object.entries(users).map(([id, data]) => ({
+          id,
+          name: data.name || id,
+          ...data
+        }));
+      }
+
       // Update online count in header
       const presenceHeader = document.querySelector('#user-presence > div:first-child');
       if (presenceHeader) {
-        presenceHeader.textContent = `👥 Active Users (${users.length}):`;
+        presenceHeader.textContent = `👥 Active Users (${usersArray.length}):`;
       }
 
       // Check if current user is owner
-      const currentUser = users.find(u => u.id === currentUserId);
+      const currentUser = usersArray.find(u => u.id === currentUserId);
       const isOwner = currentUser && currentUser.role === 'owner';
 
-      userListEl.innerHTML = users.map(user => {
+      userListEl.innerHTML = usersArray.map(user => {
         const initials = user.initials || (user.name || user.id).substring(0, 2).toUpperCase();
         const avatarColor = user.avatar_color || '#3b82f6';
         const isCurrentUser = user.id === currentUserId;
@@ -14016,6 +14046,18 @@ ${currentConversation.display}
 
     // Auto-connect WebSocket when workspace tab is opened
     document.addEventListener('DOMContentLoaded', () => {
+      // Check if arriving via demo redirect (session in URL)
+      let hasSessionParam = window.location.search.includes('session=');
+      if (!hasSessionParam && window.location.hash.includes('session=')) {
+        hasSessionParam = true;
+      }
+
+      // Auto-switch to workspace tab if arriving with session
+      if (hasSessionParam) {
+        console.log('[Workspace] Session param detected, switching to workspace tab');
+        showTab('workspace');
+      }
+
       // Check if on workspace tab
       const workspaceTab = document.getElementById('tab-workspace');
       if (workspaceTab) {

@@ -8730,6 +8730,22 @@ async def aiohttp_websocket_handler(request):
                                 exclude_user=user_id
                             )
 
+                    elif msg_type == 'human_message':
+                        if session_id:
+                            message_content = data.get('message', '')
+                            print(f"[WebSocket] Human chat from {user_name} in {session_id}: {message_content[:50]}...")
+
+                            await aiohttp_broadcast_to_session(
+                                session_id, 'human_message',
+                                {
+                                    'user_id': user_id,
+                                    'user_name': user_name,
+                                    'message': message_content,
+                                    'timestamp': datetime.utcnow().isoformat()
+                                },
+                                exclude_user=user_id  # Don't send back to sender (they already added locally)
+                            )
+
                 except json.JSONDecodeError:
                     pass
 
