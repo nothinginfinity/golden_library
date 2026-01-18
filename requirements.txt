@@ -1,13 +1,11 @@
 # Golden Library Dependencies
 
-# Core
-python>=3.9
+# Web Server (unified HTTP + WebSocket)
+aiohttp>=3.8.0
+websockets>=10.0
+redis>=4.0.0
+watchdog>=3.0.0
 
-# 3D Viewer Backend
+# Optional for viewer
 flask>=2.0.0
 flask-cors>=3.0.10
-
-# Optional compression modules (install as needed)
-# v4z_encoder  # For V4Z compression
-# fsl_v7_ultimate  # For FSL compression
-# ztpcf_pipeline  # For ZTPCF compression

@@ -2639,6 +2639,367 @@
     .resize-handle-v-2 { grid-area: 1 / 4 / 2 / 5; }
     .resize-handle-h-1 { grid-area: 2 / 1 / 3 / -1; }
     .resize-handle-v-3 { grid-area: 3 / 4 / 4 / 5; }
+
+    /* ========================================================================= */
+    /* FILE UPLOAD DROP ZONE & FILE CARDS */
+    /* ========================================================================= */
+
+    .drop-zone {
+      position: relative;
+      min-height: 120px;
+      border: 2px dashed rgba(16, 185, 129, 0.3);
+      border-radius: 8px;
+      transition: all 0.3s ease;
+      margin: 8px 0;
+    }
+
+    .drop-zone.drag-over {
+      border-color: rgba(16, 185, 129, 0.8);
+      background: rgba(16, 185, 129, 0.1);
+      transform: scale(1.02);
+    }
+
+    .drop-zone-overlay {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(16, 185, 129, 0.15);
+      border-radius: 6px;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      color: #34d399;
+      z-index: 10;
+    }
+
+    .drop-zone.drag-over .drop-zone-overlay {
+      display: flex;
+    }
+
+    .file-card {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .file-card:hover {
+      border-color: rgba(16, 185, 129, 0.5);
+      background: rgba(30, 41, 59, 0.8);
+    }
+
+    .file-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .file-card-icon {
+      font-size: 1.5rem;
+      margin-right: 10px;
+    }
+
+    .file-card-info {
+      flex: 1;
+    }
+
+    .file-card-name {
+      color: #e2e8f0;
+      font-size: 0.9rem;
+      font-weight: 500;
+      word-break: break-word;
+    }
+
+    .file-card-meta {
+      color: #64748b;
+      font-size: 0.75rem;
+      margin-top: 4px;
+    }
+
+    .file-card-thumbnail {
+      width: 60px;
+      height: 60px;
+      object-fit: cover;
+      border-radius: 4px;
+      margin-left: 8px;
+    }
+
+    .file-card-actions {
+      display: flex;
+      gap: 4px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .file-card-btn {
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      color: #a5b4fc;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.7rem;
+      transition: all 0.2s;
+    }
+
+    .file-card-btn:hover {
+      background: rgba(99, 102, 241, 0.4);
+    }
+
+    .file-card-btn.danger {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+    }
+
+    .file-card-btn.danger:hover {
+      background: rgba(239, 68, 68, 0.4);
+    }
+
+    .file-card-btn.success {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #34d399;
+    }
+
+    .file-card-preview {
+      color: #94a3b8;
+      font-size: 0.75rem;
+      margin-top: 8px;
+      padding: 8px;
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 4px;
+      max-height: 60px;
+      overflow: hidden;
+      font-family: 'SF Mono', Monaco, monospace;
+    }
+
+    .file-category-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .file-category-badge.documents { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+    .file-category-badge.code { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+    .file-category-badge.images { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
+    .file-category-badge.videos { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .file-category-badge.specs { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+
+    .upload-progress {
+      background: rgba(30, 41, 59, 0.8);
+      border-radius: 6px;
+      padding: 12px;
+      margin: 8px 0;
+    }
+
+    .upload-progress-bar {
+      height: 4px;
+      background: rgba(99, 102, 241, 0.2);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .upload-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1, #a855f7);
+      width: 0%;
+      transition: width 0.3s;
+      animation: progressPulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes progressPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    /* File Preview Modal */
+    .file-preview-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+
+    .file-preview-modal.active {
+      display: flex;
+    }
+
+    .file-preview-content {
+      max-width: 90%;
+      max-height: 90%;
+      background: rgba(30, 41, 59, 0.95);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .file-preview-header {
+      padding: 16px 20px;
+      background: rgba(15, 23, 42, 0.8);
+      border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .file-preview-body {
+      padding: 20px;
+      overflow: auto;
+      max-height: 70vh;
+    }
+
+    .file-preview-close {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    /* Image Editor */
+    .image-editor-canvas {
+      max-width: 100%;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 4px;
+    }
+
+    .image-editor-tools {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .editor-tool-btn {
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      color: #a5b4fc;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .editor-tool-btn:hover {
+      background: rgba(99, 102, 241, 0.4);
+    }
+
+    .editor-tool-btn.active {
+      background: rgba(99, 102, 241, 0.5);
+      border-color: #6366f1;
+    }
+
+    /* Video Editor */
+    .video-editor-container {
+      background: rgba(15, 23, 42, 0.8);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .video-timeline {
+      position: relative;
+      height: 60px;
+      background: rgba(30, 41, 59, 0.8);
+      border-radius: 4px;
+      margin: 16px 0;
+      overflow: hidden;
+    }
+
+    .video-timeline-track {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, rgba(99, 102, 241, 0.3), rgba(168, 85, 247, 0.3));
+    }
+
+    .video-trim-handle {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 8px;
+      background: #6366f1;
+      cursor: ew-resize;
+      z-index: 5;
+    }
+
+    .video-trim-handle:hover {
+      background: #818cf8;
+    }
+
+    .video-trim-handle.left {
+      left: 0;
+      border-radius: 4px 0 0 4px;
+    }
+
+    .video-trim-handle.right {
+      right: 0;
+      border-radius: 0 4px 4px 0;
+    }
+
+    .video-controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .video-control-btn {
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #fbbf24;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .video-control-btn:hover {
+      background: rgba(245, 158, 11, 0.4);
+    }
+
+    .files-tab-btn {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34d399;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+    }
+
+    .files-tab-btn:hover, .files-tab-btn.active {
+      background: rgba(16, 185, 129, 0.4);
+    }
+
+    .files-filter-bar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
   </style>
 </head>
 <body>
@@ -2929,9 +3290,63 @@
             </div>
           </div>
 
+          <!-- Canvas Mode Tabs -->
+          <div style="display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid rgba(148, 163, 184, 0.2);">
+            <button id="canvas-tab-sections" class="files-tab-btn active" onclick="switchCanvasMode('sections')">📝 Sections</button>
+            <button id="canvas-tab-files" class="files-tab-btn" onclick="switchCanvasMode('files')">📁 Files</button>
+          </div>
+
+          <!-- Sections View -->
           <div class="panel-body" id="canvas-sections-list">
             <div style="color: #94a3b8; font-size: 0.85rem; text-align: center; margin-top: 20px;">
               Create a document to start collaborating
+            </div>
+          </div>
+
+          <!-- Files View (Hidden by default) -->
+          <div class="panel-body" id="canvas-files-view" style="display: none;">
+            <!-- Drop Zone -->
+            <div id="canvas-drop-zone" class="drop-zone"
+                 ondragover="handleDragOver(event)"
+                 ondragleave="handleDragLeave(event)"
+                 ondrop="handleFileDrop(event)">
+              <div class="drop-zone-overlay">📥 Drop files here to upload</div>
+              <div style="text-align: center; padding: 20px; color: #64748b;">
+                <div style="font-size: 2rem; margin-bottom: 8px;">📂</div>
+                <div style="font-size: 0.85rem;">Drag & drop files here</div>
+                <div style="font-size: 0.75rem; margin-top: 4px;">PDF, DOCX, Code, Images, Videos</div>
+                <label style="display: inline-block; margin-top: 12px; cursor: pointer;">
+                  <span class="file-card-btn success">📤 Browse Files</span>
+                  <input type="file" id="canvas-file-input" multiple style="display: none;" onchange="handleFileSelect(event)" />
+                </label>
+              </div>
+            </div>
+
+            <!-- Upload Progress -->
+            <div id="upload-progress" class="upload-progress" style="display: none;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span id="upload-status" style="color: #a5b4fc; font-size: 0.85rem;">Uploading...</span>
+                <span id="upload-percent" style="color: #6ee7b7; font-size: 0.85rem;">0%</span>
+              </div>
+              <div class="upload-progress-bar">
+                <div id="upload-progress-fill" class="upload-progress-fill"></div>
+              </div>
+            </div>
+
+            <!-- File Filters -->
+            <div class="files-filter-bar">
+              <button class="files-tab-btn active" onclick="filterFiles('all')">All</button>
+              <button class="files-tab-btn" onclick="filterFiles('documents')">📄 Docs</button>
+              <button class="files-tab-btn" onclick="filterFiles('code')">💻 Code</button>
+              <button class="files-tab-btn" onclick="filterFiles('images')">🖼️ Images</button>
+              <button class="files-tab-btn" onclick="filterFiles('videos')">🎬 Videos</button>
+            </div>
+
+            <!-- File List -->
+            <div id="canvas-files-list">
+              <div style="color: #94a3b8; font-size: 0.85rem; text-align: center; margin-top: 20px;">
+                No files uploaded yet
+              </div>
             </div>
           </div>
 
@@ -5876,11 +6291,32 @@
       return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
     }
 
+    // Dynamic WebSocket URL for local/cloud deployment
+    function getWebSocketUrl() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.hostname;
+      const port = window.location.port;
+
+      // Check if we're on Railway or other cloud (no port or standard ports)
+      const isCloud = !port || port === '80' || port === '443';
+
+      if (isCloud) {
+        // Cloud: use /ws path on same host (unified server)
+        return `${protocol}//${host}/ws`;
+      } else if (host === 'localhost' || host === '127.0.0.1') {
+        // Local dev: try /ws first (unified), fall back to port 8081
+        // Check if unified mode by trying /ws
+        return `ws://${host}:${port}/ws`;
+      }
+      // Default: use /ws path
+      return `${protocol}//${host}:${port}/ws`;
+    }
+
     function connectWebSocket3D() {
       if (ws3D && ws3D.readyState === WebSocket.OPEN) return;
 
       try {
-        ws3D = new WebSocket('ws://localhost:8081');
+        ws3D = new WebSocket(getWebSocketUrl());
 
         ws3D.onopen = () => {
           console.log('[3D WebSocket] Connected to handoff notification service');
@@ -9979,7 +10415,7 @@ ${currentConversation.display}
     function connectWorkspaceWebSocket() {
       if (workspaceWebSocket) return;
 
-      const wsUrl = 'ws://localhost:8081';
+      const wsUrl = getWebSocketUrl();
       workspaceWebSocket = new WebSocket(wsUrl);
 
       workspaceWebSocket.onopen = () => {
@@ -12967,13 +13403,70 @@ ${currentConversation.display}
       }
     }
 
-    function copyInviteLink() {
+    let currentDemoCode = null;
+
+    // Fallback copy function using textarea
+    function copyToClipboardFallback(text) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        return true;
+      } catch (e) {
+        return false;
+      } finally {
+        document.body.removeChild(textarea);
+      }
+    }
+
+    async function copyInviteLink() {
       if (!currentSessionId) return;
 
-      const inviteUrl = `${window.location.origin}?session=${currentSessionId}`;
-      navigator.clipboard.writeText(inviteUrl).then(() => {
-        alert('Invite link copied to clipboard!');
-      });
+      try {
+        // Create or get demo code for this session
+        if (!currentDemoCode) {
+          const userName = localStorage.getItem('workspace_user_name') || 'Host';
+          const res = await fetch(`${API_BASE}/api/demo/create?owner=${encodeURIComponent(userName)}`);
+          const data = await res.json();
+          if (data.code) {
+            currentDemoCode = data.code;
+            // Link demo to workspace session
+            await fetch(`${API_BASE}/api/demo/link?code=${currentDemoCode}&session=${currentSessionId}`);
+          }
+        }
+
+        // Generate invite URL
+        const inviteUrl = currentDemoCode
+          ? `${window.location.origin}/demo?code=${currentDemoCode}`
+          : `${window.location.origin}?session=${currentSessionId}`;
+
+        // Try clipboard API first, fallback to textarea method
+        let copied = false;
+        try {
+          await navigator.clipboard.writeText(inviteUrl);
+          copied = true;
+        } catch (clipErr) {
+          copied = copyToClipboardFallback(inviteUrl);
+        }
+
+        if (copied) {
+          showNotification('📋 Invite link copied! Share with collaborators.', 'success');
+          // Also show the link in an alert for easy access
+          alert('Invite link copied!\n\n' + inviteUrl);
+        } else {
+          // Can't copy - show the link for manual copy
+          prompt('Copy this invite link:', inviteUrl);
+        }
+      } catch (err) {
+        console.error('Failed to copy invite link:', err);
+        // Last resort - show link in prompt
+        const fallbackUrl = `${window.location.origin}?session=${currentSessionId}`;
+        prompt('Copy this invite link:', fallbackUrl);
+      }
     }
 
     // =========================================================================
@@ -14024,6 +14517,838 @@ ${currentConversation.display}
     window.copyInviteLink = copyInviteLink;
     window.connectWorkspaceWebSocket = connectWorkspaceWebSocket;
     window.sendHumanMessage = sendHumanMessage;
+
+    // =========================================================================
+    // FILE UPLOAD & MANAGEMENT SYSTEM
+    // =========================================================================
+
+    let uploadedFiles = [];
+    let currentFileFilter = 'all';
+    let currentCanvasMode = 'sections';
+
+    // Canvas mode switching
+    function switchCanvasMode(mode) {
+      currentCanvasMode = mode;
+      const sectionsView = document.getElementById('canvas-sections-list');
+      const filesView = document.getElementById('canvas-files-view');
+      const sectionsTab = document.getElementById('canvas-tab-sections');
+      const filesTab = document.getElementById('canvas-tab-files');
+
+      if (mode === 'sections') {
+        sectionsView.style.display = 'block';
+        filesView.style.display = 'none';
+        sectionsTab.classList.add('active');
+        filesTab.classList.remove('active');
+      } else {
+        sectionsView.style.display = 'none';
+        filesView.style.display = 'block';
+        sectionsTab.classList.remove('active');
+        filesTab.classList.add('active');
+        loadUploadedFiles();
+      }
+    }
+
+    // Drag and drop handlers
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      document.getElementById('canvas-drop-zone').classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      document.getElementById('canvas-drop-zone').classList.remove('drag-over');
+    }
+
+    async function handleFileDrop(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      document.getElementById('canvas-drop-zone').classList.remove('drag-over');
+
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        await uploadFiles(files);
+      }
+    }
+
+    async function handleFileSelect(e) {
+      const files = e.target.files;
+      if (files.length > 0) {
+        await uploadFiles(files);
+      }
+      e.target.value = ''; // Reset input
+    }
+
+    async function uploadFiles(files) {
+      const progressDiv = document.getElementById('upload-progress');
+      const statusEl = document.getElementById('upload-status');
+      const percentEl = document.getElementById('upload-percent');
+      const fillEl = document.getElementById('upload-progress-fill');
+
+      progressDiv.style.display = 'block';
+      statusEl.textContent = `Uploading ${files.length} file(s)...`;
+      percentEl.textContent = '0%';
+      fillEl.style.width = '0%';
+
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+      }
+
+      try {
+        // Simulate progress
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+          progress = Math.min(progress + 10, 90);
+          fillEl.style.width = progress + '%';
+          percentEl.textContent = progress + '%';
+        }, 200);
+
+        const response = await fetch(`${API_BASE}/api/files/upload`, {
+          method: 'POST',
+          body: formData
+        });
+
+        clearInterval(progressInterval);
+        fillEl.style.width = '100%';
+        percentEl.textContent = '100%';
+
+        const data = await response.json();
+
+        if (data.ok) {
+          statusEl.textContent = `Uploaded ${data.count} file(s) successfully`;
+          setTimeout(() => {
+            progressDiv.style.display = 'none';
+            loadUploadedFiles();
+          }, 1500);
+        } else {
+          statusEl.textContent = 'Upload failed: ' + (data.error || 'Unknown error');
+        }
+      } catch (error) {
+        statusEl.textContent = 'Upload error: ' + error.message;
+        console.error('Upload error:', error);
+      }
+    }
+
+    async function loadUploadedFiles() {
+      try {
+        const url = currentFileFilter === 'all'
+          ? `${API_BASE}/api/files/list`
+          : `${API_BASE}/api/files/list?category=${currentFileFilter}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.ok) {
+          uploadedFiles = data.files || [];
+          renderFilesList();
+        }
+      } catch (error) {
+        console.error('Error loading files:', error);
+      }
+    }
+
+    function filterFiles(category) {
+      currentFileFilter = category;
+
+      // Update filter buttons
+      document.querySelectorAll('.files-filter-bar .files-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      event.target.classList.add('active');
+
+      loadUploadedFiles();
+    }
+
+    function getFileIcon(category) {
+      const icons = {
+        documents: '📄',
+        code: '💻',
+        images: '🖼️',
+        videos: '🎬',
+        specs: '📋'
+      };
+      return icons[category] || '📁';
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function formatDate(isoString) {
+      const date = new Date(isoString);
+      const now = new Date();
+      const diff = now - date;
+
+      if (diff < 60000) return 'just now';
+      if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+      if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+      return date.toLocaleDateString();
+    }
+
+    function renderFilesList() {
+      const container = document.getElementById('canvas-files-list');
+
+      if (!uploadedFiles || uploadedFiles.length === 0) {
+        container.innerHTML = `
+          <div style="color: #94a3b8; font-size: 0.85rem; text-align: center; margin-top: 20px;">
+            No files uploaded yet
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = uploadedFiles.map(file => {
+        const icon = getFileIcon(file.category);
+        const thumbnailHtml = file.thumbnail
+          ? `<img src="${API_BASE}/api/files/${file.id}/thumbnail" class="file-card-thumbnail" alt="thumbnail" />`
+          : '';
+
+        const previewHtml = file.extracted_preview
+          ? `<div class="file-card-preview">${escapeHtml(file.extracted_preview.substring(0, 200))}...</div>`
+          : '';
+
+        const indexedBadge = file.indexed_to_memory
+          ? '<span style="color: #34d399; font-size: 0.65rem;">✓ Indexed</span>'
+          : '';
+
+        return `
+          <div class="file-card" onclick="previewFile('${file.id}')">
+            <div class="file-card-header">
+              <span class="file-card-icon">${icon}</span>
+              <div class="file-card-info">
+                <div class="file-card-name">${escapeHtml(file.filename)}</div>
+                <div class="file-card-meta">
+                  <span class="file-category-badge ${file.category}">${file.category}</span>
+                  ${formatFileSize(file.size)} | ${formatDate(file.uploaded)}
+                  ${indexedBadge}
+                </div>
+              </div>
+              ${thumbnailHtml}
+            </div>
+            ${previewHtml}
+            <div class="file-card-actions" onclick="event.stopPropagation()">
+              <button class="file-card-btn" onclick="previewFile('${file.id}')">👁️ View</button>
+              ${file.category === 'images' ? `<button class="file-card-btn" onclick="editImage('${file.id}')">✏️ Edit</button>` : ''}
+              ${file.category === 'videos' ? `<button class="file-card-btn" onclick="editVideo('${file.id}')">🎬 Edit</button>` : ''}
+              <button class="file-card-btn success" onclick="extractToMemory('${file.id}')">🧠 Extract</button>
+              <button class="file-card-btn" onclick="sendFileToAgent('${file.id}')">📤 To Agent</button>
+              <button class="file-card-btn danger" onclick="deleteFile('${file.id}')">🗑️ Delete</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function previewFile(fileId) {
+      try {
+        const response = await fetch(`${API_BASE}/api/files/${fileId}`);
+        const data = await response.json();
+
+        if (!data.ok) {
+          alert('Failed to load file info');
+          return;
+        }
+
+        const file = data.file;
+        showFilePreviewModal(file);
+      } catch (error) {
+        console.error('Error loading file:', error);
+      }
+    }
+
+    function showFilePreviewModal(file) {
+      // Remove existing modal if any
+      const existing = document.getElementById('file-preview-modal');
+      if (existing) existing.remove();
+
+      let contentHtml = '';
+      const category = file.category;
+
+      if (category === 'images') {
+        contentHtml = `<img src="${API_BASE}/api/files/${file.id}/content" style="max-width: 100%; max-height: 60vh;" />`;
+      } else if (category === 'videos') {
+        contentHtml = `
+          <video controls style="max-width: 100%; max-height: 60vh;">
+            <source src="${API_BASE}/api/files/${file.id}/content" type="video/mp4">
+            Your browser does not support video playback.
+          </video>
+        `;
+      } else if (file.extracted_preview) {
+        contentHtml = `
+          <pre style="white-space: pre-wrap; font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; color: #e2e8f0; max-height: 60vh; overflow: auto;">
+${escapeHtml(file.extracted_preview)}
+          </pre>
+        `;
+      } else {
+        contentHtml = `
+          <div style="text-align: center; color: #94a3b8; padding: 40px;">
+            <div style="font-size: 3rem; margin-bottom: 16px;">${getFileIcon(category)}</div>
+            <div>Preview not available</div>
+            <a href="${API_BASE}/api/files/${file.id}/content" target="_blank" class="file-card-btn" style="display: inline-block; margin-top: 16px;">
+              📥 Download
+            </a>
+          </div>
+        `;
+      }
+
+      const modal = document.createElement('div');
+      modal.id = 'file-preview-modal';
+      modal.className = 'file-preview-modal active';
+      modal.innerHTML = `
+        <div class="file-preview-content" style="min-width: 50%;">
+          <div class="file-preview-header">
+            <div>
+              <span style="color: #e2e8f0; font-weight: 500;">${escapeHtml(file.filename)}</span>
+              <span class="file-category-badge ${file.category}" style="margin-left: 8px;">${file.category}</span>
+            </div>
+            <button class="file-preview-close" onclick="closeFilePreviewModal()">✕ Close</button>
+          </div>
+          <div class="file-preview-body">
+            ${contentHtml}
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // Close on backdrop click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeFilePreviewModal();
+      });
+
+      // Close on Escape
+      document.addEventListener('keydown', handleEscapeClose);
+    }
+
+    function closeFilePreviewModal() {
+      const modal = document.getElementById('file-preview-modal');
+      if (modal) modal.remove();
+      document.removeEventListener('keydown', handleEscapeClose);
+    }
+
+    function handleEscapeClose(e) {
+      if (e.key === 'Escape') closeFilePreviewModal();
+    }
+
+    async function extractToMemory(fileId) {
+      if (!confirm('Extract this file and add to memory browser index?')) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/files/${fileId}/extract`, {
+          method: 'POST'
+        });
+        const data = await response.json();
+
+        if (data.ok) {
+          alert('File extracted and indexed to memory!');
+          loadUploadedFiles();
+        } else {
+          alert('Extraction failed: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+
+    async function deleteFile(fileId) {
+      if (!confirm('Are you sure you want to delete this file?')) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/files/${fileId}/delete`, {
+          method: 'POST'
+        });
+        const data = await response.json();
+
+        if (data.ok) {
+          loadUploadedFiles();
+        } else {
+          alert('Delete failed: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+
+    function sendFileToAgent(fileId) {
+      const agent = prompt('Send to which agent? (koda, cairn, prax)');
+      if (!agent) return;
+
+      // Add file reference to agent's chat
+      const file = uploadedFiles.find(f => f.id === fileId);
+      if (!file) return;
+
+      const message = `📎 File shared: ${file.filename} (${file.category})`;
+
+      // Add to appropriate agent's messages
+      const agentMap = { koda: 'a', cairn: 'b', prax: 'moderator' };
+      const agentId = agentMap[agent.toLowerCase()];
+
+      if (agentId) {
+        const messagesEl = document.getElementById(agentId === 'moderator' ? 'moderator-messages' : `agent-${agentId}-messages`);
+        if (messagesEl) {
+          const msgDiv = document.createElement('div');
+          msgDiv.style.cssText = 'background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 8px 12px; border-radius: 6px; margin: 8px 0; font-size: 0.85rem;';
+          msgDiv.innerHTML = `<span style="color: #34d399;">📎</span> <span style="color: #e2e8f0;">File: ${escapeHtml(file.filename)}</span>`;
+          messagesEl.appendChild(msgDiv);
+        }
+        alert(`File reference sent to ${agent}`);
+      } else {
+        alert('Unknown agent. Use: koda, cairn, or prax');
+      }
+    }
+
+    // Image Editor
+    async function editImage(fileId) {
+      const file = uploadedFiles.find(f => f.id === fileId);
+      if (!file) return;
+
+      showImageEditorModal(file);
+    }
+
+    function showImageEditorModal(file) {
+      const existing = document.getElementById('image-editor-modal');
+      if (existing) existing.remove();
+
+      const modal = document.createElement('div');
+      modal.id = 'image-editor-modal';
+      modal.className = 'file-preview-modal active';
+      modal.innerHTML = `
+        <div class="file-preview-content" style="min-width: 70%;">
+          <div class="file-preview-header">
+            <span style="color: #e2e8f0; font-weight: 500;">✏️ Edit: ${escapeHtml(file.filename)}</span>
+            <button class="file-preview-close" onclick="closeImageEditor()">✕ Close</button>
+          </div>
+          <div class="file-preview-body">
+            <div class="image-editor-tools">
+              <button class="editor-tool-btn" onclick="imageEditorRotate(-90)">↶ Rotate Left</button>
+              <button class="editor-tool-btn" onclick="imageEditorRotate(90)">↷ Rotate Right</button>
+              <button class="editor-tool-btn" onclick="imageEditorFlipH()">↔️ Flip H</button>
+              <button class="editor-tool-btn" onclick="imageEditorFlipV()">↕️ Flip V</button>
+              <div style="flex: 1;"></div>
+              <label style="color: #94a3b8; font-size: 0.85rem;">
+                Brightness: <input type="range" id="brightness-slider" min="0" max="200" value="100" onchange="imageEditorApplyFilters()" />
+              </label>
+              <label style="color: #94a3b8; font-size: 0.85rem;">
+                Contrast: <input type="range" id="contrast-slider" min="0" max="200" value="100" onchange="imageEditorApplyFilters()" />
+              </label>
+            </div>
+            <canvas id="image-editor-canvas" class="image-editor-canvas"></canvas>
+            <div style="margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end;">
+              <button class="editor-tool-btn" onclick="imageEditorReset()">🔄 Reset</button>
+              <button class="editor-tool-btn" style="background: rgba(16, 185, 129, 0.3); border-color: rgba(16, 185, 129, 0.5); color: #34d399;" onclick="imageEditorSave()">💾 Save Copy</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeImageEditor();
+      });
+
+      // Load image into canvas
+      initImageEditor(file);
+    }
+
+    let imageEditorState = {
+      original: null,
+      canvas: null,
+      ctx: null,
+      rotation: 0,
+      flipH: 1,
+      flipV: 1
+    };
+
+    function initImageEditor(file) {
+      const canvas = document.getElementById('image-editor-canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+
+      img.onload = function() {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        imageEditorState = {
+          original: img,
+          canvas: canvas,
+          ctx: ctx,
+          rotation: 0,
+          flipH: 1,
+          flipV: 1,
+          fileId: file.id
+        };
+      };
+
+      img.src = `${API_BASE}/api/files/${file.id}/content`;
+    }
+
+    function imageEditorRotate(degrees) {
+      imageEditorState.rotation = (imageEditorState.rotation + degrees) % 360;
+      imageEditorRedraw();
+    }
+
+    function imageEditorFlipH() {
+      imageEditorState.flipH *= -1;
+      imageEditorRedraw();
+    }
+
+    function imageEditorFlipV() {
+      imageEditorState.flipV *= -1;
+      imageEditorRedraw();
+    }
+
+    function imageEditorApplyFilters() {
+      imageEditorRedraw();
+    }
+
+    function imageEditorRedraw() {
+      const { original, canvas, ctx, rotation, flipH, flipV } = imageEditorState;
+      if (!original) return;
+
+      const brightness = document.getElementById('brightness-slider')?.value || 100;
+      const contrast = document.getElementById('contrast-slider')?.value || 100;
+
+      // Calculate new canvas size for rotation
+      const rad = rotation * Math.PI / 180;
+      const sin = Math.abs(Math.sin(rad));
+      const cos = Math.abs(Math.cos(rad));
+      const newWidth = original.width * cos + original.height * sin;
+      const newHeight = original.width * sin + original.height * cos;
+
+      canvas.width = newWidth;
+      canvas.height = newHeight;
+
+      ctx.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
+
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(rotation * Math.PI / 180);
+      ctx.scale(flipH, flipV);
+      ctx.drawImage(original, -original.width / 2, -original.height / 2);
+      ctx.restore();
+    }
+
+    function imageEditorReset() {
+      imageEditorState.rotation = 0;
+      imageEditorState.flipH = 1;
+      imageEditorState.flipV = 1;
+      document.getElementById('brightness-slider').value = 100;
+      document.getElementById('contrast-slider').value = 100;
+      imageEditorRedraw();
+    }
+
+    function imageEditorSave() {
+      const canvas = imageEditorState.canvas;
+      if (!canvas) return;
+
+      canvas.toBlob(async (blob) => {
+        const formData = new FormData();
+        formData.append('files', blob, `edited_${Date.now()}.png`);
+
+        try {
+          const response = await fetch(`${API_BASE}/api/files/upload`, {
+            method: 'POST',
+            body: formData
+          });
+          const data = await response.json();
+          if (data.ok) {
+            alert('Edited image saved!');
+            closeImageEditor();
+            loadUploadedFiles();
+          } else {
+            alert('Save failed: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          alert('Error saving: ' + error.message);
+        }
+      }, 'image/png');
+    }
+
+    function closeImageEditor() {
+      const modal = document.getElementById('image-editor-modal');
+      if (modal) modal.remove();
+      imageEditorState = { original: null, canvas: null, ctx: null, rotation: 0, flipH: 1, flipV: 1 };
+    }
+
+    // Video Editor
+    async function editVideo(fileId) {
+      const file = uploadedFiles.find(f => f.id === fileId);
+      if (!file) return;
+
+      showVideoEditorModal(file);
+    }
+
+    let videoEditorState = {
+      fileId: null,
+      duration: 0,
+      startTime: 0,
+      endTime: 0
+    };
+
+    function showVideoEditorModal(file) {
+      const existing = document.getElementById('video-editor-modal');
+      if (existing) existing.remove();
+
+      const modal = document.createElement('div');
+      modal.id = 'video-editor-modal';
+      modal.className = 'file-preview-modal active';
+      modal.innerHTML = `
+        <div class="file-preview-content" style="min-width: 70%;">
+          <div class="file-preview-header">
+            <span style="color: #e2e8f0; font-weight: 500;">🎬 Edit: ${escapeHtml(file.filename)}</span>
+            <button class="file-preview-close" onclick="closeVideoEditor()">✕ Close</button>
+          </div>
+          <div class="file-preview-body">
+            <div class="video-editor-container">
+              <video id="video-editor-player" controls style="width: 100%; max-height: 300px; border-radius: 8px;">
+                <source src="${API_BASE}/api/files/${file.id}/content" type="video/mp4">
+              </video>
+
+              <div class="video-timeline">
+                <div class="video-timeline-track"></div>
+                <div id="video-trim-left" class="video-trim-handle left" style="left: 0%;"></div>
+                <div id="video-trim-right" class="video-trim-handle right" style="right: 0%;"></div>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; color: #94a3b8; font-size: 0.8rem; margin-bottom: 16px;">
+                <span>Start: <span id="trim-start-time">0:00</span></span>
+                <span>End: <span id="trim-end-time">0:00</span></span>
+              </div>
+
+              <div class="video-controls">
+                <button class="video-control-btn" onclick="videoTrim()">✂️ Trim</button>
+                <button class="video-control-btn" onclick="videoExtractAudio()">🔊 Extract Audio</button>
+                <button class="video-control-btn" onclick="videoAddText()">📝 Add Text</button>
+                <button class="video-control-btn" onclick="videoResize()">📐 Resize</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeVideoEditor();
+      });
+
+      // Initialize video editor state
+      const video = document.getElementById('video-editor-player');
+      video.onloadedmetadata = function() {
+        videoEditorState = {
+          fileId: file.id,
+          duration: video.duration,
+          startTime: 0,
+          endTime: video.duration
+        };
+        updateTrimDisplay();
+        initTrimHandles();
+      };
+    }
+
+    function initTrimHandles() {
+      const leftHandle = document.getElementById('video-trim-left');
+      const rightHandle = document.getElementById('video-trim-right');
+      const timeline = leftHandle.parentElement;
+
+      let isDragging = null;
+
+      function onMouseDown(e, handle) {
+        isDragging = handle;
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      }
+
+      function onMouseMove(e) {
+        if (!isDragging) return;
+
+        const rect = timeline.getBoundingClientRect();
+        let percent = ((e.clientX - rect.left) / rect.width) * 100;
+        percent = Math.max(0, Math.min(100, percent));
+
+        if (isDragging === 'left') {
+          const rightPercent = 100 - parseFloat(rightHandle.style.right);
+          if (percent < rightPercent - 5) {
+            leftHandle.style.left = percent + '%';
+            videoEditorState.startTime = (percent / 100) * videoEditorState.duration;
+          }
+        } else {
+          const leftPercent = parseFloat(leftHandle.style.left);
+          if (percent > leftPercent + 5) {
+            rightHandle.style.right = (100 - percent) + '%';
+            videoEditorState.endTime = (percent / 100) * videoEditorState.duration;
+          }
+        }
+
+        updateTrimDisplay();
+      }
+
+      function onMouseUp() {
+        isDragging = null;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      }
+
+      leftHandle.addEventListener('mousedown', (e) => onMouseDown(e, 'left'));
+      rightHandle.addEventListener('mousedown', (e) => onMouseDown(e, 'right'));
+    }
+
+    function updateTrimDisplay() {
+      const formatTime = (s) => {
+        const mins = Math.floor(s / 60);
+        const secs = Math.floor(s % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+      };
+
+      document.getElementById('trim-start-time').textContent = formatTime(videoEditorState.startTime);
+      document.getElementById('trim-end-time').textContent = formatTime(videoEditorState.endTime);
+    }
+
+    async function videoTrim() {
+      const { fileId, startTime, endTime } = videoEditorState;
+
+      if (endTime <= startTime) {
+        alert('End time must be after start time');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/video/trim`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_id: fileId, start_time: startTime, end_time: endTime })
+        });
+
+        const data = await response.json();
+        if (data.ok) {
+          alert('Video trimmed successfully!');
+          closeVideoEditor();
+          loadUploadedFiles();
+        } else {
+          alert('Trim failed: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+
+    async function videoExtractAudio() {
+      const format = prompt('Audio format (mp3 or aac)?', 'mp3');
+      if (!format) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/video/extract-audio`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_id: videoEditorState.fileId, format: format })
+        });
+
+        const data = await response.json();
+        if (data.ok) {
+          alert('Audio extracted successfully!');
+          loadUploadedFiles();
+        } else {
+          alert('Extraction failed: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+
+    async function videoAddText() {
+      const text = prompt('Text to add:');
+      if (!text) return;
+
+      const position = prompt('Position (top, center, bottom)?', 'bottom');
+      const fontSize = prompt('Font size?', '24');
+
+      try {
+        const response = await fetch(`${API_BASE}/api/video/add-text`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            file_id: videoEditorState.fileId,
+            text: text,
+            position: position,
+            font_size: parseInt(fontSize)
+          })
+        });
+
+        const data = await response.json();
+        if (data.ok) {
+          alert('Text added successfully!');
+          loadUploadedFiles();
+        } else {
+          alert('Failed: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+
+    async function videoResize() {
+      const width = prompt('New width (height auto)?', '1280');
+      if (!width) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/video/resize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            file_id: videoEditorState.fileId,
+            width: parseInt(width),
+            height: -1
+          })
+        });
+
+        const data = await response.json();
+        if (data.ok) {
+          alert('Video resized successfully!');
+          loadUploadedFiles();
+        } else {
+          alert('Resize failed: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+
+    function closeVideoEditor() {
+      const modal = document.getElementById('video-editor-modal');
+      if (modal) modal.remove();
+      videoEditorState = { fileId: null, duration: 0, startTime: 0, endTime: 0 };
+    }
+
+    // Export file functions to global scope
+    window.switchCanvasMode = switchCanvasMode;
+    window.handleDragOver = handleDragOver;
+    window.handleDragLeave = handleDragLeave;
+    window.handleFileDrop = handleFileDrop;
+    window.handleFileSelect = handleFileSelect;
+    window.filterFiles = filterFiles;
+    window.previewFile = previewFile;
+    window.closeFilePreviewModal = closeFilePreviewModal;
+    window.extractToMemory = extractToMemory;
+    window.deleteFile = deleteFile;
+    window.sendFileToAgent = sendFileToAgent;
+    window.editImage = editImage;
+    window.closeImageEditor = closeImageEditor;
+    window.imageEditorRotate = imageEditorRotate;
+    window.imageEditorFlipH = imageEditorFlipH;
+    window.imageEditorFlipV = imageEditorFlipV;
+    window.imageEditorApplyFilters = imageEditorApplyFilters;
+    window.imageEditorReset = imageEditorReset;
+    window.imageEditorSave = imageEditorSave;
+    window.editVideo = editVideo;
+    window.closeVideoEditor = closeVideoEditor;
+    window.videoTrim = videoTrim;
+    window.videoExtractAudio = videoExtractAudio;
+    window.videoAddText = videoAddText;
+    window.videoResize = videoResize;
 
   </script>
 </body>

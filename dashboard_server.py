@@ -22,6 +22,14 @@ import time
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+# aiohttp for unified HTTP + WebSocket on single port
+try:
+    from aiohttp import web
+    AIOHTTP_AVAILABLE = True
+except ImportError:
+    AIOHTTP_AVAILABLE = False
+    print("Warning: aiohttp not installed. Using separate ports for HTTP/WS.")
+
 # Add src directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
@@ -71,6 +79,9 @@ ARSENAL_PRESETS = ARSENAL_DIR / "presets"
 GOLDEN_LIBRARY_DIR = HOME / "ztgi" / "golden_library" / ".golden_library"
 GOLDEN_INDEX_FILE = GOLDEN_LIBRARY_DIR / "index.json"
 API_KEYS_FILE = HOME / ".claude" / "api_keys.json"
+UPLOADS_DIR = HOME / "ztgi" / "uploads"
+UPLOADS_INDEX_FILE = UPLOADS_DIR / "index.json"
+UNIFIED_HISTORY_INDEX = HOME / ".claude" / "unified_history_index.json"
 
 class DashboardHandler(SimpleHTTPRequestHandler):
     """Custom handler to serve API endpoints and static files."""
@@ -254,8 +265,27 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif path == '/api/demo/info':
             self.serve_demo_info(parsed_path.query)
             return
+        elif path == '/api/demo/link':
+            self.serve_demo_link(parsed_path.query)
+            return
         elif path == '/api/demo/list':
             self.serve_demo_list()
+            return
+        # File Upload API
+        elif path == '/api/files/list':
+            self.serve_files_list(parsed_path.query)
+            return
+        elif path.startswith('/api/files/') and '/thumbnail' in path:
+            file_id = path.split('/')[3]
+            self.serve_file_thumbnail(file_id)
+            return
+        elif path.startswith('/api/files/') and '/content' in path:
+            file_id = path.split('/')[3]
+            self.serve_file_content(file_id)
+            return
+        elif path.startswith('/api/files/') and path.count('/') == 3:
+            file_id = path.split('/')[-1]
+            self.serve_file_info(file_id)
             return
         else:
             # Return 404 for other paths
@@ -274,7 +304,12 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         parsed_path = urlparse(self.path)
         path = parsed_path.path
 
-        # Get content length and read body
+        # Handle file upload FIRST (before reading body as JSON)
+        if path == '/api/files/upload':
+            self.handle_file_upload()
+            return
+
+        # Get content length and read body for JSON endpoints
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length).decode('utf-8')
 
@@ -421,6 +456,38 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif path == '/api/todos/bulk-update':
             self.bulk_update_todos(data)
             return
+        # File API (upload handled before body read)
+        elif path.startswith('/api/files/') and '/extract' in path:
+            file_id = path.split('/')[3]
+            self.extract_file_to_memory(file_id)
+            return
+        elif path.startswith('/api/files/') and '/delete' in path:
+            file_id = path.split('/')[3]
+            self.delete_file(file_id)
+            return
+        # Video Editing API (FFmpeg)
+        elif path == '/api/video/trim':
+            self.video_trim(data)
+            return
+        elif path == '/api/video/concat':
+            self.video_concat(data)
+            return
+        elif path == '/api/video/extract-audio':
+            self.video_extract_audio(data)
+            return
+        elif path == '/api/video/add-text':
+            self.video_add_text(data)
+            return
+        elif path == '/api/video/resize':
+            self.video_resize(data)
+            return
+        # Agent File API
+        elif path == '/api/files/for-agent':
+            self.serve_files_for_agent(data)
+            return
+        elif path == '/api/files/agent-request':
+            self.agent_file_request(data)
+            return
         else:
             self.send_error(404, "Not found")
 
@@ -473,17 +540,1019 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self.send_error(404, "Tabs test page not found")
 
     # =========================================================================
+    # FILE UPLOAD & MANAGEMENT API
+    # =========================================================================
+
+    def get_file_type_category(self, filename):
+        """Determine file type category from filename."""
+        ext = Path(filename).suffix.lower()
+
+        doc_exts = {'.pdf', '.docx', '.doc', '.txt', '.md', '.rtf', '.odt'}
+        code_exts = {'.py', '.js', '.ts', '.jsx', '.tsx', '.go', '.rs', '.java',
+                     '.c', '.cpp', '.h', '.hpp', '.cs', '.rb', '.php', '.swift',
+                     '.kt', '.scala', '.r', '.sql', '.sh', '.bash', '.zsh',
+                     '.json', '.yaml', '.yml', '.toml', '.xml', '.html', '.css'}
+        image_exts = {'.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp', '.ico'}
+        video_exts = {'.mp4', '.mov', '.avi', '.webm', '.mkv', '.m4v', '.wmv'}
+        spec_exts = {'.prd', '.spec', '.req', '.feature'}
+
+        if ext in doc_exts:
+            return 'documents'
+        elif ext in code_exts:
+            return 'code'
+        elif ext in image_exts:
+            return 'images'
+        elif ext in video_exts:
+            return 'videos'
+        elif ext in spec_exts:
+            return 'specs'
+        else:
+            return 'documents'  # Default to documents
+
+    def load_uploads_index(self):
+        """Load the uploads index."""
+        try:
+            if UPLOADS_INDEX_FILE.exists():
+                with open(UPLOADS_INDEX_FILE, 'r') as f:
+                    return json.load(f)
+            return {'files': [], 'version': '1.0'}
+        except Exception as e:
+            print(f"[Files] Error loading index: {e}")
+            return {'files': [], 'version': '1.0'}
+
+    def save_uploads_index(self, index_data):
+        """Save the uploads index."""
+        try:
+            UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+            with open(UPLOADS_INDEX_FILE, 'w') as f:
+                json.dump(index_data, f, indent=2)
+        except Exception as e:
+            print(f"[Files] Error saving index: {e}")
+
+    def handle_file_upload(self):
+        """Handle multipart file upload."""
+        try:
+            content_type = self.headers.get('Content-Type', '')
+
+            if 'multipart/form-data' not in content_type:
+                self.serve_json({'error': 'Expected multipart/form-data'}, status=400)
+                return
+
+            # Get boundary from content type
+            boundary = None
+            for part in content_type.split(';'):
+                part = part.strip()
+                if part.startswith('boundary='):
+                    boundary = part[9:].strip('"\'')
+                    break
+
+            if not boundary:
+                self.serve_json({'error': 'No boundary in content-type'}, status=400)
+                return
+
+            content_length = int(self.headers.get('Content-Length', 0))
+            print(f"[Files] Upload: length={content_length}, boundary={boundary[:20]}...", flush=True)
+
+            # Read body in chunks
+            body = b''
+            remaining = content_length
+            while remaining > 0:
+                chunk_size = min(remaining, 65536)
+                chunk = self.rfile.read(chunk_size)
+                if not chunk:
+                    break
+                body += chunk
+                remaining -= len(chunk)
+
+            print(f"[Files] Read {len(body)} bytes", flush=True)
+
+            # Parse multipart manually
+            boundary_bytes = f'--{boundary}'.encode()
+            parts = body.split(boundary_bytes)
+
+            uploaded_files = []
+
+            for part in parts:
+                # Skip empty parts and closing boundary
+                if not part.strip() or part.strip() == b'--':
+                    continue
+
+                # Find header/body separator
+                header_end = part.find(b'\r\n\r\n')
+                if header_end == -1:
+                    continue
+
+                headers_raw = part[:header_end].decode('utf-8', errors='ignore')
+                file_content = part[header_end + 4:]
+
+                # Remove trailing \r\n
+                if file_content.endswith(b'\r\n'):
+                    file_content = file_content[:-2]
+
+                # Check for filename in Content-Disposition
+                filename_match = None
+                for line in headers_raw.split('\r\n'):
+                    if 'filename="' in line:
+                        start = line.find('filename="') + 10
+                        end = line.find('"', start)
+                        if end > start:
+                            filename_match = line[start:end]
+                            break
+
+                if not filename_match:
+                    continue
+
+                print(f"[Files] Found file: {filename_match}, size={len(file_content)}", flush=True)
+
+                # Determine category and save
+                category = self.get_file_type_category(filename_match)
+                file_id = str(uuid.uuid4())[:8]
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                safe_filename = f"{timestamp}_{filename_match.replace(' ', '_')}"
+
+                save_dir = UPLOADS_DIR / category
+                save_dir.mkdir(parents=True, exist_ok=True)
+                save_path = save_dir / safe_filename
+
+                with open(save_path, 'wb') as f:
+                    f.write(file_content)
+
+                # Generate thumbnail for images/videos
+                thumbnail_path = None
+                if category == 'images':
+                    thumbnail_path = self.generate_image_thumbnail(save_path)
+                elif category == 'videos':
+                    thumbnail_path = self.generate_video_thumbnail(save_path)
+
+                # Extract text content for documents/code
+                extracted_text = None
+                if category in ['documents', 'code', 'specs']:
+                    extracted_text = self.extract_text_content(save_path, category)
+
+                # Create file metadata
+                file_meta = {
+                    'id': file_id,
+                    'filename': filename_match,
+                    'saved_as': safe_filename,
+                    'category': category,
+                    'path': str(save_path),
+                    'size': len(file_content),
+                    'uploaded': datetime.now().isoformat(),
+                    'thumbnail': str(thumbnail_path) if thumbnail_path else None,
+                    'extracted_preview': extracted_text[:500] if extracted_text else None,
+                    'indexed_to_memory': False
+                }
+
+                # Update index
+                index = self.load_uploads_index()
+                index['files'].append(file_meta)
+                self.save_uploads_index(index)
+
+                uploaded_files.append(file_meta)
+                print(f"[Files] Uploaded: {filename_match} -> {save_path}")
+
+            if uploaded_files:
+                self.serve_json({
+                    'ok': True,
+                    'files': uploaded_files,
+                    'count': len(uploaded_files)
+                })
+            else:
+                self.serve_json({'error': 'No files found in request'}, status=400)
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'error': str(e)}, status=500)
+
+    def generate_image_thumbnail(self, image_path):
+        """Generate thumbnail for an image."""
+        try:
+            from PIL import Image
+
+            thumb_dir = UPLOADS_DIR / 'thumbnails'
+            thumb_dir.mkdir(parents=True, exist_ok=True)
+
+            img = Image.open(image_path)
+            img.thumbnail((200, 200), Image.Resampling.LANCZOS)
+
+            thumb_name = f"thumb_{Path(image_path).stem}.jpg"
+            thumb_path = thumb_dir / thumb_name
+
+            # Convert to RGB if necessary (for PNG with alpha)
+            if img.mode in ('RGBA', 'P'):
+                img = img.convert('RGB')
+
+            img.save(thumb_path, 'JPEG', quality=85)
+            return thumb_path
+
+        except ImportError:
+            print("[Files] PIL not installed, skipping thumbnail")
+            return None
+        except Exception as e:
+            print(f"[Files] Thumbnail generation failed: {e}")
+            return None
+
+    def generate_video_thumbnail(self, video_path):
+        """Generate thumbnail for a video using FFmpeg."""
+        try:
+            thumb_dir = UPLOADS_DIR / 'thumbnails'
+            thumb_dir.mkdir(parents=True, exist_ok=True)
+
+            thumb_name = f"thumb_{Path(video_path).stem}.jpg"
+            thumb_path = thumb_dir / thumb_name
+
+            # Get duration first
+            probe_cmd = ['ffprobe', '-v', 'error', '-show_entries',
+                        'format=duration', '-of', 'csv=p=0', str(video_path)]
+            result = subprocess.run(probe_cmd, capture_output=True, text=True)
+
+            duration = 10  # Default
+            try:
+                duration = float(result.stdout.strip())
+            except:
+                pass
+
+            # Extract frame at 10% mark
+            timestamp = duration * 0.1
+
+            cmd = ['ffmpeg', '-y', '-ss', str(timestamp), '-i', str(video_path),
+                   '-vframes', '1', '-vf', 'scale=200:-1', str(thumb_path)]
+
+            subprocess.run(cmd, capture_output=True)
+
+            if thumb_path.exists():
+                return thumb_path
+            return None
+
+        except Exception as e:
+            print(f"[Files] Video thumbnail failed: {e}")
+            return None
+
+    def extract_text_content(self, file_path, category):
+        """Extract text content from a file."""
+        try:
+            file_path = Path(file_path)
+            ext = file_path.suffix.lower()
+
+            # Plain text and code files
+            if ext in {'.txt', '.md', '.py', '.js', '.ts', '.jsx', '.tsx', '.go',
+                      '.rs', '.java', '.c', '.cpp', '.h', '.cs', '.rb', '.php',
+                      '.json', '.yaml', '.yml', '.toml', '.xml', '.html', '.css',
+                      '.sh', '.bash', '.sql', '.prd', '.spec', '.req', '.feature'}:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    return f.read()
+
+            # PDF extraction
+            elif ext == '.pdf':
+                try:
+                    import pypdf
+                    reader = pypdf.PdfReader(str(file_path))
+                    text = []
+                    for page in reader.pages:
+                        text.append(page.extract_text() or '')
+                    return '\n'.join(text)
+                except ImportError:
+                    try:
+                        import PyPDF2
+                        reader = PyPDF2.PdfReader(str(file_path))
+                        text = []
+                        for page in reader.pages:
+                            text.append(page.extract_text() or '')
+                        return '\n'.join(text)
+                    except ImportError:
+                        print("[Files] PDF extraction requires pypdf or PyPDF2")
+                        return None
+
+            # DOCX extraction
+            elif ext == '.docx':
+                try:
+                    from docx import Document
+                    doc = Document(str(file_path))
+                    paragraphs = [p.text for p in doc.paragraphs]
+                    return '\n'.join(paragraphs)
+                except ImportError:
+                    print("[Files] DOCX extraction requires python-docx")
+                    return None
+
+            return None
+
+        except Exception as e:
+            print(f"[Files] Text extraction failed: {e}")
+            return None
+
+    def serve_files_list(self, query_string):
+        """List uploaded files with optional filtering."""
+        try:
+            params = parse_qs(query_string) if query_string else {}
+            category = params.get('category', [None])[0]
+            limit = int(params.get('limit', ['100'])[0])
+            offset = int(params.get('offset', ['0'])[0])
+
+            index = self.load_uploads_index()
+            files = index.get('files', [])
+
+            # Apply category filter
+            if category:
+                files = [f for f in files if f.get('category') == category]
+
+            # Sort by upload date (newest first)
+            files.sort(key=lambda x: x.get('uploaded', ''), reverse=True)
+
+            # Paginate
+            total = len(files)
+            files = files[offset:offset + limit]
+
+            self.serve_json({
+                'ok': True,
+                'files': files,
+                'total': total,
+                'limit': limit,
+                'offset': offset
+            })
+
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def serve_file_info(self, file_id):
+        """Get info for a specific file."""
+        try:
+            index = self.load_uploads_index()
+
+            for f in index.get('files', []):
+                if f.get('id') == file_id:
+                    self.serve_json({'ok': True, 'file': f})
+                    return
+
+            self.serve_json({'error': 'File not found'}, status=404)
+
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def serve_file_thumbnail(self, file_id):
+        """Serve thumbnail for a file."""
+        try:
+            index = self.load_uploads_index()
+
+            for f in index.get('files', []):
+                if f.get('id') == file_id:
+                    thumb_path = f.get('thumbnail')
+                    if thumb_path and Path(thumb_path).exists():
+                        self.send_response(200)
+                        self.send_header('Content-Type', 'image/jpeg')
+                        self.send_header('Access-Control-Allow-Origin', '*')
+                        self.end_headers()
+                        with open(thumb_path, 'rb') as img:
+                            self.wfile.write(img.read())
+                        return
+                    break
+
+            self.send_error(404, "Thumbnail not found")
+
+        except Exception as e:
+            self.send_error(500, str(e))
+
+    def serve_file_content(self, file_id):
+        """Serve file content for download/preview."""
+        try:
+            index = self.load_uploads_index()
+
+            for f in index.get('files', []):
+                if f.get('id') == file_id:
+                    file_path = Path(f.get('path', ''))
+                    if file_path.exists():
+                        # Determine content type
+                        ext = file_path.suffix.lower()
+                        content_types = {
+                            '.pdf': 'application/pdf',
+                            '.json': 'application/json',
+                            '.txt': 'text/plain',
+                            '.md': 'text/markdown',
+                            '.html': 'text/html',
+                            '.css': 'text/css',
+                            '.js': 'application/javascript',
+                            '.png': 'image/png',
+                            '.jpg': 'image/jpeg',
+                            '.jpeg': 'image/jpeg',
+                            '.gif': 'image/gif',
+                            '.svg': 'image/svg+xml',
+                            '.mp4': 'video/mp4',
+                            '.webm': 'video/webm',
+                            '.mov': 'video/quicktime',
+                        }
+                        content_type = content_types.get(ext, 'application/octet-stream')
+
+                        self.send_response(200)
+                        self.send_header('Content-Type', content_type)
+                        self.send_header('Access-Control-Allow-Origin', '*')
+                        self.send_header('Content-Disposition',
+                                        f'inline; filename="{f.get("filename", "file")}"')
+                        self.end_headers()
+
+                        with open(file_path, 'rb') as content:
+                            self.wfile.write(content.read())
+                        return
+                    break
+
+            self.send_error(404, "File not found")
+
+        except Exception as e:
+            self.send_error(500, str(e))
+
+    def extract_file_to_memory(self, file_id):
+        """Extract file content and add to memory browser index."""
+        try:
+            index = self.load_uploads_index()
+            file_meta = None
+            file_idx = None
+
+            for i, f in enumerate(index.get('files', [])):
+                if f.get('id') == file_id:
+                    file_meta = f
+                    file_idx = i
+                    break
+
+            if not file_meta:
+                self.serve_json({'error': 'File not found'}, status=404)
+                return
+
+            file_path = Path(file_meta.get('path', ''))
+            if not file_path.exists():
+                self.serve_json({'error': 'File path not found'}, status=404)
+                return
+
+            # Extract full text content
+            extracted_text = self.extract_text_content(file_path, file_meta.get('category', ''))
+
+            if not extracted_text:
+                self.serve_json({'error': 'Could not extract text from file'}, status=400)
+                return
+
+            # Create unified history entry
+            memory_entry = {
+                'type': 'uploaded_file',
+                'id': f'file-{file_id}',
+                'timestamp': int(datetime.now().timestamp() * 1000),
+                'timeFormatted': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'file_type': file_meta.get('category', 'document'),
+                'filename': file_meta.get('filename', 'unknown'),
+                'path': str(file_path),
+                'preview': extracted_text[:500] if extracted_text else '',
+                'display': f"[File] {file_meta.get('filename', 'unknown')}",
+                'tags': ['uploaded', file_meta.get('category', 'file')],
+                'searchable_content': extracted_text,
+                'category': 'uploaded_file'
+            }
+
+            # Load and update unified history index
+            try:
+                unified_index = {'items': [], 'counts': {}}
+                if UNIFIED_HISTORY_INDEX.exists():
+                    with open(UNIFIED_HISTORY_INDEX, 'r') as f:
+                        unified_index = json.load(f)
+
+                # Check if already indexed
+                existing_ids = {item.get('id') for item in unified_index.get('items', [])}
+                if memory_entry['id'] not in existing_ids:
+                    unified_index['items'].append(memory_entry)
+
+                    # Update counts
+                    counts = unified_index.get('counts', {})
+                    counts['uploaded_file'] = counts.get('uploaded_file', 0) + 1
+                    unified_index['counts'] = counts
+
+                    with open(UNIFIED_HISTORY_INDEX, 'w') as f:
+                        json.dump(unified_index, f, indent=2)
+
+                    print(f"[Files] Indexed to memory: {file_meta.get('filename')}")
+            except Exception as e:
+                print(f"[Files] Failed to update unified index: {e}")
+
+            # Mark as indexed in uploads index
+            index['files'][file_idx]['indexed_to_memory'] = True
+            index['files'][file_idx]['extracted_preview'] = extracted_text[:500]
+            self.save_uploads_index(index)
+
+            self.serve_json({
+                'ok': True,
+                'message': 'File extracted and indexed to memory',
+                'entry': memory_entry
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'error': str(e)}, status=500)
+
+    def delete_file(self, file_id):
+        """Delete an uploaded file."""
+        try:
+            index = self.load_uploads_index()
+
+            new_files = []
+            deleted = None
+
+            for f in index.get('files', []):
+                if f.get('id') == file_id:
+                    deleted = f
+                    # Delete actual file
+                    file_path = Path(f.get('path', ''))
+                    if file_path.exists():
+                        file_path.unlink()
+                    # Delete thumbnail
+                    thumb_path = f.get('thumbnail')
+                    if thumb_path and Path(thumb_path).exists():
+                        Path(thumb_path).unlink()
+                else:
+                    new_files.append(f)
+
+            if deleted:
+                index['files'] = new_files
+                self.save_uploads_index(index)
+
+                # Remove from unified index if exists
+                try:
+                    if UNIFIED_HISTORY_INDEX.exists():
+                        with open(UNIFIED_HISTORY_INDEX, 'r') as f:
+                            unified_index = json.load(f)
+
+                        unified_index['items'] = [
+                            item for item in unified_index.get('items', [])
+                            if item.get('id') != f'file-{file_id}'
+                        ]
+
+                        with open(UNIFIED_HISTORY_INDEX, 'w') as f:
+                            json.dump(unified_index, f, indent=2)
+                except Exception as e:
+                    print(f"[Files] Failed to remove from unified index: {e}")
+
+                self.serve_json({'ok': True, 'deleted': deleted})
+            else:
+                self.serve_json({'error': 'File not found'}, status=404)
+
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    # =========================================================================
+    # VIDEO EDITING API (FFmpeg)
+    # =========================================================================
+
+    def video_trim(self, data):
+        """Trim a video to start/end time."""
+        try:
+            file_id = data.get('file_id')
+            start_time = data.get('start_time', 0)
+            end_time = data.get('end_time')
+
+            if not file_id or not end_time:
+                self.serve_json({'error': 'Missing file_id or end_time'}, status=400)
+                return
+
+            # Get file path
+            index = self.load_uploads_index()
+            file_meta = None
+            for f in index.get('files', []):
+                if f.get('id') == file_id:
+                    file_meta = f
+                    break
+
+            if not file_meta:
+                self.serve_json({'error': 'File not found'}, status=404)
+                return
+
+            input_path = Path(file_meta.get('path', ''))
+            if not input_path.exists():
+                self.serve_json({'error': 'Source file not found'}, status=404)
+                return
+
+            # Create output filename
+            output_name = f"trimmed_{input_path.stem}_{int(start_time)}_{int(end_time)}{input_path.suffix}"
+            output_path = UPLOADS_DIR / 'videos' / output_name
+
+            # Run FFmpeg
+            cmd = ['ffmpeg', '-y', '-i', str(input_path),
+                   '-ss', str(start_time), '-to', str(end_time),
+                   '-c', 'copy', str(output_path)]
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if output_path.exists():
+                # Add to index
+                new_id = str(uuid.uuid4())[:8]
+                new_meta = {
+                    'id': new_id,
+                    'filename': output_name,
+                    'saved_as': output_name,
+                    'category': 'videos',
+                    'path': str(output_path),
+                    'size': output_path.stat().st_size,
+                    'uploaded': datetime.now().isoformat(),
+                    'source_file': file_id,
+                    'operation': 'trim'
+                }
+
+                # Generate thumbnail
+                thumb = self.generate_video_thumbnail(output_path)
+                if thumb:
+                    new_meta['thumbnail'] = str(thumb)
+
+                index['files'].append(new_meta)
+                self.save_uploads_index(index)
+
+                self.serve_json({'ok': True, 'file': new_meta})
+            else:
+                self.serve_json({
+                    'error': 'FFmpeg failed',
+                    'stderr': result.stderr
+                }, status=500)
+
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def video_concat(self, data):
+        """Concatenate multiple videos."""
+        try:
+            file_ids = data.get('file_ids', [])
+
+            if len(file_ids) < 2:
+                self.serve_json({'error': 'Need at least 2 files'}, status=400)
+                return
+
+            index = self.load_uploads_index()
+            input_files = []
+
+            for fid in file_ids:
+                for f in index.get('files', []):
+                    if f.get('id') == fid:
+                        path = Path(f.get('path', ''))
+                        if path.exists():
+                            input_files.append(path)
+                        break
+
+            if len(input_files) < 2:
+                self.serve_json({'error': 'Not enough valid files found'}, status=400)
+                return
+
+            # Create concat file
+            concat_file = UPLOADS_DIR / 'videos' / 'concat_list.txt'
+            with open(concat_file, 'w') as f:
+                for p in input_files:
+                    f.write(f"file '{p}'\n")
+
+            # Output filename
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            output_name = f"concat_{timestamp}.mp4"
+            output_path = UPLOADS_DIR / 'videos' / output_name
+
+            # Run FFmpeg concat
+            cmd = ['ffmpeg', '-y', '-f', 'concat', '-safe', '0',
+                   '-i', str(concat_file), '-c', 'copy', str(output_path)]
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
+            # Clean up concat file
+            concat_file.unlink()
+
+            if output_path.exists():
+                new_id = str(uuid.uuid4())[:8]
+                new_meta = {
+                    'id': new_id,
+                    'filename': output_name,
+                    'saved_as': output_name,
+                    'category': 'videos',
+                    'path': str(output_path),
+                    'size': output_path.stat().st_size,
+                    'uploaded': datetime.now().isoformat(),
+                    'source_files': file_ids,
+                    'operation': 'concat'
+                }
+
+                thumb = self.generate_video_thumbnail(output_path)
+                if thumb:
+                    new_meta['thumbnail'] = str(thumb)
+
+                index['files'].append(new_meta)
+                self.save_uploads_index(index)
+
+                self.serve_json({'ok': True, 'file': new_meta})
+            else:
+                self.serve_json({
+                    'error': 'FFmpeg concat failed',
+                    'stderr': result.stderr
+                }, status=500)
+
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def video_extract_audio(self, data):
+        """Extract audio from video."""
+        try:
+            file_id = data.get('file_id')
+            output_format = data.get('format', 'mp3')
+
+            if not file_id:
+                self.serve_json({'error': 'Missing file_id'}, status=400)
+                return
+
+            index = self.load_uploads_index()
+            file_meta = None
+            for f in index.get('files', []):
+                if f.get('id') == file_id:
+                    file_meta = f
+                    break
+
+            if not file_meta:
+                self.serve_json({'error': 'File not found'}, status=404)
+                return
+
+            input_path = Path(file_meta.get('path', ''))
+            output_name = f"{input_path.stem}_audio.{output_format}"
+            output_path = UPLOADS_DIR / 'documents' / output_name
+
+            cmd = ['ffmpeg', '-y', '-i', str(input_path),
+                   '-vn', '-acodec', 'libmp3lame' if output_format == 'mp3' else 'copy',
+                   str(output_path)]
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if output_path.exists():
+                new_id = str(uuid.uuid4())[:8]
+                new_meta = {
+                    'id': new_id,
+                    'filename': output_name,
+                    'saved_as': output_name,
+                    'category': 'documents',
+                    'path': str(output_path),
+                    'size': output_path.stat().st_size,
+                    'uploaded': datetime.now().isoformat(),
+                    'source_file': file_id,
+                    'operation': 'extract_audio'
+                }
+
+                index['files'].append(new_meta)
+                self.save_uploads_index(index)
+
+                self.serve_json({'ok': True, 'file': new_meta})
+            else:
+                self.serve_json({'error': 'FFmpeg failed', 'stderr': result.stderr}, status=500)
+
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def video_add_text(self, data):
+        """Add text overlay to video."""
+        try:
+            file_id = data.get('file_id')
+            text = data.get('text', '')
+            position = data.get('position', 'bottom')  # top, center, bottom
+            font_size = data.get('font_size', 24)
+
+            if not file_id or not text:
+                self.serve_json({'error': 'Missing file_id or text'}, status=400)
+                return
+
+            index = self.load_uploads_index()
+            file_meta = None
+            for f in index.get('files', []):
+                if f.get('id') == file_id:
+                    file_meta = f
+                    break
+
+            if not file_meta:
+                self.serve_json({'error': 'File not found'}, status=404)
+                return
+
+            input_path = Path(file_meta.get('path', ''))
+            output_name = f"text_{input_path.stem}{input_path.suffix}"
+            output_path = UPLOADS_DIR / 'videos' / output_name
+
+            # Position mapping
+            y_pos = {'top': '10', 'center': '(h-text_h)/2', 'bottom': 'h-text_h-10'}
+
+            drawtext = f"drawtext=text='{text}':fontsize={font_size}:fontcolor=white:x=(w-text_w)/2:y={y_pos.get(position, 'h-text_h-10')}"
+
+            cmd = ['ffmpeg', '-y', '-i', str(input_path),
+                   '-vf', drawtext, '-codec:a', 'copy', str(output_path)]
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if output_path.exists():
+                new_id = str(uuid.uuid4())[:8]
+                new_meta = {
+                    'id': new_id,
+                    'filename': output_name,
+                    'saved_as': output_name,
+                    'category': 'videos',
+                    'path': str(output_path),
+                    'size': output_path.stat().st_size,
+                    'uploaded': datetime.now().isoformat(),
+                    'source_file': file_id,
+                    'operation': 'add_text'
+                }
+
+                thumb = self.generate_video_thumbnail(output_path)
+                if thumb:
+                    new_meta['thumbnail'] = str(thumb)
+
+                index['files'].append(new_meta)
+                self.save_uploads_index(index)
+
+                self.serve_json({'ok': True, 'file': new_meta})
+            else:
+                self.serve_json({'error': 'FFmpeg failed', 'stderr': result.stderr}, status=500)
+
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def video_resize(self, data):
+        """Resize video."""
+        try:
+            file_id = data.get('file_id')
+            width = data.get('width')
+            height = data.get('height', -1)  # -1 maintains aspect ratio
+
+            if not file_id or not width:
+                self.serve_json({'error': 'Missing file_id or width'}, status=400)
+                return
+
+            index = self.load_uploads_index()
+            file_meta = None
+            for f in index.get('files', []):
+                if f.get('id') == file_id:
+                    file_meta = f
+                    break
+
+            if not file_meta:
+                self.serve_json({'error': 'File not found'}, status=404)
+                return
+
+            input_path = Path(file_meta.get('path', ''))
+            output_name = f"resized_{width}x{height}_{input_path.name}"
+            output_path = UPLOADS_DIR / 'videos' / output_name
+
+            scale_filter = f"scale={width}:{height}"
+
+            cmd = ['ffmpeg', '-y', '-i', str(input_path),
+                   '-vf', scale_filter, '-codec:a', 'copy', str(output_path)]
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if output_path.exists():
+                new_id = str(uuid.uuid4())[:8]
+                new_meta = {
+                    'id': new_id,
+                    'filename': output_name,
+                    'saved_as': output_name,
+                    'category': 'videos',
+                    'path': str(output_path),
+                    'size': output_path.stat().st_size,
+                    'uploaded': datetime.now().isoformat(),
+                    'source_file': file_id,
+                    'operation': 'resize'
+                }
+
+                thumb = self.generate_video_thumbnail(output_path)
+                if thumb:
+                    new_meta['thumbnail'] = str(thumb)
+
+                index['files'].append(new_meta)
+                self.save_uploads_index(index)
+
+                self.serve_json({'ok': True, 'file': new_meta})
+            else:
+                self.serve_json({'error': 'FFmpeg failed', 'stderr': result.stderr}, status=500)
+
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    # =========================================================================
+    # AGENT FILE ACCESS API
+    # =========================================================================
+
+    def serve_files_for_agent(self, data):
+        """List files available to an agent."""
+        try:
+            agent_id = data.get('agent_id', 'default')
+            category = data.get('category')
+
+            index = self.load_uploads_index()
+            files = index.get('files', [])
+
+            if category:
+                files = [f for f in files if f.get('category') == category]
+
+            # Return simplified file list for agents
+            agent_files = [{
+                'id': f.get('id'),
+                'filename': f.get('filename'),
+                'category': f.get('category'),
+                'size': f.get('size'),
+                'has_extracted_text': bool(f.get('extracted_preview')),
+                'indexed_to_memory': f.get('indexed_to_memory', False)
+            } for f in files]
+
+            self.serve_json({
+                'ok': True,
+                'agent_id': agent_id,
+                'files': agent_files,
+                'count': len(agent_files)
+            })
+
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def agent_file_request(self, data):
+        """Handle agent file operation request."""
+        try:
+            agent_id = data.get('agent_id', 'default')
+            file_id = data.get('file_id')
+            operation = data.get('operation', 'read')
+
+            if not file_id:
+                self.serve_json({'error': 'Missing file_id'}, status=400)
+                return
+
+            index = self.load_uploads_index()
+            file_meta = None
+
+            for f in index.get('files', []):
+                if f.get('id') == file_id:
+                    file_meta = f
+                    break
+
+            if not file_meta:
+                self.serve_json({'error': 'File not found'}, status=404)
+                return
+
+            if operation == 'read':
+                # Return extracted text content
+                extracted = file_meta.get('extracted_preview', '')
+
+                # If no preview, try to extract now
+                if not extracted:
+                    file_path = Path(file_meta.get('path', ''))
+                    if file_path.exists():
+                        extracted = self.extract_text_content(file_path, file_meta.get('category', ''))
+
+                self.serve_json({
+                    'ok': True,
+                    'agent_id': agent_id,
+                    'file_id': file_id,
+                    'operation': operation,
+                    'content': extracted or '[No text content extracted]',
+                    'metadata': file_meta
+                })
+
+            elif operation == 'analyze':
+                # Return file for analysis
+                file_path = Path(file_meta.get('path', ''))
+                if file_path.exists():
+                    # For code/text files, return full content
+                    if file_meta.get('category') in ['code', 'documents', 'specs']:
+                        content = self.extract_text_content(file_path, file_meta.get('category', ''))
+                        self.serve_json({
+                            'ok': True,
+                            'agent_id': agent_id,
+                            'file_id': file_id,
+                            'operation': operation,
+                            'content': content,
+                            'metadata': file_meta
+                        })
+                    else:
+                        self.serve_json({
+                            'ok': True,
+                            'agent_id': agent_id,
+                            'file_id': file_id,
+                            'operation': operation,
+                            'content_url': f'/api/files/{file_id}/content',
+                            'metadata': file_meta
+                        })
+                else:
+                    self.serve_json({'error': 'File path not found'}, status=404)
+            else:
+                self.serve_json({'error': f'Unknown operation: {operation}'}, status=400)
+
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    # =========================================================================
     # DEMO SHARING ENDPOINTS
     # =========================================================================
 
     def serve_demo_page(self, query_string):
         """Serve the demo join page with optional pre-filled code."""
+        import random
         params = parse_qs(query_string)
         code = params.get('code', [''])[0]
         name = params.get('name', [''])[0]
+        auto_join = params.get('auto', [''])[0] == '1'
+
+        # Auto-generate guest name if code provided but no name
+        if code and not name:
+            name = f"Guest-{random.randint(1000, 9999)}"
 
         # Generate demo join HTML
-        html = self._generate_demo_html(code, name)
+        html = self._generate_demo_html(code, name, auto_join)
 
         self.send_response(200)
         self.send_header('Content-Type', 'text/html')
@@ -588,6 +1657,29 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             self.serve_json({'error': str(e)}, status=500)
 
+    def serve_demo_link(self, query_string):
+        """Link a demo code to a workspace session."""
+        if not demo_store:
+            self.serve_json({'error': 'Demo store not available'}, status=500)
+            return
+
+        params = parse_qs(query_string)
+        code = params.get('code', [''])[0]
+        session_id = params.get('session', [''])[0]
+
+        if not code or not session_id:
+            self.serve_json({'error': 'Both code and session required'}, status=400)
+            return
+
+        try:
+            success = demo_store.link_workspace_session(code.upper(), session_id)
+            if success:
+                self.serve_json({'success': True, 'code': code.upper(), 'session_id': session_id})
+            else:
+                self.serve_json({'error': 'Demo not found'}, status=404)
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
     def serve_demo_list(self):
         """List all active demos."""
         if not demo_store:
@@ -603,8 +1695,10 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             self.serve_json({'error': str(e)}, status=500)
 
-    def _generate_demo_html(self, code: str = '', name: str = '') -> str:
+    def _generate_demo_html(self, code: str = '', name: str = '', auto_join: bool = False) -> str:
         """Generate the demo join page HTML."""
+        auto_join_js = 'true' if auto_join else 'false'
+        has_code = 'true' if code else 'false'
         return f'''<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -733,38 +1827,155 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         .create-link:hover {{
             text-decoration: underline;
         }}
+        .invite-info {{
+            background: rgba(74,158,255,0.15);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 25px 0;
+            text-align: center;
+        }}
+        .invite-code {{
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 8px;
+        }}
+        .invite-code strong {{
+            color: #4a9eff;
+            font-family: monospace;
+            letter-spacing: 2px;
+        }}
+        .invite-name {{
+            font-size: 18px;
+        }}
+        .invite-name strong {{
+            color: #2ed573;
+        }}
+        .change-name {{
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-top: 15px;
+            cursor: pointer;
+        }}
+        .change-name:hover {{
+            color: #4a9eff;
+        }}
+        #quickJoinBtn {{
+            font-size: 20px;
+            padding: 18px;
+            background: linear-gradient(135deg, #2ed573 0%, #1abc9c 100%);
+        }}
+        #quickJoinBtn:hover {{
+            box-shadow: 0 4px 20px rgba(46,213,115,0.4);
+        }}
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Join Demo</h1>
-        <p class="subtitle">Enter the demo code to join a live workspace session</p>
+        <div id="invite-view" style="display: {{'none' if not code else 'block'}};">
+            <h1>🎉 You're Invited!</h1>
+            <p class="subtitle">Join the collaborative workspace session</p>
 
-        <form id="joinForm">
-            <div class="form-group">
-                <label for="code">Demo Code</label>
-                <input type="text" id="code" class="code-input" placeholder="DEMO123ABC"
-                       value="{code}" maxlength="12" required>
+            <div class="invite-info">
+                <div class="invite-code">Session: <strong>{code}</strong></div>
+                <div class="invite-name">Joining as: <strong id="guest-name">{name}</strong></div>
             </div>
 
-            <div class="form-group">
-                <label for="name">Your Name</label>
-                <input type="text" id="name" placeholder="Enter your name"
-                       value="{name}" required>
-            </div>
+            <button type="button" id="quickJoinBtn" onclick="quickJoin()">
+                Join Now →
+            </button>
 
-            <button type="submit" id="joinBtn">Join Demo</button>
-        </form>
+            <p class="change-name" onclick="showFullForm()">Change your name</p>
 
-        <div id="status" class="status"></div>
+            <div id="quick-status" class="status"></div>
+        </div>
 
-        <div class="divider">or</div>
+        <div id="full-form" style="display: {{'block' if not code else 'none'}};">
+            <h1>Join Demo</h1>
+            <p class="subtitle">Enter the demo code to join a live workspace session</p>
 
-        <p class="create-link" onclick="createDemo()">Create a new demo session</p>
+            <form id="joinForm">
+                <div class="form-group">
+                    <label for="code">Demo Code</label>
+                    <input type="text" id="code" class="code-input" placeholder="DEMO123ABC"
+                           value="{code}" maxlength="12" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="name">Your Name</label>
+                    <input type="text" id="name" placeholder="Enter your name"
+                           value="{name}" required>
+                </div>
+
+                <button type="submit" id="joinBtn">Join Demo</button>
+            </form>
+
+            <div id="status" class="status"></div>
+
+            <div class="divider">or</div>
+
+            <p class="create-link" onclick="createDemo()">Create a new demo session</p>
+        </div>
     </div>
 
     <script>
         const WS_URL = 'ws://' + window.location.hostname + ':8081';
+        const AUTO_JOIN = {auto_join_js};
+        const HAS_CODE = {has_code};
+        const PREFILLED_CODE = '{code}';
+        const PREFILLED_NAME = '{name}';
+
+        // Quick join function for invite links
+        async function quickJoin() {{
+            const code = PREFILLED_CODE;
+            const name = PREFILLED_NAME;
+            const btn = document.getElementById('quickJoinBtn');
+            const status = document.getElementById('quick-status');
+
+            btn.disabled = true;
+            btn.textContent = 'Joining...';
+
+            try {{
+                const res = await fetch(`/api/demo/join?code=${{code}}&name=${{encodeURIComponent(name)}}`);
+                const data = await res.json();
+
+                if (!res.ok) {{
+                    throw new Error(data.error || 'Failed to join demo');
+                }}
+
+                status.className = 'status success';
+                status.textContent = 'Success! Redirecting...';
+                status.style.display = 'block';
+
+                const params = new URLSearchParams({{
+                    demo: code,
+                    name: name,
+                    session: data.workspace_session_id || ''
+                }});
+                window.location.href = '/#workspace?' + params.toString();
+
+            }} catch (err) {{
+                status.className = 'status error';
+                status.textContent = err.message;
+                status.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Join Now →';
+            }}
+        }}
+
+        // Show full form for name change
+        function showFullForm() {{
+            document.getElementById('invite-view').style.display = 'none';
+            document.getElementById('full-form').style.display = 'block';
+            document.getElementById('name').focus();
+        }}
+
+        // Auto-join on page load if enabled
+        if (AUTO_JOIN && HAS_CODE) {{
+            window.addEventListener('load', () => {{
+                setTimeout(quickJoin, 500);
+            }});
+        }}
 
         document.getElementById('joinForm').addEventListener('submit', async (e) => {{
             e.preventDefault();
@@ -7408,15 +8619,496 @@ def run_server(port=8080, ws_port=8081):
         print(f"\n❌ Server error: {e}")
 
 
+# =============================================================================
+# UNIFIED AIOHTTP SERVER (Single Port for HTTP + WebSocket)
+# =============================================================================
+
+# Track aiohttp WebSocket clients by session
+aiohttp_session_clients = {}  # {session_id: {user_id: (ws, user_name)}}
+
+async def aiohttp_broadcast_to_session(session_id, event, data, exclude_user=None):
+    """Broadcast message to all clients in a session."""
+    if session_id not in aiohttp_session_clients:
+        return
+
+    message = json.dumps({'event': event, 'data': data})
+    for uid, (client_ws, _) in list(aiohttp_session_clients[session_id].items()):
+        if uid != exclude_user and not client_ws.closed:
+            try:
+                await client_ws.send_str(message)
+            except Exception as e:
+                print(f"[Broadcast] Error sending to {uid}: {e}")
+
+
+async def aiohttp_websocket_handler(request):
+    """Handle WebSocket connections via aiohttp."""
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+
+    print(f"[WebSocket] Client connected via aiohttp")
+    connected_clients.add(ws)
+
+    session_id = None
+    user_id = None
+    user_name = None
+
+    try:
+        await ws.send_json({
+            'event': 'connected',
+            'message': 'WebSocket connected - listening for updates'
+        })
+
+        async for msg in ws:
+            if msg.type == web.WSMsgType.TEXT:
+                try:
+                    data = json.loads(msg.data)
+                    msg_type = data.get('type')
+
+                    if msg_type == 'ping':
+                        await ws.send_json({'type': 'pong'})
+
+                    elif msg_type == 'join_workspace_session':
+                        session_id = data.get('session_id')
+                        user_id = data.get('user_id') or str(uuid.uuid4())[:8]
+                        user_name = data.get('user_name', 'Anonymous')
+
+                        # Track this client in the session
+                        if session_id not in aiohttp_session_clients:
+                            aiohttp_session_clients[session_id] = {}
+                        aiohttp_session_clients[session_id][user_id] = (ws, user_name)
+
+                        print(f"[WebSocket] User {user_name} ({user_id}) joined session {session_id}")
+
+                        # Notify the joining user
+                        await ws.send_json({
+                            'event': 'session_joined',
+                            'session_id': session_id,
+                            'user_id': user_id
+                        })
+
+                        # Notify others in the session
+                        await aiohttp_broadcast_to_session(
+                            session_id, 'user_joined',
+                            {'user_id': user_id, 'user_name': user_name,
+                             'users': {uid: {'name': un} for uid, (_, un) in aiohttp_session_clients[session_id].items()}},
+                            exclude_user=user_id
+                        )
+
+                    elif msg_type == 'workspace_message':
+                        if session_id:
+                            # Broadcast message to all users in session
+                            msg_content = data.get('content', data.get('message', ''))
+                            agent_id = data.get('agent_id', 'chat')
+
+                            print(f"[WebSocket] Message from {user_name} in {session_id}: {msg_content[:50]}...")
+
+                            await aiohttp_broadcast_to_session(
+                                session_id, 'user_message',
+                                {
+                                    'user_id': user_id,
+                                    'user_name': user_name,
+                                    'content': msg_content,
+                                    'agent_id': agent_id,
+                                    'timestamp': datetime.utcnow().isoformat()
+                                },
+                                exclude_user=None  # Send to everyone including sender for confirmation
+                            )
+
+                    elif msg_type == 'user_typing':
+                        if session_id:
+                            await aiohttp_broadcast_to_session(
+                                session_id, 'user_typing',
+                                {'user_id': user_id, 'user_name': user_name, 'is_typing': data.get('is_typing')},
+                                exclude_user=user_id
+                            )
+
+                    elif msg_type == 'cursor_move':
+                        if session_id:
+                            await aiohttp_broadcast_to_session(
+                                session_id, 'cursor_move',
+                                {'user_id': user_id, 'position': data.get('position')},
+                                exclude_user=user_id
+                            )
+
+                except json.JSONDecodeError:
+                    pass
+
+            elif msg.type == web.WSMsgType.ERROR:
+                print(f'[WebSocket] Error: {ws.exception()}')
+
+    finally:
+        connected_clients.discard(ws)
+        # Remove from session tracking
+        if session_id and user_id and session_id in aiohttp_session_clients:
+            aiohttp_session_clients[session_id].pop(user_id, None)
+            print(f"[WebSocket] User {user_name} ({user_id}) left session {session_id}")
+            # Notify others
+            await aiohttp_broadcast_to_session(
+                session_id, 'user_left',
+                {'user_id': user_id, 'user_name': user_name}
+            )
+        print(f"[WebSocket] Client disconnected")
+
+    return ws
+
+
+class AiohttpHandler:
+    """Wraps DashboardHandler methods for aiohttp."""
+
+    def __init__(self):
+        self.handler = DashboardHandler
+
+    async def handle_request(self, request):
+        """Route HTTP requests to appropriate handler."""
+        path = request.path
+        query = request.query_string
+
+        # Create a mock handler instance to use its methods
+        handler = MockHandler(path, query, request)
+
+        # Route based on path
+        try:
+            if path == '/' or path == '':
+                return await self._serve_dashboard(handler)
+            elif path == '/api/stats':
+                return await self._serve_json(handler.get_compression_stats())
+            elif path == '/api/daemon-status':
+                return await self._serve_json(handler.get_daemon_status())
+            elif path.startswith('/api/demo/'):
+                return await self._handle_demo_api(path, query, handler)
+            elif path == '/demo':
+                return await self._serve_demo_page(query)
+            elif path.startswith('/api/'):
+                return await self._handle_api(path, query, handler, request)
+            else:
+                # Serve static files
+                return await self._serve_static(path)
+        except Exception as e:
+            return web.json_response({'error': str(e)}, status=500)
+
+    async def _serve_dashboard(self, handler):
+        """Serve the main dashboard HTML."""
+        dashboard_html = handler.get_dashboard_html()
+        return web.Response(text=dashboard_html, content_type='text/html')
+
+    async def _serve_json(self, data):
+        """Serve JSON response."""
+        return web.json_response(data)
+
+    async def _serve_demo_page(self, query):
+        """Serve demo join page."""
+        import random
+        params = parse_qs(query)
+        code = params.get('code', [''])[0] if params.get('code') else ''
+        name = params.get('name', [''])[0] if params.get('name') else ''
+        auto_join = params.get('auto', [''])[0] == '1' if params.get('auto') else False
+
+        if code and not name:
+            name = f"Guest-{random.randint(1000, 9999)}"
+
+        handler = MockHandler('/demo', query, None)
+        html = handler._generate_demo_html(code, name, auto_join)
+        return web.Response(text=html, content_type='text/html')
+
+    async def _handle_demo_api(self, path, query, handler):
+        """Handle demo API endpoints."""
+        params = parse_qs(query)
+
+        if path == '/api/demo/create':
+            if not demo_store:
+                return web.json_response({'error': 'Demo store not available'}, status=500)
+            code = params.get('code', [None])[0]
+            owner = params.get('owner', ['Host'])[0]
+            demo = demo_store.create_demo(
+                code=code.upper() if code else None,
+                owner_name=owner
+            )
+            host = os.environ.get('RAILWAY_PUBLIC_DOMAIN', 'localhost:8080')
+            protocol = 'https' if 'RAILWAY' in os.environ.get('RAILWAY_ENVIRONMENT', '') else 'http'
+            share_url = f"{protocol}://{host}/demo?code={demo.code}"
+            return web.json_response({
+                'success': True, 'code': demo.code,
+                'share_url': share_url, 'expires_at': demo.expires_at
+            })
+
+        elif path == '/api/demo/join':
+            if not demo_store:
+                return web.json_response({'error': 'Demo store not available'}, status=500)
+            code = params.get('code', [''])[0]
+            name = params.get('name', ['Guest'])[0]
+            if not code:
+                return web.json_response({'error': 'Code required'}, status=400)
+            demo = demo_store.join_demo(code.upper(), name)
+            if not demo:
+                return web.json_response({'error': 'Demo not found or expired'}, status=404)
+            return web.json_response({
+                'success': True, 'code': demo.code,
+                'workspace_session_id': demo.workspace_session_id,
+                'participants': demo.participants
+            })
+
+        elif path == '/api/demo/link':
+            if not demo_store:
+                return web.json_response({'error': 'Demo store not available'}, status=500)
+            code = params.get('code', [''])[0]
+            session_id = params.get('session', [''])[0]
+            if not code or not session_id:
+                return web.json_response({'error': 'Code and session required'}, status=400)
+            success = demo_store.link_workspace_session(code.upper(), session_id)
+            if success:
+                return web.json_response({'success': True})
+            return web.json_response({'error': 'Demo not found'}, status=404)
+
+        elif path == '/api/demo/list':
+            if not demo_store:
+                return web.json_response({'error': 'Demo store not available'}, status=500)
+            demos = demo_store.list_active_demos()
+            return web.json_response({'demos': [d.to_dict() for d in demos], 'count': len(demos)})
+
+        elif path == '/api/demo/info':
+            if not demo_store:
+                return web.json_response({'error': 'Demo store not available'}, status=500)
+            code = params.get('code', [''])[0]
+            if not code:
+                return web.json_response({'error': 'Code required'}, status=400)
+            demo = demo_store.get_demo(code.upper())
+            if not demo:
+                return web.json_response({'error': 'Demo not found'}, status=404)
+            return web.json_response(demo.to_dict())
+
+        return web.json_response({'error': 'Not found'}, status=404)
+
+    async def _handle_api(self, path, query, handler, request):
+        """Handle other API endpoints."""
+        params = parse_qs(query)
+
+        # Session management
+        if path == '/api/session/create':
+            if not session_manager:
+                return web.json_response({'error': 'Session manager not available'}, status=500)
+            name = params.get('name', ['Anonymous'])[0]
+            session = session_manager.create_session(name)
+            return web.json_response({
+                'session_id': session.session_id,
+                'created_at': session.created_at
+            })
+
+        elif path == '/api/session/list':
+            if not session_manager:
+                return web.json_response({'error': 'Session manager not available'}, status=500)
+            sessions = session_manager.list_sessions()
+            return web.json_response({'sessions': sessions})
+
+        elif path.startswith('/api/session/') and path.endswith('/info'):
+            session_id = path.split('/')[3]
+            if not session_manager:
+                return web.json_response({'error': 'Session manager not available'}, status=500)
+            session = session_manager.get_session(session_id)
+            if not session:
+                return web.json_response({'error': 'Session not found'}, status=404)
+            return web.json_response(session.to_dict())
+
+        # Search and other endpoints
+        elif path == '/api/search':
+            q = params.get('q', [''])[0]
+            result = handler.search_conversations(q)
+            return web.json_response(result)
+
+        # API keys (stub)
+        elif path == '/api/keys/list':
+            return web.json_response({'keys': [], 'ok': True})
+
+        # Todos (stub)
+        elif path.startswith('/api/todos/'):
+            return web.json_response({'todos': [], 'ok': True})
+
+        # Conversations (stub to prevent errors)
+        elif path == '/api/conversations/list':
+            return web.json_response({'conversations': [], 'ok': True})
+
+        # Agents list
+        elif path == '/api/agents/list':
+            return web.json_response({'agents': [], 'ok': True})
+
+        # Default - return empty ok response for unknown API paths
+        return web.json_response({'ok': True, 'data': None})
+
+    async def _serve_static(self, path):
+        """Serve static files."""
+        # For now, return 404 for unknown paths
+        return web.Response(text='Not found', status=404)
+
+    async def handle_post_request(self, request):
+        """Handle POST requests."""
+        path = request.path
+
+        try:
+            body = await request.json()
+        except:
+            body = {}
+
+        # Session creation - generate session ID for WebSocket to use
+        if path == '/api/workspace/sessions/create' or path == '/api/session/create':
+            import uuid
+            session_id = str(uuid.uuid4())[:8]
+            user_id = body.get('user_id') or str(uuid.uuid4())[:8]
+            user_name = body.get('user_name', body.get('name', 'Anonymous'))
+
+            return web.json_response({
+                'success': True,
+                'ok': True,
+                'session_id': session_id,
+                'user_id': user_id,
+                'user_name': user_name,
+                'created_at': datetime.utcnow().isoformat()
+            })
+
+        # Canvas endpoints
+        if '/canvas/' in path:
+            return web.json_response({'ok': True, 'success': True, 'message': 'Canvas endpoint'})
+
+        # Default
+        return web.json_response({'error': 'POST endpoint not found', 'path': path}, status=404)
+
+
+class MockHandler:
+    """Mock handler to reuse DashboardHandler methods."""
+
+    def __init__(self, path, query, request):
+        self.path = path
+        self.query = query
+        self.request = request
+
+    def get_compression_stats(self):
+        """Get compression statistics."""
+        stats = {
+            'library_exists': LIBRARY_DIR.exists(),
+            'compressed_count': 0,
+            'total_original_bytes': 0,
+            'total_compressed_bytes': 0
+        }
+        if COMPRESSED_DIR.exists():
+            files = list(COMPRESSED_DIR.glob('*.jsonl'))
+            stats['compressed_count'] = len(files)
+        return stats
+
+    def get_daemon_status(self):
+        """Get daemon status."""
+        running = False
+        pid = None
+        if DAEMON_PID_FILE.exists():
+            try:
+                pid = int(DAEMON_PID_FILE.read_text().strip())
+                os.kill(pid, 0)
+                running = True
+            except (ValueError, OSError):
+                running = False
+        return {'running': running, 'pid': pid}
+
+    def get_dashboard_html(self):
+        """Get dashboard HTML from file."""
+        dashboard_path = Path(__file__).parent / 'claude_dashboard.html'
+        if dashboard_path.exists():
+            return dashboard_path.read_text()
+        return '<html><body>Dashboard not found</body></html>'
+
+    def search_conversations(self, query):
+        """Search conversations."""
+        return {'results': [], 'query': query}
+
+    def _generate_demo_html(self, code='', name='', auto_join=False):
+        """Generate demo join HTML - delegating to DashboardHandler."""
+        # This is a simplified version - the full HTML is in DashboardHandler
+        handler = DashboardHandler.__new__(DashboardHandler)
+        return handler._generate_demo_html(code, name, auto_join)
+
+
+async def run_unified_server(port=8080):
+    """Run unified HTTP + WebSocket server on single port."""
+    print(f"""
+╔════════════════════════════════════════════════════════════════╗
+║                                                                ║
+║      🎛️  Claude Control Center Dashboard (Unified) 🎛️          ║
+║                                                                ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  Server:    http://localhost:{port}                            ║
+║  WebSocket: ws://localhost:{port}/ws                           ║
+║                                                                ║
+║  Single port mode - ready for Railway deployment!              ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+    """)
+
+    # Start file watchers
+    observer = Observer()
+    handoff_handler = HandoffWatcher()
+    if COMPRESSED_DIR.exists():
+        observer.schedule(handoff_handler, str(COMPRESSED_DIR), recursive=True)
+        print(f"[Server] Watching {COMPRESSED_DIR} for handoffs")
+
+    history_handler = HistoryWatcher()
+    history_dir = Path.home() / '.claude'
+    if history_dir.exists():
+        observer.schedule(history_handler, str(history_dir), recursive=False)
+
+    observer.start()
+
+    # Create aiohttp app
+    app = web.Application()
+    aio_handler = AiohttpHandler()
+
+    # WebSocket route
+    app.router.add_get('/ws', aiohttp_websocket_handler)
+
+    # POST routes for session/workspace APIs
+    app.router.add_post('/api/workspace/sessions/create', aio_handler.handle_post_request)
+    app.router.add_post('/api/session/create', aio_handler.handle_post_request)
+    app.router.add_post('/{path:.*}', aio_handler.handle_post_request)
+
+    # HTTP GET routes
+    app.router.add_get('/{path:.*}', aio_handler.handle_request)
+
+    # Start broadcast notifications task
+    asyncio.create_task(broadcast_notifications())
+
+    # Run server
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    print(f"✅ Unified server started on port {port}")
+
+    # Keep running
+    await asyncio.Future()
+
+
 if __name__ == '__main__':
     import sys
 
-    port = 8080
-    if len(sys.argv) > 1:
-        try:
-            port = int(sys.argv[1])
-        except ValueError:
-            print(f"Invalid port: {sys.argv[1]}")
-            sys.exit(1)
+    # Railway/cloud deployment: use PORT env variable
+    port = int(os.environ.get('PORT', 8080))
+    ws_port = int(os.environ.get('WS_PORT', 8081))
 
-    run_server(port)
+    # Parse arguments (skip flags)
+    for arg in sys.argv[1:]:
+        if not arg.startswith('--'):
+            try:
+                port = int(arg)
+            except ValueError:
+                print(f"Invalid port: {arg}")
+                sys.exit(1)
+
+    # Use unified server if aiohttp available and on Railway or --unified flag
+    use_unified = AIOHTTP_AVAILABLE and (
+        os.environ.get('RAILWAY_ENVIRONMENT') or
+        '--unified' in sys.argv or
+        os.environ.get('UNIFIED_SERVER', '').lower() == 'true'
+    )
+
+    if use_unified:
+        print("🚀 Starting unified single-port server...")
+        asyncio.run(run_unified_server(port))
+    else:
+        # Fallback to separate ports
+        run_server(port, ws_port)
