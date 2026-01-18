@@ -86,10 +86,11 @@ def init_redis():
     if not REDIS_AVAILABLE:
         return None
 
-    redis_host = os.environ.get('REDIS_HOST', 'localhost')
-    redis_port = int(os.environ.get('REDIS_PORT', 6379))
-    redis_user = os.environ.get('REDIS_USER', '')
-    redis_password = os.environ.get('REDIS_PASSWORD', '')
+    # Support both Railway naming (REDISHOST) and standard (REDIS_HOST)
+    redis_host = os.environ.get('REDISHOST') or os.environ.get('REDIS_HOST', 'localhost')
+    redis_port = int(os.environ.get('REDISPORT') or os.environ.get('REDIS_PORT', '6379'))
+    redis_user = os.environ.get('REDISUSER') or os.environ.get('REDIS_USER', '')
+    redis_password = os.environ.get('REDISPASSWORD') or os.environ.get('REDIS_PASSWORD', '')
 
     try:
         if redis_password:
