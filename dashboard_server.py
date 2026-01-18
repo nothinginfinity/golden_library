@@ -4766,11 +4766,19 @@ async def handle_workspace_message(session_id, user_id, data, websocket):
         # Stream agent response
         full_response = []
         try:
+            # Map friendly agent names to orchestrator IDs
+            AGENT_ID_MAP = {
+                'prax': 'moderator',
+                'cairn': 'b',
+                'koda': 'a'
+            }
+            orchestrator_agent_id = AGENT_ID_MAP.get(agent_id, agent_id)
+
             # orchestrator.send_message() is a sync iterator with sender_user_id for collaborative context
             loop = asyncio.get_event_loop()
 
             # Collect chunks from sync iterator (orchestrator builds collaborative context in system prompt)
-            for chunk in session.orchestrator.send_message(agent_id, message_content, sender_user_id=user_id):
+            for chunk in session.orchestrator.send_message(orchestrator_agent_id, message_content, sender_user_id=user_id):
                 full_response.append(chunk)
 
                 # Broadcast chunk to all users in session
