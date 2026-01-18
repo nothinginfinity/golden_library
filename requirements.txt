@@ -6,6 +6,9 @@ websockets>=10.0
 redis>=4.0.0
 watchdog>=3.0.0
 
+# Anthropic API for agents (Prax, Koda, Cairn)
+anthropic>=0.39.0
+
 # Optional for viewer
 flask>=2.0.0
 flask-cors>=3.0.10
