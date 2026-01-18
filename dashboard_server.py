@@ -67,6 +67,84 @@ except ImportError:
     demo_store = None
     print("Warning: demo_session_store not found. Demo sharing features disabled.")
 
+# Redis for persistent API key storage
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    redis = None
+    print("Warning: redis not installed. API keys will use file storage.")
+
+# Initialize Redis connection for API keys
+REDIS_CLIENT = None
+REDIS_API_KEYS_KEY = "golden_library:api_keys"
+
+def init_redis():
+    """Initialize Redis connection."""
+    global REDIS_CLIENT
+    if not REDIS_AVAILABLE:
+        return None
+
+    redis_host = os.environ.get('REDIS_HOST', 'localhost')
+    redis_port = int(os.environ.get('REDIS_PORT', 6379))
+    redis_user = os.environ.get('REDIS_USER', '')
+    redis_password = os.environ.get('REDIS_PASSWORD', '')
+
+    try:
+        if redis_password:
+            REDIS_CLIENT = redis.Redis(
+                host=redis_host,
+                port=redis_port,
+                username=redis_user or 'default',
+                password=redis_password,
+                decode_responses=True,
+                socket_timeout=5
+            )
+        else:
+            REDIS_CLIENT = redis.Redis(
+                host=redis_host,
+                port=redis_port,
+                decode_responses=True,
+                socket_timeout=5
+            )
+        REDIS_CLIENT.ping()
+        print(f"[Server] Redis connected at {redis_host}:{redis_port}")
+        return REDIS_CLIENT
+    except Exception as e:
+        print(f"[Server] Redis connection failed: {e}")
+        return None
+
+def get_api_keys_from_redis():
+    """Load API keys from Redis."""
+    global REDIS_CLIENT
+    if REDIS_CLIENT is None:
+        init_redis()
+    if REDIS_CLIENT:
+        try:
+            data = REDIS_CLIENT.get(REDIS_API_KEYS_KEY)
+            if data:
+                return json.loads(data)
+        except Exception as e:
+            print(f"[Server] Redis get failed: {e}")
+    return None
+
+def save_api_keys_to_redis(keys: dict):
+    """Save API keys to Redis."""
+    global REDIS_CLIENT
+    if REDIS_CLIENT is None:
+        init_redis()
+    if REDIS_CLIENT:
+        try:
+            REDIS_CLIENT.set(REDIS_API_KEYS_KEY, json.dumps(keys))
+            return True
+        except Exception as e:
+            print(f"[Server] Redis set failed: {e}")
+    return False
+
+# Initialize Redis on startup
+init_redis()
+
 # Paths
 HOME = Path.home()
 LIBRARY_DIR = HOME / ".claude" / "conversation_library"
@@ -8930,16 +9008,19 @@ class AiohttpHandler:
             result = handler.search_conversations(q)
             return web.json_response(result)
 
-        # API keys - load from file
+        # API keys - load from Redis first, then file
         elif path == '/api/keys/list':
-            keys = {}
-            if API_KEYS_FILE.exists():
-                try:
-                    with open(API_KEYS_FILE, 'r') as f:
-                        keys = json.load(f)
-                except:
-                    pass
-            return web.json_response({'keys': keys, 'ok': True})
+            keys = get_api_keys_from_redis()
+            if keys is None:
+                # Fall back to file
+                keys = {}
+                if API_KEYS_FILE.exists():
+                    try:
+                        with open(API_KEYS_FILE, 'r') as f:
+                            keys = json.load(f)
+                    except:
+                        pass
+            return web.json_response({'keys': keys, 'ok': True, 'source': 'redis' if REDIS_CLIENT else 'file'})
 
         # Model selection
         elif path == '/api/model/current':
@@ -9020,23 +9101,28 @@ class AiohttpHandler:
                 'created_at': datetime.utcnow().isoformat()
             })
 
-        # API keys save
+        # API keys save - to Redis first, then file as backup
         if path == '/api/keys/save':
             keys = body.get('keys', {})
             if not keys:
                 return web.json_response({'error': 'No keys provided'}, status=400)
             try:
-                # Ensure .claude directory exists
-                API_KEYS_FILE.parent.mkdir(parents=True, exist_ok=True)
-                # Save keys to file
-                with open(API_KEYS_FILE, 'w') as f:
-                    json.dump(keys, f, indent=2)
-                # Set restrictive permissions
-                os.chmod(API_KEYS_FILE, 0o600)
+                saved_to_redis = save_api_keys_to_redis(keys)
+
+                # Also save to file as backup
+                try:
+                    API_KEYS_FILE.parent.mkdir(parents=True, exist_ok=True)
+                    with open(API_KEYS_FILE, 'w') as f:
+                        json.dump(keys, f, indent=2)
+                    os.chmod(API_KEYS_FILE, 0o600)
+                except:
+                    pass  # File save is optional on Railway
+
                 return web.json_response({
                     'success': True,
-                    'message': f'Saved {len(keys)} API key(s)',
-                    'count': len(keys)
+                    'message': f'Saved {len(keys)} API key(s)' + (' to Redis' if saved_to_redis else ' to file'),
+                    'count': len(keys),
+                    'storage': 'redis' if saved_to_redis else 'file'
                 })
             except Exception as e:
                 return web.json_response({'error': str(e)}, status=500)
@@ -9066,9 +9152,17 @@ class AiohttpHandler:
         # Initialize orchestrator on first use
         if AGENT_ORCHESTRATOR is None:
             try:
-                # Try to get API key from environment first (for Railway)
+                # Priority: 1. Environment variable, 2. Redis, 3. File
                 api_key = os.environ.get('ANTHROPIC_API_KEY')
+
+                if not api_key:
+                    # Try Redis
+                    redis_keys = get_api_keys_from_redis()
+                    if redis_keys:
+                        api_key = redis_keys.get('claude')
+
                 if not api_key and API_KEYS_FILE.exists():
+                    # Fall back to file
                     try:
                         with open(API_KEYS_FILE, 'r') as f:
                             keys = json.load(f)
@@ -9078,7 +9172,7 @@ class AiohttpHandler:
 
                 if not api_key:
                     return web.json_response({
-                        'error': 'ANTHROPIC_API_KEY not configured. Set it in Railway environment variables or save in Config tab.'
+                        'error': 'ANTHROPIC_API_KEY not configured. Save your API key in the Config tab (it will persist in Redis).'
                     }, status=500)
 
                 AGENT_ORCHESTRATOR = AgentOrchestrator(api_key=api_key)
