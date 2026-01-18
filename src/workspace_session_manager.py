@@ -12,11 +12,62 @@ Handles:
 
 import uuid
 import json
+import os
 import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, List, Set, Optional, Any
 from dataclasses import dataclass, field, asdict
 from enum import Enum
+from pathlib import Path
+
+# Redis for API key retrieval
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    redis = None
+
+def get_api_key():
+    """Get Anthropic API key from environment, Redis, or file."""
+    # 1. Check environment
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    if api_key:
+        return api_key
+
+    # 2. Check Redis
+    if REDIS_AVAILABLE:
+        redis_host = os.environ.get('REDISHOST') or os.environ.get('REDIS_HOST', 'localhost')
+        redis_port = int(os.environ.get('REDISPORT') or os.environ.get('REDIS_PORT', '6379'))
+        redis_password = os.environ.get('REDISPASSWORD') or os.environ.get('REDIS_PASSWORD', '')
+        try:
+            if redis_password:
+                r = redis.Redis(host=redis_host, port=redis_port, password=redis_password, decode_responses=True, socket_timeout=2)
+            else:
+                r = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, socket_timeout=2)
+            data = r.get('golden_library:api_keys')
+            if data:
+                keys = json.loads(data)
+                api_key = keys.get('claude')
+                if api_key:
+                    print(f"[SessionManager] Got API key from Redis")
+                    return api_key
+        except Exception as e:
+            print(f"[SessionManager] Redis lookup failed: {e}")
+
+    # 3. Check file
+    api_keys_file = Path.home() / '.claude' / 'api_keys.json'
+    if api_keys_file.exists():
+        try:
+            with open(api_keys_file, 'r') as f:
+                keys = json.load(f)
+            api_key = keys.get('claude')
+            if api_key:
+                return api_key
+        except:
+            pass
+
+    return None
 
 # Import AgentOrchestrator for per-session agent management
 try:
@@ -380,14 +431,22 @@ class WorkspaceSessionManager:
         # Initialize AgentOrchestrator for this session (with MCP tools support)
         if AgentOrchestrator:
             try:
-                session.orchestrator = AgentOrchestrator(
-                    session_users=session.users,
-                    session_manager=self,  # Pass session manager for MCP tools
-                    session_id=session_id   # Pass session ID for MCP tool calls
-                )
-                print(f"[SessionManager] Initialized AgentOrchestrator for session {session_id} with MCP tools")
+                # Get API key from env, Redis, or file
+                api_key = get_api_key()
+                if api_key:
+                    session.orchestrator = AgentOrchestrator(
+                        api_key=api_key,
+                        session_users=session.users,
+                        session_manager=self,  # Pass session manager for MCP tools
+                        session_id=session_id   # Pass session ID for MCP tool calls
+                    )
+                    print(f"[SessionManager] Initialized AgentOrchestrator for session {session_id} with MCP tools")
+                else:
+                    print(f"[SessionManager] Warning: No API key found - agents will not work. Save key in Config tab.")
             except Exception as e:
                 print(f"[SessionManager] Warning: Could not initialize orchestrator: {e}")
+                import traceback
+                traceback.print_exc()
 
         self.sessions[session_id] = session
         print(f"[SessionManager] Created session {session_id} for user {owner_name}")
