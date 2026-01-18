@@ -24,6 +24,17 @@ from watchdog.events import FileSystemEventHandler
 # Add src directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
+# Load .env file if exists
+env_file = Path(__file__).parent / '.env'
+if env_file.exists():
+    with open(env_file) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                key, val = line.split('=', 1)
+                os.environ[key] = val
+    print(f"[Server] Loaded environment from {env_file}")
+
 # Import agent orchestrator for collaborative workspace
 try:
     from agent_orchestrator import AgentOrchestrator
@@ -38,6 +49,14 @@ try:
 except ImportError:
     session_manager = None
     print("Warning: workspace_session_manager not found. Multiplayer features disabled.")
+
+# Import demo session store for shareable demos
+try:
+    from demo_session_store import get_demo_store, create_demo, join_demo, get_demo
+    demo_store = get_demo_store()
+except ImportError:
+    demo_store = None
+    print("Warning: demo_session_store not found. Demo sharing features disabled.")
 
 # Paths
 HOME = Path.home()
@@ -183,6 +202,22 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             return
         elif path == '/test_tabs.html':
             self.serve_test_tabs()
+            return
+        # Demo sharing endpoints
+        elif path == '/demo':
+            self.serve_demo_page(parsed_path.query)
+            return
+        elif path == '/api/demo/create':
+            self.serve_demo_create(parsed_path.query)
+            return
+        elif path == '/api/demo/join':
+            self.serve_demo_join(parsed_path.query)
+            return
+        elif path == '/api/demo/info':
+            self.serve_demo_info(parsed_path.query)
+            return
+        elif path == '/api/demo/list':
+            self.serve_demo_list()
             return
         else:
             # Return 404 for other paths
@@ -344,6 +379,373 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 self.wfile.write(f.read())
         else:
             self.send_error(404, "Tabs test page not found")
+
+    # =========================================================================
+    # DEMO SHARING ENDPOINTS
+    # =========================================================================
+
+    def serve_demo_page(self, query_string):
+        """Serve the demo join page with optional pre-filled code."""
+        params = parse_qs(query_string)
+        code = params.get('code', [''])[0]
+        name = params.get('name', [''])[0]
+
+        # Generate demo join HTML
+        html = self._generate_demo_html(code, name)
+
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html')
+        self.end_headers()
+        self.wfile.write(html.encode())
+
+    def serve_demo_create(self, query_string):
+        """Create a new demo session."""
+        if not demo_store:
+            self.serve_json({'error': 'Demo store not available'}, status=500)
+            return
+
+        params = parse_qs(query_string)
+        code = params.get('code', [None])[0]
+        owner_name = params.get('owner', ['Host'])[0]
+        template_id = params.get('template', [None])[0]
+
+        try:
+            demo = demo_store.create_demo(
+                code=code.upper() if code else None,
+                owner_name=owner_name,
+                template_id=template_id
+            )
+
+            # Generate shareable URL
+            host = self.headers.get('Host', 'localhost:8080')
+            share_url = f"http://{host}/demo?code={demo.code}"
+
+            self.serve_json({
+                'success': True,
+                'code': demo.code,
+                'share_url': share_url,
+                'expires_at': demo.expires_at,
+                'template_id': demo.template_id
+            })
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def serve_demo_join(self, query_string):
+        """Join an existing demo session."""
+        if not demo_store:
+            self.serve_json({'error': 'Demo store not available'}, status=500)
+            return
+
+        params = parse_qs(query_string)
+        code = params.get('code', [''])[0]
+        name = params.get('name', ['Guest'])[0]
+
+        if not code:
+            self.serve_json({'error': 'Demo code required'}, status=400)
+            return
+
+        try:
+            demo = demo_store.join_demo(code.upper(), name)
+
+            if not demo:
+                self.serve_json({'error': 'Demo not found or expired'}, status=404)
+                return
+
+            self.serve_json({
+                'success': True,
+                'code': demo.code,
+                'workspace_session_id': demo.workspace_session_id,
+                'participants': demo.participants,
+                'template_id': demo.template_id,
+                'owner_name': demo.owner_name
+            })
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def serve_demo_info(self, query_string):
+        """Get demo session info."""
+        if not demo_store:
+            self.serve_json({'error': 'Demo store not available'}, status=500)
+            return
+
+        params = parse_qs(query_string)
+        code = params.get('code', [''])[0]
+
+        if not code:
+            self.serve_json({'error': 'Demo code required'}, status=400)
+            return
+
+        try:
+            demo = demo_store.get_demo(code.upper())
+
+            if not demo:
+                self.serve_json({'error': 'Demo not found'}, status=404)
+                return
+
+            self.serve_json({
+                'code': demo.code,
+                'owner_name': demo.owner_name,
+                'template_id': demo.template_id,
+                'participants': demo.participants,
+                'workspace_session_id': demo.workspace_session_id,
+                'created_at': demo.created_at,
+                'expires_at': demo.expires_at,
+                'is_active': demo.is_active,
+                'is_expired': demo.is_expired()
+            })
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def serve_demo_list(self):
+        """List all active demos."""
+        if not demo_store:
+            self.serve_json({'error': 'Demo store not available'}, status=500)
+            return
+
+        try:
+            demos = demo_store.list_active_demos()
+            self.serve_json({
+                'demos': [d.to_dict() for d in demos],
+                'count': len(demos)
+            })
+        except Exception as e:
+            self.serve_json({'error': str(e)}, status=500)
+
+    def _generate_demo_html(self, code: str = '', name: str = '') -> str:
+        """Generate the demo join page HTML."""
+        return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join Demo - Golden Library</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }}
+        .container {{
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }}
+        h1 {{
+            font-size: 28px;
+            margin-bottom: 8px;
+            text-align: center;
+        }}
+        .subtitle {{
+            text-align: center;
+            color: #aaa;
+            margin-bottom: 30px;
+        }}
+        .form-group {{
+            margin-bottom: 20px;
+        }}
+        label {{
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }}
+        input {{
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }}
+        input:focus {{
+            outline: none;
+            border-color: #4a9eff;
+        }}
+        input::placeholder {{
+            color: rgba(255,255,255,0.5);
+        }}
+        .code-input {{
+            text-transform: uppercase;
+            font-family: monospace;
+            font-size: 20px;
+            letter-spacing: 3px;
+            text-align: center;
+        }}
+        button {{
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #4a9eff 0%, #6c5ce7 100%);
+            color: #fff;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }}
+        button:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(74,158,255,0.4);
+        }}
+        button:disabled {{
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }}
+        .status {{
+            text-align: center;
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            display: none;
+        }}
+        .status.error {{
+            display: block;
+            background: rgba(255,71,87,0.2);
+            color: #ff4757;
+        }}
+        .status.success {{
+            display: block;
+            background: rgba(46,213,115,0.2);
+            color: #2ed573;
+        }}
+        .divider {{
+            text-align: center;
+            margin: 30px 0;
+            color: #666;
+        }}
+        .divider::before, .divider::after {{
+            content: '';
+            display: inline-block;
+            width: 60px;
+            height: 1px;
+            background: rgba(255,255,255,0.2);
+            vertical-align: middle;
+            margin: 0 15px;
+        }}
+        .create-link {{
+            text-align: center;
+            color: #4a9eff;
+            cursor: pointer;
+        }}
+        .create-link:hover {{
+            text-decoration: underline;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Join Demo</h1>
+        <p class="subtitle">Enter the demo code to join a live workspace session</p>
+
+        <form id="joinForm">
+            <div class="form-group">
+                <label for="code">Demo Code</label>
+                <input type="text" id="code" class="code-input" placeholder="DEMO123ABC"
+                       value="{code}" maxlength="12" required>
+            </div>
+
+            <div class="form-group">
+                <label for="name">Your Name</label>
+                <input type="text" id="name" placeholder="Enter your name"
+                       value="{name}" required>
+            </div>
+
+            <button type="submit" id="joinBtn">Join Demo</button>
+        </form>
+
+        <div id="status" class="status"></div>
+
+        <div class="divider">or</div>
+
+        <p class="create-link" onclick="createDemo()">Create a new demo session</p>
+    </div>
+
+    <script>
+        const WS_URL = 'ws://' + window.location.hostname + ':8081';
+
+        document.getElementById('joinForm').addEventListener('submit', async (e) => {{
+            e.preventDefault();
+            const code = document.getElementById('code').value.trim().toUpperCase();
+            const name = document.getElementById('name').value.trim();
+            const btn = document.getElementById('joinBtn');
+            const status = document.getElementById('status');
+
+            if (!code || !name) return;
+
+            btn.disabled = true;
+            btn.textContent = 'Joining...';
+            status.className = 'status';
+            status.style.display = 'none';
+
+            try {{
+                // Join demo via API
+                const res = await fetch(`/api/demo/join?code=${{code}}&name=${{encodeURIComponent(name)}}`);
+                const data = await res.json();
+
+                if (!res.ok) {{
+                    throw new Error(data.error || 'Failed to join demo');
+                }}
+
+                status.className = 'status success';
+                status.textContent = 'Joining workspace...';
+                status.style.display = 'block';
+
+                // Redirect to dashboard with session info
+                const params = new URLSearchParams({{
+                    demo: code,
+                    name: name,
+                    session: data.workspace_session_id || ''
+                }});
+                window.location.href = '/#workspace?' + params.toString();
+
+            }} catch (err) {{
+                status.className = 'status error';
+                status.textContent = err.message;
+                status.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Join Demo';
+            }}
+        }});
+
+        async function createDemo() {{
+            const name = prompt('Enter your name (host):');
+            if (!name) return;
+
+            try {{
+                const res = await fetch(`/api/demo/create?owner=${{encodeURIComponent(name)}}`);
+                const data = await res.json();
+
+                if (!res.ok) throw new Error(data.error);
+
+                alert(`Demo created!\\n\\nCode: ${{data.code}}\\n\\nShare this link:\\n${{data.share_url}}`);
+                document.getElementById('code').value = data.code;
+                document.getElementById('name').value = name;
+
+            }} catch (err) {{
+                alert('Failed to create demo: ' + err.message);
+            }}
+        }}
+
+        // Auto-focus
+        if (!document.getElementById('code').value) {{
+            document.getElementById('code').focus();
+        }} else if (!document.getElementById('name').value) {{
+            document.getElementById('name').focus();
+        }}
+    </script>
+</body>
+</html>'''
 
     def serve_stats(self):
         """Serve statistics about compressed data."""
