@@ -2427,6 +2427,218 @@
       font-size: 0.8rem;
       color: #6ee7b7;
     }
+
+    /* =========================================================================
+       N8N-STYLE FLEXIBLE WORKSPACE LAYOUT
+       ========================================================================= */
+
+    .workspace-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    .workspace-toolbar-section {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .workspace-toolbar-label {
+      color: #64748b;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-right: 4px;
+    }
+
+    .preset-btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: rgba(30, 41, 59, 0.6);
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+    }
+
+    .preset-btn:hover {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: rgba(99, 102, 241, 0.5);
+      color: #a5b4fc;
+    }
+
+    .preset-btn.active {
+      background: rgba(99, 102, 241, 0.3);
+      border-color: rgba(99, 102, 241, 0.6);
+      color: #a5b4fc;
+    }
+
+    .panel-toggle {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: rgba(30, 41, 59, 0.6);
+      color: #64748b;
+      cursor: pointer;
+      font-size: 0.75rem;
+      transition: all 0.2s;
+    }
+
+    .panel-toggle.active {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: rgba(16, 185, 129, 0.5);
+      color: #34d399;
+    }
+
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: var(--col1, 1fr) 4px var(--col2, 1fr) 4px var(--col3, 0fr);
+      grid-template-rows: var(--row1, 1fr) 4px var(--row2, 0.5fr);
+      gap: 0;
+      height: calc(100vh - 280px);
+      min-height: 600px;
+      position: relative;
+    }
+
+    .workspace-panel {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .workspace-panel.minimized {
+      flex: 0 0 42px !important;
+      min-height: 42px !important;
+      max-height: 42px !important;
+      overflow: hidden;
+    }
+
+    .workspace-panel.minimized .panel-body,
+    .workspace-panel.minimized .panel-footer {
+      display: none !important;
+    }
+
+    .workspace-panel.hidden {
+      display: none !important;
+    }
+
+    .panel-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel-footer {
+      padding: 16px;
+      border-top: 1px solid rgba(148, 163, 184, 0.2);
+      flex-shrink: 0;
+    }
+
+    .panel-minimize-btn {
+      background: none;
+      border: none;
+      color: #64748b;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 0.9rem;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .panel-minimize-btn:hover {
+      background: rgba(148, 163, 184, 0.2);
+      color: #94a3b8;
+    }
+
+    .resize-handle-v {
+      background: rgba(148, 163, 184, 0.15);
+      cursor: col-resize;
+      transition: background 0.2s;
+      z-index: 10;
+    }
+
+    .resize-handle-v:hover,
+    .resize-handle-v.active {
+      background: rgba(99, 102, 241, 0.6);
+    }
+
+    .resize-handle-h {
+      background: rgba(148, 163, 184, 0.15);
+      cursor: row-resize;
+      transition: background 0.2s;
+      z-index: 10;
+      grid-column: 1 / -1;
+    }
+
+    .resize-handle-h:hover,
+    .resize-handle-h.active {
+      background: rgba(99, 102, 241, 0.6);
+    }
+
+    /* Panel-specific border colors */
+    .workspace-panel[data-panel="koda"] {
+      border: 2px solid rgba(59, 130, 246, 0.4);
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 12px;
+    }
+
+    .workspace-panel[data-panel="cairn"] {
+      border: 2px solid rgba(168, 85, 247, 0.4);
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 12px;
+    }
+
+    .workspace-panel[data-panel="moderator"] {
+      border: 2px solid rgba(234, 179, 8, 0.4);
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 12px;
+    }
+
+    .workspace-panel[data-panel="canvas"] {
+      border: 2px solid rgba(16, 185, 129, 0.4);
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 12px;
+    }
+
+    .workspace-panel[data-panel="teamChat"] {
+      border: 2px solid rgba(99, 102, 241, 0.4);
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 12px;
+    }
+
+    /* Grid area assignments: Koda | Canvas | Cairn */
+    .workspace-panel[data-panel="koda"] { grid-area: 1 / 1 / 2 / 2; }
+    .workspace-panel[data-panel="canvas"] { grid-area: 1 / 3 / 2 / 4; }
+    .workspace-panel[data-panel="cairn"] { grid-area: 1 / 5 / 2 / 6; }
+    .workspace-panel[data-panel="moderator"] { grid-area: 3 / 1 / 4 / 4; }
+    .workspace-panel[data-panel="teamChat"] { grid-area: 3 / 5 / 4 / 6; }
+
+    .resize-handle-v-1 { grid-area: 1 / 2 / 2 / 3; }
+    .resize-handle-v-2 { grid-area: 1 / 4 / 2 / 5; }
+    .resize-handle-h-1 { grid-area: 2 / 1 / 3 / -1; }
+    .resize-handle-v-3 { grid-area: 3 / 4 / 4 / 5; }
   </style>
 </head>
 <body>
@@ -2571,23 +2783,37 @@
         </div>
       </div>
 
-      <!-- Main Layout with Chat Sidebar -->
-      <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+      <!-- Workspace Layout Toolbar -->
+      <div class="workspace-toolbar" id="workspace-toolbar">
+        <div class="workspace-toolbar-section">
+          <span class="workspace-toolbar-label">Layout:</span>
+          <button class="preset-btn active" data-preset="default" onclick="applyLayoutPreset('default')">Default</button>
+          <button class="preset-btn" data-preset="chat" onclick="applyLayoutPreset('chat')">Chat Mode</button>
+          <button class="preset-btn" data-preset="document" onclick="applyLayoutPreset('document')">Document Mode</button>
+          <button class="preset-btn" data-preset="focus" onclick="applyLayoutPreset('focus')">Focus Mode</button>
+        </div>
+        <div class="workspace-toolbar-section">
+          <span class="workspace-toolbar-label">Panels:</span>
+          <button class="panel-toggle active" data-panel="canvas" onclick="togglePanelVisibility('canvas')">Canvas</button>
+          <button class="panel-toggle" data-panel="teamChat" onclick="togglePanelVisibility('teamChat')">Team Chat</button>
+        </div>
+        <div class="workspace-toolbar-section">
+          <button class="preset-btn" onclick="saveWorkspaceLayout()" title="Save current layout">Save Layout</button>
+          <button class="preset-btn" onclick="resetWorkspaceLayout()" title="Reset to default">Reset</button>
+        </div>
+      </div>
 
-        <!-- Agent Panels Container -->
-        <div id="agent-panels" style="flex: 1; display: flex; flex-direction: column; gap: 20px;">
+      <!-- Main Workspace Grid -->
+      <div id="workspace-grid" class="workspace-grid" style="--col1: 1fr; --col2: 1.2fr; --col3: 1fr; --row1: 1.5fr; --row2: 1fr;">
 
-          <!-- Top Row - Agent A and B -->
-          <div id="top-panels" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; height: 500px; position: relative;">
-
-        <!-- Panel A (Agent A - Koda) -->
-        <div id="agent-a-panel" style="background: rgba(15, 23, 42, 0.6); border-radius: 12px; display: flex; flex-direction: column; border: 2px solid rgba(59, 130, 246, 0.4); position: relative;">
+        <!-- Panel: Koda (Agent A) -->
+        <div id="agent-a-panel" class="workspace-panel" data-panel="koda">
           <!-- Inbox Badge -->
           <div id="agent-koda-inbox-badge" style="display: none; position: absolute; top: 8px; right: 8px; background: rgba(234, 179, 8, 0.3); border: 1px solid #fbbf24; border-radius: 50%; width: 32px; height: 32px; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; z-index: 10;" onclick="showAgentInbox('koda')" title="Agent inbox (unread messages)">
             📬
           </div>
 
-          <div style="padding: 16px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: space-between; align-items: center;">
+          <div class="panel-header">
             <div>
               <h3 style="color: #60a5fa; font-size: 1.1rem; margin-bottom: 4px;">🅰️ Agent A (Koda)</h3>
               <div style="display: flex; align-items: center; gap: 8px;">
@@ -2595,22 +2821,24 @@
                 <span id="agent-a-control" style="font-size: 0.75rem; color: #64748b;"></span>
               </div>
             </div>
-            <div style="display: flex; gap: 8px;">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button onclick="showAgentInbox('koda')" style="background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;" title="View Inbox">📬</button>
+              <button onclick="showAgentCalendar('koda')" style="background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;" title="View Calendar">📅</button>
+              <button onclick="showAgentTodos('koda')" style="background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;" title="View Todos">✅</button>
               <button id="agent-a-control-btn" onclick="toggleAgentControl('a')" style="display: none; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Claim</button>
               <button id="agent-a-handoff-btn" onclick="handoffAgentControl('a')" style="display: none; background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.4); color: #fbbf24; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Handoff</button>
               <button onclick="clearAgentChat('a')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Clear</button>
+              <button class="panel-minimize-btn" onclick="togglePanelMinimize('koda')" title="Minimize">−</button>
             </div>
           </div>
 
-          <!-- Chat History -->
-          <div id="agent-a-messages" style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+          <div class="panel-body" id="agent-a-messages">
             <div style="color: #94a3b8; font-size: 0.9rem; text-align: center; margin-top: 40px;">
               Send a message to Agent A (Koda - Builder)
             </div>
           </div>
 
-          <!-- Input -->
-          <div style="padding: 16px; border-top: 1px solid rgba(148, 163, 184, 0.2);">
+          <div class="panel-footer">
             <div style="display: flex; gap: 8px;">
               <input
                 type="text"
@@ -2629,14 +2857,17 @@
           </div>
         </div>
 
-        <!-- Panel B (Agent B - Cairn) -->
-        <div id="agent-b-panel" style="background: rgba(15, 23, 42, 0.6); border-radius: 12px; display: flex; flex-direction: column; border: 2px solid rgba(168, 85, 247, 0.4); position: relative;">
+        <!-- Resize Handle: Koda-Cairn -->
+        <div class="resize-handle-v resize-handle-v-1" data-resize="col1"></div>
+
+        <!-- Panel: Cairn (Agent B) -->
+        <div id="agent-b-panel" class="workspace-panel" data-panel="cairn">
           <!-- Inbox Badge -->
           <div id="agent-cairn-inbox-badge" style="display: none; position: absolute; top: 8px; right: 8px; background: rgba(234, 179, 8, 0.3); border: 1px solid #fbbf24; border-radius: 50%; width: 32px; height: 32px; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; z-index: 10;" onclick="showAgentInbox('cairn')" title="Agent inbox (unread messages)">
             📬
           </div>
 
-          <div style="padding: 16px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: space-between; align-items: center;">
+          <div class="panel-header">
             <div>
               <h3 style="color: #c084fc; font-size: 1.1rem; margin-bottom: 4px;">🅱️ Agent B (Cairn)</h3>
               <div style="display: flex; align-items: center; gap: 8px;">
@@ -2644,22 +2875,24 @@
                 <span id="agent-b-control" style="font-size: 0.75rem; color: #64748b;"></span>
               </div>
             </div>
-            <div style="display: flex; gap: 8px;">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button onclick="showAgentInbox('cairn')" style="background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;" title="View Inbox">📬</button>
+              <button onclick="showAgentCalendar('cairn')" style="background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;" title="View Calendar">📅</button>
+              <button onclick="showAgentTodos('cairn')" style="background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;" title="View Todos">✅</button>
               <button id="agent-b-control-btn" onclick="toggleAgentControl('b')" style="display: none; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Claim</button>
               <button id="agent-b-handoff-btn" onclick="handoffAgentControl('b')" style="display: none; background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.4); color: #fbbf24; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Handoff</button>
               <button onclick="clearAgentChat('b')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Clear</button>
+              <button class="panel-minimize-btn" onclick="togglePanelMinimize('cairn')" title="Minimize">−</button>
             </div>
           </div>
 
-          <!-- Chat History -->
-          <div id="agent-b-messages" style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+          <div class="panel-body" id="agent-b-messages">
             <div style="color: #94a3b8; font-size: 0.9rem; text-align: center; margin-top: 40px;">
               Send a message to Agent B (Cairn - Architect)
             </div>
           </div>
 
-          <!-- Input -->
-          <div style="padding: 16px; border-top: 1px solid rgba(148, 163, 184, 0.2);">
+          <div class="panel-footer">
             <div style="display: flex; gap: 8px;">
               <input
                 type="text"
@@ -2678,88 +2911,33 @@
           </div>
         </div>
 
-            <!-- Resize Handle -->
-            <div id="resize-handle" style="position: absolute; top: 0; bottom: 0; left: 50%; width: 4px; margin-left: -2px; cursor: col-resize; background: rgba(148, 163, 184, 0.2); z-index: 10; transition: background 0.2s;"
-                 onmouseover="this.style.background='rgba(99, 102, 241, 0.6)'"
-                 onmouseout="if(!window.isResizing) this.style.background='rgba(148, 163, 184, 0.2)'"></div>
-          </div>
+        <!-- Resize Handle: Cairn-Canvas -->
+        <div class="resize-handle-v resize-handle-v-2" data-resize="col2"></div>
 
-      <!-- Moderator Panel (Full Width) -->
-      <div id="moderator-panel" style="background: rgba(15, 23, 42, 0.6); border-radius: 12px; display: flex; flex-direction: column; border: 2px solid rgba(234, 179, 8, 0.4); height: 300px; position: relative;">
-        <!-- Inbox Badge -->
-        <div id="agent-prax-inbox-badge" style="display: none; position: absolute; top: 8px; right: 8px; background: rgba(234, 179, 8, 0.3); border: 1px solid #fbbf24; border-radius: 50%; width: 32px; height: 32px; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; z-index: 10;" onclick="showAgentInbox('prax')" title="Agent inbox (unread messages)">
-          📬
-        </div>
-
-        <div style="padding: 16px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <h3 style="color: #fbbf24; font-size: 1.1rem; margin-bottom: 4px;">🎭 Moderator (Prax)</h3>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span id="moderator-status" style="font-size: 0.8rem; color: #94a3b8;">● idle</span>
-              <span id="moderator-control" style="font-size: 0.75rem; color: #64748b;"></span>
-            </div>
-          </div>
-          <div style="display: flex; gap: 8px;">
-            <button id="moderator-control-btn" onclick="toggleAgentControl('moderator')" style="display: none; background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.4); color: #fbbf24; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Claim</button>
-            <button id="moderator-handoff-btn" onclick="handoffAgentControl('moderator')" style="display: none; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #6ee7b7; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Handoff</button>
-            <button onclick="clearAgentChat('moderator')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Clear</button>
-          </div>
-        </div>
-
-        <!-- Chat History -->
-        <div id="moderator-messages" style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
-          <div style="color: #94a3b8; font-size: 0.9rem; text-align: center; margin-top: 20px;">
-            Send a coordination command to Moderator (Prax - Orchestrator)
-          </div>
-        </div>
-
-        <!-- Input -->
-        <div style="padding: 16px; border-top: 1px solid rgba(148, 163, 184, 0.2);">
-          <div style="display: flex; gap: 8px;">
-            <input
-              type="text"
-              id="moderator-input"
-              placeholder="Coordinate agents (e.g., 'Agent A: do X. Agent B: do Y.')"
-              style="flex: 1; padding: 10px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0; font-size: 0.9rem;"
-              onkeypress="if(event.key === 'Enter') sendAgentMessage('moderator')"
-            />
-            <button
-              onclick="sendAgentMessage('moderator')"
-              style="background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%); border: none; color: white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;"
-            >
-              Coordinate
-            </button>
-          </div>
-        </div>
-
-        </div>
-        <!-- End Agent Panels Container -->
-
-        <!-- Canvas Panel (Phase 4C.2) -->
-        <div id="canvas-panel" style="display: none; width: 450px; background: rgba(15, 23, 42, 0.6); border-radius: 12px; flex-direction: column; border: 2px solid rgba(16, 185, 129, 0.4); max-height: calc(100vh - 200px);">
-          <!-- Canvas Header -->
-          <div style="padding: 12px 16px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: space-between; align-items: center;">
+        <!-- Panel: Canvas -->
+        <div id="canvas-panel" class="workspace-panel" data-panel="canvas">
+          <div class="panel-header">
             <div>
               <h3 style="color: #34d399; font-size: 1rem; margin-bottom: 2px;">📄 Shared Canvas</h3>
               <span id="canvas-doc-name" style="font-size: 0.75rem; color: #64748b;">No document loaded</span>
             </div>
-            <div style="display: flex; gap: 6px;">
+            <div style="display: flex; gap: 6px; align-items: center;">
               <button onclick="createCanvasDocument()" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">+ New</button>
               <button onclick="addCanvasSection()" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #a5b4fc; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">+ Section</button>
               <button onclick="exportCanvasMarkdown()" style="background: rgba(148, 163, 184, 0.2); border: 1px solid rgba(148, 163, 184, 0.4); color: #94a3b8; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Export</button>
+              <button class="panel-minimize-btn" onclick="togglePanelMinimize('canvas')" title="Minimize">−</button>
             </div>
           </div>
 
-          <!-- Canvas Sections List -->
-          <div id="canvas-sections-list" style="flex: 1; overflow-y: auto; padding: 12px;">
+          <div class="panel-body" id="canvas-sections-list">
             <div style="color: #94a3b8; font-size: 0.85rem; text-align: center; margin-top: 20px;">
               Create a document to start collaborating
             </div>
           </div>
 
           <!-- Active Section Editor -->
-          <div id="canvas-editor-container" style="display: none; border-top: 1px solid rgba(148, 163, 184, 0.2);">
-            <div style="padding: 8px 12px; background: rgba(30, 41, 59, 0.6); display: flex; justify-content: space-between; align-items: center;">
+          <div id="canvas-editor-container" class="panel-footer" style="display: none;">
+            <div style="padding: 8px 0; display: flex; justify-content: space-between; align-items: center;">
               <span id="canvas-editor-section-name" style="color: #e2e8f0; font-size: 0.85rem; font-weight: 500;"></span>
               <div style="display: flex; gap: 4px; align-items: center;">
                 <span id="canvas-editor-owner" style="font-size: 0.7rem; color: #64748b;"></span>
@@ -2768,34 +2946,95 @@
             </div>
             <textarea
               id="canvas-editor-textarea"
-              style="width: 100%; height: 200px; padding: 12px; background: rgba(15, 23, 42, 0.8); border: none; border-top: 1px solid rgba(148, 163, 184, 0.1); color: #e2e8f0; font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; resize: vertical;"
+              style="width: 100%; height: 150px; padding: 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 6px; color: #e2e8f0; font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; resize: vertical;"
               placeholder="Start typing..."
               oninput="onCanvasEditorInput()"
             ></textarea>
-            <div style="padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(148, 163, 184, 0.1);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
               <span id="canvas-editor-status" style="font-size: 0.7rem; color: #64748b;">Ready</span>
               <button onclick="saveCanvasSection()" style="background: rgba(16, 185, 129, 0.3); border: 1px solid rgba(16, 185, 129, 0.5); color: #34d399; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Save</button>
             </div>
           </div>
         </div>
-        <!-- End Canvas Panel -->
 
-        <!-- Human Chat Sidebar -->
-        <div id="human-chat-sidebar" style="width: 350px; background: rgba(15, 23, 42, 0.6); border-radius: 12px; display: none; flex-direction: column; border: 2px solid rgba(99, 102, 241, 0.4);">
-          <div style="padding: 16px; border-bottom: 1px solid rgba(148, 163, 184, 0.2);">
-            <h3 style="color: #a5b4fc; font-size: 1.1rem; margin-bottom: 4px;">💬 Team Chat</h3>
-            <span style="font-size: 0.75rem; color: #64748b;">Chat with other humans in this session</span>
+        <!-- Resize Handle: Horizontal (between rows) -->
+        <div class="resize-handle-h resize-handle-h-1" data-resize="row1"></div>
+
+        <!-- Panel: Moderator (Prax) -->
+        <div id="moderator-panel" class="workspace-panel" data-panel="moderator">
+          <!-- Inbox Badge -->
+          <div id="agent-prax-inbox-badge" style="display: none; position: absolute; top: 8px; right: 8px; background: rgba(234, 179, 8, 0.3); border: 1px solid #fbbf24; border-radius: 50%; width: 32px; height: 32px; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; z-index: 10;" onclick="showAgentInbox('prax')" title="Agent inbox (unread messages)">
+            📬
           </div>
 
-          <!-- Chat Messages -->
-          <div id="human-chat-messages" style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+          <div class="panel-header">
+            <div>
+              <h3 style="color: #fbbf24; font-size: 1.1rem; margin-bottom: 4px;">🎭 Moderator (Prax)</h3>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="moderator-status" style="font-size: 0.8rem; color: #94a3b8;">● idle</span>
+                <span id="moderator-control" style="font-size: 0.75rem; color: #64748b;"></span>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button onclick="showAgentInbox('prax')" style="background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.4); color: #fbbf24; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;" title="View Inbox">📬</button>
+              <button onclick="showAgentCalendar('prax')" style="background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.4); color: #fbbf24; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;" title="View Calendar">📅</button>
+              <button onclick="showAssignTaskModal()" style="background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4); color: #4ade80; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;" title="Assign Task to Koda/Cairn">📋 Assign</button>
+              <button onclick="showWebhooksModal()" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #a5b4fc; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;" title="Configure Webhooks">🔗</button>
+              <button onclick="showAgentTodos('prax')" style="background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.4); color: #fbbf24; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;" title="View Todos">✅</button>
+              <button onclick="showUnifiedTodos()" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #6ee7b7; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;" title="All Todos (Unified View)">📊</button>
+              <button onclick="showPrdSplitterModal()" style="background: rgba(236, 72, 153, 0.2); border: 1px solid rgba(236, 72, 153, 0.4); color: #f472b6; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;" title="Split PRD into Tasks">📑 PRD</button>
+              <button id="moderator-control-btn" onclick="toggleAgentControl('moderator')" style="display: none; background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.4); color: #fbbf24; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Claim</button>
+              <button id="moderator-handoff-btn" onclick="handoffAgentControl('moderator')" style="display: none; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #6ee7b7; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Handoff</button>
+              <button onclick="clearAgentChat('moderator')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Clear</button>
+              <button class="panel-minimize-btn" onclick="togglePanelMinimize('moderator')" title="Minimize">−</button>
+            </div>
+          </div>
+
+          <div class="panel-body" id="moderator-messages">
+            <div style="color: #94a3b8; font-size: 0.9rem; text-align: center; margin-top: 20px;">
+              Send a coordination command to Moderator (Prax - Orchestrator)
+            </div>
+          </div>
+
+          <div class="panel-footer">
+            <div style="display: flex; gap: 8px;">
+              <input
+                type="text"
+                id="moderator-input"
+                placeholder="Coordinate agents (e.g., 'Agent A: do X. Agent B: do Y.')"
+                style="flex: 1; padding: 10px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0; font-size: 0.9rem;"
+                onkeypress="if(event.key === 'Enter') sendAgentMessage('moderator')"
+              />
+              <button
+                onclick="sendAgentMessage('moderator')"
+                style="background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%); border: none; color: white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;"
+              >
+                Coordinate
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resize Handle: Moderator-TeamChat -->
+        <div class="resize-handle-v resize-handle-v-3" data-resize="col2-bottom" style="grid-area: 3 / 4 / 4 / 5;"></div>
+
+        <!-- Panel: Team Chat -->
+        <div id="human-chat-sidebar" class="workspace-panel hidden" data-panel="teamChat">
+          <div class="panel-header">
+            <div>
+              <h3 style="color: #a5b4fc; font-size: 1.1rem; margin-bottom: 4px;">💬 Team Chat</h3>
+              <span style="font-size: 0.75rem; color: #64748b;">Chat with other humans in this session</span>
+            </div>
+            <button class="panel-minimize-btn" onclick="togglePanelMinimize('teamChat')" title="Minimize">−</button>
+          </div>
+
+          <div class="panel-body" id="human-chat-messages">
             <div style="color: #94a3b8; font-size: 0.85rem; text-align: center; margin-top: 40px;">
               No messages yet. Start a conversation!
             </div>
           </div>
 
-          <!-- Chat Input -->
-          <div style="padding: 16px; border-top: 1px solid rgba(148, 163, 184, 0.2);">
+          <div class="panel-footer">
             <div style="display: flex; gap: 8px;">
               <input
                 type="text"
@@ -2813,10 +3052,9 @@
             </div>
           </div>
         </div>
-        <!-- End Human Chat Sidebar -->
 
       </div>
-      <!-- End Main Layout -->
+      <!-- End Workspace Grid -->
 
     </div>
     <!-- End Collaborative Workspace Tab -->
@@ -9305,6 +9543,86 @@ ${currentConversation.display}
     // COLLABORATIVE WORKSPACE - AGENT CHAT
     // =========================================================================
 
+    /**
+     * Parse moderator (Prax) messages for agent assignments.
+     * Supports patterns like:
+     * - "@Koda: implement feature X"
+     * - "Koda: do task Y"
+     * - "Cairn, please review..."
+     * - "Koda + Cairn: coordinate on..."
+     * - FSL format: "§T:B§o:task§p:H§from:D§"
+     */
+    async function parseModeratorAssignments(message) {
+      const assignments = [];
+
+      // Pattern 1: @Agent: message or Agent: message
+      const atPattern = /@?(koda|cairn|agent\s*a|agent\s*b)[,:]?\s*(.+)/gi;
+      let match;
+
+      while ((match = atPattern.exec(message)) !== null) {
+        const agentName = match[1].toLowerCase();
+        const taskContent = match[2].trim();
+
+        // Map agent names
+        let target = 'koda';
+        if (agentName.includes('cairn') || agentName.includes('agent b')) {
+          target = 'cairn';
+        }
+
+        assignments.push({ target, content: taskContent });
+      }
+
+      // Pattern 2: FSL stone format §T:B§o:task§p:H§...
+      const fslPattern = /§T:([ABK])§o:([^§]+)§p:([HML])§/gi;
+      while ((match = fslPattern.exec(message)) !== null) {
+        const targetId = match[1].toUpperCase();
+        const objective = match[2].trim();
+        const priority = match[3];
+
+        let target = 'koda';
+        if (targetId === 'A' || targetId === 'C') {
+          target = 'cairn';
+        }
+
+        assignments.push({
+          target,
+          content: `Task: ${objective}`,
+          priority: priority === 'H' ? 'high' : 'normal',
+          type: 'task'
+        });
+      }
+
+      // Send assignments to inboxes
+      for (const assignment of assignments) {
+        try {
+          await fetch('/api/inbox/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              target: assignment.target,
+              message: assignment.content,
+              from: 'prax',
+              priority: assignment.priority || 'normal',
+              type: assignment.type || 'message'
+            })
+          });
+
+          // Update inbox badge
+          updateInboxBadge(assignment.target, true);
+
+          console.log(`[Inbox] Sent to ${assignment.target}: ${assignment.content.substring(0, 50)}...`);
+        } catch (error) {
+          console.error(`[Inbox] Failed to send to ${assignment.target}:`, error);
+        }
+      }
+
+      // If we found assignments, show a notification
+      if (assignments.length > 0) {
+        const targets = [...new Set(assignments.map(a => a.target))];
+        showNotification(`Tasks sent to: ${targets.join(', ')}`, 'success');
+      }
+    }
+
     async function sendAgentMessage(agentId) {
       const inputId = agentId === 'moderator' ? 'moderator-input' : `agent-${agentId}-input`;
       const messagesId = agentId === 'moderator' ? 'moderator-messages' : `agent-${agentId}-messages`;
@@ -9317,6 +9635,11 @@ ${currentConversation.display}
 
       // Clear input
       input.value = '';
+
+      // If this is from the moderator (Prax), parse for agent assignments
+      if (agentId === 'moderator') {
+        await parseModeratorAssignments(message);
+      }
 
       // Update status
       updateAgentStatus(agentId, 'thinking');
@@ -10021,15 +10344,28 @@ ${currentConversation.display}
       });
     }
 
+    // Store inbox data globally for filtering
+    let currentInboxData = [];
+    let currentInboxAgentId = '';
+
     async function showAgentInbox(agentId) {
-      // Fetch current session data
-      const session = await fetchSession();
-      if (!session || !session.agent_inboxes) {
-        showNotification('No inbox data available', 'warning');
-        return;
+      // Fetch inbox data from FSL inbox API
+      let inbox = [];
+      try {
+        const response = await fetch(`/api/inbox/${agentId}`);
+        const data = await response.json();
+        if (data.success) {
+          inbox = data.messages || [];
+        } else {
+          console.warn('Inbox fetch failed:', data.error);
+        }
+      } catch (error) {
+        console.error('Error fetching inbox:', error);
       }
 
-      const inbox = session.agent_inboxes[agentId] || [];
+      // Store for filtering
+      currentInboxData = inbox;
+      currentInboxAgentId = agentId;
 
       // Create modal
       const modal = document.createElement('div');
@@ -10050,17 +10386,25 @@ ${currentConversation.display}
       const agentNames = {
         'prax': 'Prax (Orchestrator)',
         'cairn': 'Cairn (Architect)',
-        'koda': 'Koda (Builder)'
+        'koda': 'Koda (Builder)',
+        'moderator': 'Prax (Orchestrator)'
+      };
+
+      const agentColors = {
+        'prax': '#fbbf24',
+        'cairn': '#c084fc',
+        'koda': '#60a5fa',
+        'moderator': '#fbbf24'
       };
 
       const modalContent = document.createElement('div');
       modalContent.style.cssText = `
         background: rgba(15, 23, 42, 0.98);
-        border: 2px solid rgba(148, 163, 184, 0.3);
+        border: 2px solid ${agentColors[agentId] || 'rgba(148, 163, 184, 0.3)'};
         border-radius: 12px;
-        max-width: 700px;
-        width: 90%;
-        max-height: 80vh;
+        max-width: 900px;
+        width: 95%;
+        max-height: 85vh;
         display: flex;
         flex-direction: column;
       `;
@@ -10069,55 +10413,100 @@ ${currentConversation.display}
       const unreadCount = inbox.filter(m => !m.read).length;
 
       modalContent.innerHTML = `
-        <div style="padding: 20px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <h2 style="color: #e2e8f0; margin: 0; font-size: 1.3rem;">
-              📬 ${agentNames[agentId]} Inbox
-            </h2>
-            <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">
-              ${inbox.length} message${inbox.length !== 1 ? 's' : ''}
-              ${unreadCount > 0 ? `(${unreadCount} unread)` : ''}
+        <!-- Header -->
+        <div style="padding: 20px; border-bottom: 1px solid rgba(148, 163, 184, 0.2);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div>
+              <h2 style="color: #e2e8f0; margin: 0; font-size: 1.3rem;">
+                📬 ${agentNames[agentId] || agentId} Inbox
+              </h2>
+              <div id="inbox-stats" style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">
+                ${inbox.length} message${inbox.length !== 1 ? 's' : ''}
+                ${unreadCount > 0 ? `<span style="color: #60a5fa;"> (${unreadCount} unread)</span>` : ''}
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button onclick="refreshAgentInbox('${agentId}')" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #a5b4fc; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
+                Refresh
+              </button>
+              <button onclick="closeAgentInbox()" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
+                Close
+              </button>
             </div>
           </div>
-          <button onclick="closeAgentInbox()" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
-            Close
-          </button>
+
+          <!-- Search & Filter Bar -->
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <!-- Search Input -->
+            <div style="flex: 1; min-width: 200px; position: relative;">
+              <input
+                type="text"
+                id="inbox-search"
+                placeholder="🔍 Search messages..."
+                style="width: 100%; padding: 10px 12px 10px 36px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; color: #e2e8f0; font-size: 0.9rem;"
+                oninput="filterInboxMessages()"
+              />
+              <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #64748b;">🔍</span>
+            </div>
+
+            <!-- Date Filter -->
+            <select id="inbox-date-filter" onchange="filterInboxMessages()" style="padding: 10px 12px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; color: #e2e8f0; font-size: 0.85rem; cursor: pointer;">
+              <option value="all">📅 All Time</option>
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+            </select>
+
+            <!-- Sort -->
+            <select id="inbox-sort" onchange="filterInboxMessages()" style="padding: 10px 12px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; color: #e2e8f0; font-size: 0.85rem; cursor: pointer;">
+              <option value="newest">⬇️ Newest First</option>
+              <option value="oldest">⬆️ Oldest First</option>
+              <option value="priority">🔴 Priority First</option>
+              <option value="unread">📩 Unread First</option>
+            </select>
+
+            <!-- Type Filter -->
+            <select id="inbox-type-filter" onchange="filterInboxMessages()" style="padding: 10px 12px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; color: #e2e8f0; font-size: 0.85rem; cursor: pointer;">
+              <option value="all">All Types</option>
+              <option value="task">📋 Tasks Only</option>
+              <option value="message">💬 Messages Only</option>
+              <option value="high">🔴 High Priority</option>
+            </select>
+          </div>
         </div>
+
+        <!-- Messages List -->
         <div id="inbox-messages" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px;">
-          ${inbox.length === 0 ? `
-            <div style="text-align: center; color: #64748b; padding: 40px; font-size: 0.95rem;">
-              📭 No messages in inbox
-            </div>
-          ` : inbox.map(msg => `
-            <div style="background: ${msg.read ? 'rgba(30, 41, 59, 0.6)' : 'rgba(59, 130, 246, 0.1)'}; border: 1px solid ${msg.read ? 'rgba(148, 163, 184, 0.2)' : 'rgba(59, 130, 246, 0.3)'}; border-radius: 8px; padding: 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="font-weight: 600; color: #60a5fa; font-size: 0.9rem;">From: ${msg.from_agent}</span>
-                  ${msg.priority === 'high' ? '<span style="background: rgba(239, 68, 68, 0.3); border: 1px solid #ef4444; color: #fca5a5; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">HIGH</span>' : ''}
-                  ${!msg.read ? '<span style="background: rgba(59, 130, 246, 0.3); border: 1px solid #3b82f6; color: #93c5fd; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">UNREAD</span>' : ''}
-                </div>
-                <div style="font-size: 0.75rem; color: #64748b;">
-                  ${new Date(msg.timestamp).toLocaleTimeString()}
-                </div>
-              </div>
-              <div style="color: #cbd5e1; font-size: 0.9rem; line-height: 1.5;">
-                ${msg.content}
-              </div>
-              ${msg.metadata && msg.metadata.workflow_id ? `
-                <div style="margin-top: 8px; font-size: 0.75rem; color: #64748b;">
-                  Workflow: ${msg.metadata.workflow_id}
-                  ${msg.metadata.task_type ? ` | Type: ${msg.metadata.task_type}` : ''}
-                </div>
-              ` : ''}
-            </div>
-          `).join('')}
+          ${renderInboxMessages(inbox, agentId)}
+        </div>
+
+        <!-- Send Message Section -->
+        <div style="padding: 16px; border-top: 1px solid rgba(148, 163, 184, 0.2);">
+          <div style="display: flex; gap: 8px;">
+            <select id="inbox-send-target" style="padding: 8px 12px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0; font-size: 0.85rem;">
+              <option value="koda">To: Koda</option>
+              <option value="cairn">To: Cairn</option>
+              <option value="prax">To: Prax</option>
+              <option value="all">To: All</option>
+            </select>
+            <input
+              type="text"
+              id="inbox-send-message"
+              placeholder="Send a message or task..."
+              style="flex: 1; padding: 8px 12px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0; font-size: 0.85rem;"
+              onkeypress="if(event.key === 'Enter') sendInboxMessage('${agentId}')"
+            />
+            <button onclick="sendInboxMessage('${agentId}')" style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); border: none; color: white; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem;">
+              Send
+            </button>
+          </div>
         </div>
       `;
 
       modal.appendChild(modalContent);
       document.body.appendChild(modal);
 
-      // Mark badge as viewed (messages stay unread until explicitly marked)
+      // Mark badge as viewed
       updateInboxBadge(agentId, false);
 
       // Close on background click
@@ -10126,6 +10515,210 @@ ${currentConversation.display}
           closeAgentInbox();
         }
       });
+
+      // Focus search input
+      setTimeout(() => {
+        const searchInput = document.getElementById('inbox-search');
+        if (searchInput) searchInput.focus();
+      }, 100);
+    }
+
+    function renderInboxMessages(messages, agentId) {
+      if (messages.length === 0) {
+        return `
+          <div style="text-align: center; color: #64748b; padding: 40px; font-size: 0.95rem;">
+            📭 No messages found
+          </div>
+        `;
+      }
+
+      return messages.map(msg => `
+        <div class="inbox-message-item" data-id="${msg.id}" data-content="${escapeHtml(msg.content).toLowerCase()}" data-from="${(msg.from_agent || msg.from_id || '').toLowerCase()}" data-timestamp="${msg.timestamp}" data-priority="${msg.priority}" data-type="${msg.type || 'message'}" data-read="${msg.read}" style="background: ${msg.read ? 'rgba(30, 41, 59, 0.6)' : 'rgba(59, 130, 246, 0.1)'}; border: 1px solid ${msg.read ? 'rgba(148, 163, 184, 0.2)' : 'rgba(59, 130, 246, 0.3)'}; border-radius: 8px; padding: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <span style="font-weight: 600; color: #60a5fa; font-size: 0.9rem;">From: ${msg.from_agent || msg.from_id}</span>
+              ${msg.type === 'task' ? '<span style="background: rgba(16, 185, 129, 0.3); border: 1px solid #10b981; color: #6ee7b7; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">TASK</span>' : ''}
+              ${msg.priority === 'high' ? '<span style="background: rgba(239, 68, 68, 0.3); border: 1px solid #ef4444; color: #fca5a5; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">HIGH</span>' : ''}
+              ${!msg.read ? '<span style="background: rgba(59, 130, 246, 0.3); border: 1px solid #3b82f6; color: #93c5fd; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">NEW</span>' : ''}
+            </div>
+            <div style="font-size: 0.75rem; color: #64748b; white-space: nowrap;">
+              ${formatRelativeTime(msg.timestamp)}
+            </div>
+          </div>
+          <div style="color: #cbd5e1; font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; max-height: 150px; overflow-y: auto;">
+            ${escapeHtml(msg.content)}
+          </div>
+          ${msg.metadata && (msg.metadata.objective || msg.metadata.stone_hash) ? `
+            <div style="margin-top: 8px; font-size: 0.75rem; color: #64748b; display: flex; gap: 12px;">
+              ${msg.metadata.objective ? `<span>Objective: ${msg.metadata.objective}</span>` : ''}
+              ${msg.metadata.stone_hash ? `<span>Stone: ${msg.metadata.stone_hash}</span>` : ''}
+            </div>
+          ` : ''}
+          <div style="margin-top: 8px; display: flex; gap: 8px;">
+            <button onclick="forwardInboxMessage('${msg.id}', '${agentId}')" style="background: rgba(148, 163, 184, 0.2); border: 1px solid rgba(148, 163, 184, 0.3); color: #94a3b8; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Forward</button>
+            ${msg.type === 'task' ? `<button onclick="acceptTask('${msg.id}')" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Accept Task</button>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function formatRelativeTime(timestamp) {
+      const now = Date.now();
+      const diff = now - timestamp;
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      const days = Math.floor(diff / 86400000);
+
+      if (minutes < 1) return 'Just now';
+      if (minutes < 60) return `${minutes}m ago`;
+      if (hours < 24) return `${hours}h ago`;
+      if (days < 7) return `${days}d ago`;
+      return new Date(timestamp).toLocaleDateString();
+    }
+
+    function filterInboxMessages() {
+      const searchInput = document.getElementById('inbox-search');
+      const dateFilter = document.getElementById('inbox-date-filter');
+      const sortSelect = document.getElementById('inbox-sort');
+      const typeFilter = document.getElementById('inbox-type-filter');
+
+      if (!searchInput || !currentInboxData.length) return;
+
+      const searchTerm = searchInput.value.toLowerCase().trim();
+      const dateValue = dateFilter ? dateFilter.value : 'all';
+      const sortValue = sortSelect ? sortSelect.value : 'newest';
+      const typeValue = typeFilter ? typeFilter.value : 'all';
+
+      const now = Date.now();
+      const dayMs = 86400000;
+
+      // Filter messages
+      let filtered = currentInboxData.filter(msg => {
+        // Search filter
+        if (searchTerm) {
+          const content = (msg.content || '').toLowerCase();
+          const from = (msg.from_agent || msg.from_id || '').toLowerCase();
+          if (!content.includes(searchTerm) && !from.includes(searchTerm)) {
+            return false;
+          }
+        }
+
+        // Date filter
+        if (dateValue !== 'all') {
+          const msgAge = now - msg.timestamp;
+          if (dateValue === 'today' && msgAge > dayMs) return false;
+          if (dateValue === 'week' && msgAge > dayMs * 7) return false;
+          if (dateValue === 'month' && msgAge > dayMs * 30) return false;
+        }
+
+        // Type filter
+        if (typeValue !== 'all') {
+          if (typeValue === 'task' && msg.type !== 'task') return false;
+          if (typeValue === 'message' && msg.type === 'task') return false;
+          if (typeValue === 'high' && msg.priority !== 'high') return false;
+        }
+
+        return true;
+      });
+
+      // Sort messages
+      filtered.sort((a, b) => {
+        if (sortValue === 'newest') return b.timestamp - a.timestamp;
+        if (sortValue === 'oldest') return a.timestamp - b.timestamp;
+        if (sortValue === 'priority') {
+          const priorityOrder = { high: 0, normal: 1, low: 2 };
+          return (priorityOrder[a.priority] || 1) - (priorityOrder[b.priority] || 1);
+        }
+        if (sortValue === 'unread') {
+          if (!a.read && b.read) return -1;
+          if (a.read && !b.read) return 1;
+          return b.timestamp - a.timestamp;
+        }
+        return 0;
+      });
+
+      // Update display
+      const messagesContainer = document.getElementById('inbox-messages');
+      if (messagesContainer) {
+        messagesContainer.innerHTML = renderInboxMessages(filtered, currentInboxAgentId);
+      }
+
+      // Update stats
+      const statsEl = document.getElementById('inbox-stats');
+      if (statsEl) {
+        const unreadCount = filtered.filter(m => !m.read).length;
+        statsEl.innerHTML = `
+          Showing ${filtered.length} of ${currentInboxData.length} messages
+          ${unreadCount > 0 ? `<span style="color: #60a5fa;"> (${unreadCount} unread)</span>` : ''}
+          ${searchTerm ? `<span style="color: #fbbf24;"> matching "${searchTerm}"</span>` : ''}
+        `;
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    async function refreshAgentInbox(agentId) {
+      closeAgentInbox();
+      await showAgentInbox(agentId);
+    }
+
+    async function sendInboxMessage(fromAgentId) {
+      const targetSelect = document.getElementById('inbox-send-target');
+      const messageInput = document.getElementById('inbox-send-message');
+
+      if (!targetSelect || !messageInput) return;
+
+      const target = targetSelect.value;
+      const message = messageInput.value.trim();
+
+      if (!message) {
+        showNotification('Please enter a message', 'warning');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/inbox/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            target: target,
+            message: message,
+            from: fromAgentId,
+            priority: message.toLowerCase().includes('urgent') || message.includes('!') ? 'high' : 'normal'
+          })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          showNotification(`Message sent to ${target}`, 'success');
+          messageInput.value = '';
+          // Update target inbox badge
+          updateInboxBadge(target, true);
+        } else {
+          showNotification('Failed to send: ' + data.error, 'error');
+        }
+      } catch (error) {
+        console.error('Error sending message:', error);
+        showNotification('Failed to send message', 'error');
+      }
+    }
+
+    function forwardInboxMessage(msgId, fromAgentId) {
+      // Simple forward - just open send dialog with message reference
+      const messageInput = document.getElementById('inbox-send-message');
+      if (messageInput) {
+        messageInput.value = `[Forwarded from ${fromAgentId}] `;
+        messageInput.focus();
+      }
+    }
+
+    function acceptTask(msgId) {
+      showNotification('Task accepted - adding to current workflow', 'success');
+      // TODO: Integrate with task management system
     }
 
     function closeAgentInbox() {
@@ -10136,6 +10729,1860 @@ ${currentConversation.display}
         setTimeout(() => modal.remove(), 200);
       }
     }
+
+    // Make inbox functions globally accessible
+    window.showAgentInbox = showAgentInbox;
+    window.closeAgentInbox = closeAgentInbox;
+    window.refreshAgentInbox = refreshAgentInbox;
+    window.sendInboxMessage = sendInboxMessage;
+    window.forwardInboxMessage = forwardInboxMessage;
+    window.acceptTask = acceptTask;
+    window.updateInboxBadge = updateInboxBadge;
+    window.filterInboxMessages = filterInboxMessages;
+    window.renderInboxMessages = renderInboxMessages;
+
+    // ==================== CALENDAR FUNCTIONS ====================
+
+    // Store calendar state globally
+    let currentCalendarAgents = ['koda', 'cairn', 'prax', 'user'];
+    let currentCalendarDate = new Date();
+    let currentCalendarView = 'month'; // 'month' or 'week'
+    let currentCalendarEvents = [];
+
+    const calendarAgentColors = {
+      'koda': { bg: 'rgba(59, 130, 246, 0.3)', border: '#3b82f6', text: '#60a5fa' },
+      'cairn': { bg: 'rgba(168, 85, 247, 0.3)', border: '#a855f7', text: '#c084fc' },
+      'prax': { bg: 'rgba(234, 179, 8, 0.3)', border: '#eab308', text: '#fbbf24' },
+      'user': { bg: 'rgba(34, 197, 94, 0.3)', border: '#22c55e', text: '#4ade80' }
+    };
+
+    const calendarAgentNames = {
+      'koda': 'Koda (Builder)',
+      'cairn': 'Cairn (Architect)',
+      'prax': 'Prax (Orchestrator)',
+      'user': 'You'
+    };
+
+    async function showAgentCalendar(agentId) {
+      // If called with single agent, show that agent + user
+      if (agentId && agentId !== 'combined') {
+        currentCalendarAgents = [agentId, 'user'];
+      }
+      await showCombinedCalendar();
+    }
+
+    async function showCombinedCalendar() {
+      // Fetch events for selected agents
+      const agentsList = currentCalendarAgents.join(',');
+      let events = [];
+      try {
+        const response = await fetch(`/api/calendar/combined?agents=${agentsList}`);
+        const data = await response.json();
+        if (data.success) {
+          events = data.events || [];
+        }
+      } catch (error) {
+        console.error('Error fetching calendar:', error);
+      }
+
+      currentCalendarEvents = events;
+
+      // Create modal
+      const modal = document.createElement('div');
+      modal.id = 'calendar-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+      `;
+
+      const modalContent = document.createElement('div');
+      modalContent.style.cssText = `
+        background: rgba(15, 23, 42, 0.98);
+        border: 2px solid rgba(99, 102, 241, 0.4);
+        border-radius: 12px;
+        max-width: 1100px;
+        width: 95%;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+      `;
+
+      modalContent.innerHTML = `
+        <!-- Header -->
+        <div style="padding: 20px; border-bottom: 1px solid rgba(148, 163, 184, 0.2);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div>
+              <h2 style="color: #e2e8f0; margin: 0; font-size: 1.3rem;">
+                📅 Team Calendar
+              </h2>
+              <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">
+                ${events.length} event${events.length !== 1 ? 's' : ''} scheduled
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button onclick="showAddEventModal()" style="background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4); color: #4ade80; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
+                + Add Event
+              </button>
+              <button onclick="refreshCalendar()" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #a5b4fc; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
+                Refresh
+              </button>
+              <button onclick="closeCalendar()" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
+                Close
+              </button>
+            </div>
+          </div>
+
+          <!-- Agent Toggles -->
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
+            <span style="color: #94a3b8; font-size: 0.85rem; align-self: center;">Show:</span>
+            ${['koda', 'cairn', 'prax', 'user'].map(agent => `
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 6px 12px; background: ${currentCalendarAgents.includes(agent) ? calendarAgentColors[agent].bg : 'rgba(30, 41, 59, 0.6)'}; border: 1px solid ${currentCalendarAgents.includes(agent) ? calendarAgentColors[agent].border : 'rgba(148, 163, 184, 0.2)'}; border-radius: 6px;">
+                <input type="checkbox" ${currentCalendarAgents.includes(agent) ? 'checked' : ''} onchange="toggleCalendarAgent('${agent}')" style="cursor: pointer;">
+                <span style="color: ${currentCalendarAgents.includes(agent) ? calendarAgentColors[agent].text : '#94a3b8'}; font-size: 0.85rem;">${calendarAgentNames[agent]}</span>
+              </label>
+            `).join('')}
+          </div>
+
+          <!-- Navigation -->
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 8px;">
+              <button onclick="navigateCalendar(-1)" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); color: #e2e8f0; padding: 8px 12px; border-radius: 6px; cursor: pointer;">
+                ← Prev
+              </button>
+              <button onclick="navigateCalendar(0)" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); color: #e2e8f0; padding: 8px 12px; border-radius: 6px; cursor: pointer;">
+                Today
+              </button>
+              <button onclick="navigateCalendar(1)" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); color: #e2e8f0; padding: 8px 12px; border-radius: 6px; cursor: pointer;">
+                Next →
+              </button>
+            </div>
+            <div id="calendar-title" style="font-size: 1.2rem; font-weight: 600; color: #e2e8f0;">
+              ${formatCalendarTitle()}
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button onclick="setCalendarView('week')" style="background: ${currentCalendarView === 'week' ? 'rgba(99, 102, 241, 0.3)' : 'rgba(30, 41, 59, 0.8)'}; border: 1px solid ${currentCalendarView === 'week' ? 'rgba(99, 102, 241, 0.5)' : 'rgba(148, 163, 184, 0.3)'}; color: #e2e8f0; padding: 8px 12px; border-radius: 6px; cursor: pointer;">
+                Week
+              </button>
+              <button onclick="setCalendarView('month')" style="background: ${currentCalendarView === 'month' ? 'rgba(99, 102, 241, 0.3)' : 'rgba(30, 41, 59, 0.8)'}; border: 1px solid ${currentCalendarView === 'month' ? 'rgba(99, 102, 241, 0.5)' : 'rgba(148, 163, 184, 0.3)'}; color: #e2e8f0; padding: 8px 12px; border-radius: 6px; cursor: pointer;">
+                Month
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Calendar Grid -->
+        <div id="calendar-grid" style="flex: 1; overflow-y: auto; padding: 20px;">
+          ${renderCalendarGrid()}
+        </div>
+
+        <!-- Upcoming Events Sidebar -->
+        <div style="padding: 16px; border-top: 1px solid rgba(148, 163, 184, 0.2); max-height: 200px; overflow-y: auto;">
+          <div style="font-size: 0.9rem; font-weight: 600; color: #e2e8f0; margin-bottom: 8px;">📋 Upcoming Events</div>
+          <div id="upcoming-events" style="display: flex; flex-direction: column; gap: 8px;">
+            ${renderUpcomingEvents(events)}
+          </div>
+        </div>
+      `;
+
+      modal.appendChild(modalContent);
+      document.body.appendChild(modal);
+
+      // Close on background click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          closeCalendar();
+        }
+      });
+    }
+
+    function formatCalendarTitle() {
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      if (currentCalendarView === 'month') {
+        return `${months[currentCalendarDate.getMonth()]} ${currentCalendarDate.getFullYear()}`;
+      } else {
+        const weekStart = getWeekStart(currentCalendarDate);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        return `${months[weekStart.getMonth()]} ${weekStart.getDate()} - ${weekEnd.getDate()}, ${weekStart.getFullYear()}`;
+      }
+    }
+
+    function getWeekStart(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() - day;
+      return new Date(d.setDate(diff));
+    }
+
+    function renderCalendarGrid() {
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+      if (currentCalendarView === 'week') {
+        return renderWeekView(days);
+      } else {
+        return renderMonthView(days);
+      }
+    }
+
+    function renderMonthView(days) {
+      const year = currentCalendarDate.getFullYear();
+      const month = currentCalendarDate.getMonth();
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const today = new Date();
+
+      let html = `
+        <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;">
+          ${days.map(d => `<div style="text-align: center; padding: 8px; color: #94a3b8; font-size: 0.85rem; font-weight: 600;">${d}</div>`).join('')}
+      `;
+
+      // Empty cells before first day
+      for (let i = 0; i < firstDay; i++) {
+        html += `<div style="min-height: 80px; background: rgba(15, 23, 42, 0.4); border-radius: 4px;"></div>`;
+      }
+
+      // Days of month
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+        const dayEvents = currentCalendarEvents.filter(e => e.start && e.start.startsWith(dateStr));
+
+        html += `
+          <div onclick="showDayEvents('${dateStr}')" style="min-height: 80px; background: ${isToday ? 'rgba(99, 102, 241, 0.2)' : 'rgba(30, 41, 59, 0.6)'}; border: 1px solid ${isToday ? 'rgba(99, 102, 241, 0.5)' : 'rgba(148, 163, 184, 0.1)'}; border-radius: 4px; padding: 4px; cursor: pointer; overflow: hidden;">
+            <div style="font-size: 0.85rem; color: ${isToday ? '#a5b4fc' : '#e2e8f0'}; font-weight: ${isToday ? '600' : '400'}; margin-bottom: 4px;">${day}</div>
+            ${dayEvents.slice(0, 3).map(e => `
+              <div style="font-size: 0.7rem; padding: 2px 4px; margin-bottom: 2px; background: ${calendarAgentColors[e.agent]?.bg || 'rgba(100,100,100,0.3)'}; border-left: 2px solid ${calendarAgentColors[e.agent]?.border || '#666'}; border-radius: 2px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${escapeHtml(e.title)}
+              </div>
+            `).join('')}
+            ${dayEvents.length > 3 ? `<div style="font-size: 0.65rem; color: #64748b;">+${dayEvents.length - 3} more</div>` : ''}
+          </div>
+        `;
+      }
+
+      html += '</div>';
+      return html;
+    }
+
+    function renderWeekView(days) {
+      const weekStart = getWeekStart(currentCalendarDate);
+      const today = new Date();
+
+      let html = `
+        <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;">
+      `;
+
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(weekStart);
+        date.setDate(date.getDate() + i);
+        const dateStr = date.toISOString().split('T')[0];
+        const isToday = date.toDateString() === today.toDateString();
+        const dayEvents = currentCalendarEvents.filter(e => e.start && e.start.startsWith(dateStr));
+
+        html += `
+          <div style="background: ${isToday ? 'rgba(99, 102, 241, 0.2)' : 'rgba(30, 41, 59, 0.6)'}; border: 1px solid ${isToday ? 'rgba(99, 102, 241, 0.5)' : 'rgba(148, 163, 184, 0.1)'}; border-radius: 6px; padding: 8px; min-height: 300px;">
+            <div style="text-align: center; margin-bottom: 8px;">
+              <div style="font-size: 0.8rem; color: #94a3b8;">${days[i]}</div>
+              <div style="font-size: 1.2rem; color: ${isToday ? '#a5b4fc' : '#e2e8f0'}; font-weight: ${isToday ? '600' : '400'};">${date.getDate()}</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              ${dayEvents.map(e => `
+                <div onclick="event.stopPropagation(); showEventDetails('${e.id}', '${e.agent}')" style="font-size: 0.8rem; padding: 6px 8px; background: ${calendarAgentColors[e.agent]?.bg || 'rgba(100,100,100,0.3)'}; border-left: 3px solid ${calendarAgentColors[e.agent]?.border || '#666'}; border-radius: 4px; color: #e2e8f0; cursor: pointer;">
+                  <div style="font-weight: 500;">${escapeHtml(e.title)}</div>
+                  ${e.start.includes('T') ? `<div style="font-size: 0.7rem; color: #94a3b8;">${e.start.split('T')[1]?.substring(0,5) || ''}</div>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      html += '</div>';
+      return html;
+    }
+
+    function renderUpcomingEvents(events) {
+      const now = new Date();
+      const upcoming = events
+        .filter(e => new Date(e.start) >= now)
+        .sort((a, b) => new Date(a.start) - new Date(b.start))
+        .slice(0, 5);
+
+      if (upcoming.length === 0) {
+        return '<div style="color: #64748b; font-size: 0.85rem; text-align: center;">No upcoming events</div>';
+      }
+
+      return upcoming.map(e => `
+        <div onclick="showEventDetails('${e.id}', '${e.agent}')" style="display: flex; gap: 12px; padding: 8px; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 6px; cursor: pointer;">
+          <div style="width: 4px; background: ${calendarAgentColors[e.agent]?.border || '#666'}; border-radius: 2px;"></div>
+          <div style="flex: 1;">
+            <div style="color: #e2e8f0; font-size: 0.85rem; font-weight: 500;">${escapeHtml(e.title)}</div>
+            <div style="color: #94a3b8; font-size: 0.75rem;">${formatEventDate(e.start)} - ${calendarAgentNames[e.agent] || e.agent}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function formatEventDate(dateStr) {
+      const date = new Date(dateStr);
+      const options = { weekday: 'short', month: 'short', day: 'numeric' };
+      let formatted = date.toLocaleDateString('en-US', options);
+      if (dateStr.includes('T')) {
+        formatted += ' ' + dateStr.split('T')[1]?.substring(0, 5);
+      }
+      return formatted;
+    }
+
+    function toggleCalendarAgent(agent) {
+      if (currentCalendarAgents.includes(agent)) {
+        currentCalendarAgents = currentCalendarAgents.filter(a => a !== agent);
+      } else {
+        currentCalendarAgents.push(agent);
+      }
+      refreshCalendar();
+    }
+
+    function navigateCalendar(direction) {
+      if (direction === 0) {
+        currentCalendarDate = new Date();
+      } else if (currentCalendarView === 'month') {
+        currentCalendarDate.setMonth(currentCalendarDate.getMonth() + direction);
+      } else {
+        currentCalendarDate.setDate(currentCalendarDate.getDate() + (direction * 7));
+      }
+      refreshCalendar();
+    }
+
+    function setCalendarView(view) {
+      currentCalendarView = view;
+      refreshCalendar();
+    }
+
+    async function refreshCalendar() {
+      closeCalendar();
+      await showCombinedCalendar();
+    }
+
+    function closeCalendar() {
+      const modal = document.getElementById('calendar-modal');
+      if (modal) {
+        modal.style.transition = 'opacity 0.2s';
+        modal.style.opacity = '0';
+        setTimeout(() => modal.remove(), 200);
+      }
+    }
+
+    function showDayEvents(dateStr) {
+      const dayEvents = currentCalendarEvents.filter(e => e.start && e.start.startsWith(dateStr));
+      if (dayEvents.length === 0) {
+        showAddEventModal(dateStr);
+        return;
+      }
+
+      // Show a mini modal with day's events
+      const modal = document.createElement('div');
+      modal.id = 'day-events-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2100;
+      `;
+
+      const date = new Date(dateStr);
+      const formatted = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+      modal.innerHTML = `
+        <div style="background: rgba(15, 23, 42, 0.98); border: 2px solid rgba(99, 102, 241, 0.4); border-radius: 12px; max-width: 500px; width: 90%; max-height: 70vh; overflow: hidden; display: flex; flex-direction: column;">
+          <div style="padding: 16px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 style="color: #e2e8f0; margin: 0; font-size: 1.1rem;">${formatted}</h3>
+              <div style="color: #94a3b8; font-size: 0.85rem;">${dayEvents.length} event${dayEvents.length !== 1 ? 's' : ''}</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button onclick="closeDayEvents(); showAddEventModal('${dateStr}')" style="background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4); color: #4ade80; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">+ Add</button>
+              <button onclick="closeDayEvents()" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Close</button>
+            </div>
+          </div>
+          <div style="padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+            ${dayEvents.map(e => `
+              <div onclick="closeDayEvents(); showEventDetails('${e.id}', '${e.agent}')" style="padding: 12px; background: ${calendarAgentColors[e.agent]?.bg || 'rgba(100,100,100,0.3)'}; border: 1px solid ${calendarAgentColors[e.agent]?.border || '#666'}; border-radius: 8px; cursor: pointer;">
+                <div style="display: flex; justify-content: space-between; align-items: start;">
+                  <div style="color: #e2e8f0; font-weight: 500;">${escapeHtml(e.title)}</div>
+                  <div style="color: ${calendarAgentColors[e.agent]?.text || '#94a3b8'}; font-size: 0.75rem;">${calendarAgentNames[e.agent] || e.agent}</div>
+                </div>
+                ${e.start.includes('T') ? `<div style="color: #94a3b8; font-size: 0.8rem; margin-top: 4px;">${e.start.split('T')[1]?.substring(0,5) || ''} ${e.end && e.end !== e.start ? '- ' + (e.end.split('T')[1]?.substring(0,5) || '') : ''}</div>` : ''}
+                ${e.description ? `<div style="color: #94a3b8; font-size: 0.8rem; margin-top: 4px;">${escapeHtml(e.description).substring(0, 100)}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeDayEvents();
+      });
+
+      document.body.appendChild(modal);
+    }
+
+    function closeDayEvents() {
+      const modal = document.getElementById('day-events-modal');
+      if (modal) modal.remove();
+    }
+
+    function showAddEventModal(dateStr = null) {
+      const modal = document.createElement('div');
+      modal.id = 'add-event-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2100;
+      `;
+
+      const defaultDate = dateStr || new Date().toISOString().split('T')[0];
+
+      modal.innerHTML = `
+        <div style="background: rgba(15, 23, 42, 0.98); border: 2px solid rgba(34, 197, 94, 0.4); border-radius: 12px; max-width: 500px; width: 90%; padding: 20px;">
+          <h3 style="color: #e2e8f0; margin: 0 0 16px 0; font-size: 1.2rem;">📅 Add New Event</h3>
+
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div>
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 4px;">Title</label>
+              <input type="text" id="event-title" placeholder="Event title" style="width: 100%; padding: 10px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0; font-size: 0.9rem;">
+            </div>
+
+            <div style="display: flex; gap: 12px;">
+              <div style="flex: 1;">
+                <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 4px;">Start Date & Time</label>
+                <input type="datetime-local" id="event-start" value="${defaultDate}T09:00" style="width: 100%; padding: 10px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0; font-size: 0.9rem;">
+              </div>
+              <div style="flex: 1;">
+                <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 4px;">End Date & Time</label>
+                <input type="datetime-local" id="event-end" value="${defaultDate}T10:00" style="width: 100%; padding: 10px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0; font-size: 0.9rem;">
+              </div>
+            </div>
+
+            <div>
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 4px;">Calendar</label>
+              <select id="event-agent" style="width: 100%; padding: 10px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0; font-size: 0.9rem;">
+                <option value="user">You (Personal)</option>
+                <option value="koda">Koda (Builder)</option>
+                <option value="cairn">Cairn (Architect)</option>
+                <option value="prax">Prax (Orchestrator)</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 4px;">Type</label>
+              <select id="event-type" style="width: 100%; padding: 10px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0; font-size: 0.9rem;">
+                <option value="event">Event</option>
+                <option value="meeting">Meeting</option>
+                <option value="task">Task</option>
+                <option value="deadline">Deadline</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 4px;">Description (optional)</label>
+              <textarea id="event-description" rows="2" placeholder="Event description..." style="width: 100%; padding: 10px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0; font-size: 0.9rem; resize: vertical;"></textarea>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 12px; margin-top: 20px; justify-content: flex-end;">
+            <button onclick="closeAddEventModal()" style="background: rgba(100, 116, 139, 0.2); border: 1px solid rgba(100, 116, 139, 0.4); color: #94a3b8; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
+              Cancel
+            </button>
+            <button onclick="saveNewEvent()" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border: none; color: white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem;">
+              Save Event
+            </button>
+          </div>
+        </div>
+      `;
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeAddEventModal();
+      });
+
+      document.body.appendChild(modal);
+      document.getElementById('event-title').focus();
+    }
+
+    function closeAddEventModal() {
+      const modal = document.getElementById('add-event-modal');
+      if (modal) modal.remove();
+    }
+
+    async function saveNewEvent() {
+      const title = document.getElementById('event-title').value.trim();
+      const start = document.getElementById('event-start').value;
+      const end = document.getElementById('event-end').value;
+      const agent = document.getElementById('event-agent').value;
+      const type = document.getElementById('event-type').value;
+      const description = document.getElementById('event-description').value.trim();
+
+      if (!title) {
+        alert('Please enter an event title');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/calendar/event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, start, end, agent, type, description })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          closeAddEventModal();
+          refreshCalendar();
+        } else {
+          alert('Error creating event: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Error saving event:', error);
+        alert('Error saving event');
+      }
+    }
+
+    function showEventDetails(eventId, agentId) {
+      const event = currentCalendarEvents.find(e => e.id === eventId && e.agent === agentId);
+      if (!event) return;
+
+      const modal = document.createElement('div');
+      modal.id = 'event-details-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2100;
+      `;
+
+      const colors = calendarAgentColors[event.agent] || { bg: 'rgba(100,100,100,0.3)', border: '#666', text: '#94a3b8' };
+
+      modal.innerHTML = `
+        <div style="background: rgba(15, 23, 42, 0.98); border: 2px solid ${colors.border}; border-radius: 12px; max-width: 500px; width: 90%; padding: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
+            <div>
+              <h3 style="color: #e2e8f0; margin: 0; font-size: 1.2rem;">${escapeHtml(event.title)}</h3>
+              <div style="color: ${colors.text}; font-size: 0.85rem; margin-top: 4px;">${calendarAgentNames[event.agent] || event.agent}</div>
+            </div>
+            <span style="background: ${colors.bg}; border: 1px solid ${colors.border}; color: ${colors.text}; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">${event.type || 'event'}</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: #64748b;">📅</span>
+              <span style="color: #e2e8f0;">${formatEventDate(event.start)}</span>
+              ${event.end && event.end !== event.start ? `<span style="color: #64748b;">→</span><span style="color: #e2e8f0;">${formatEventDate(event.end)}</span>` : ''}
+            </div>
+            ${event.description ? `
+              <div>
+                <div style="color: #64748b; font-size: 0.85rem; margin-bottom: 4px;">Description</div>
+                <div style="color: #e2e8f0; background: rgba(30, 41, 59, 0.6); padding: 12px; border-radius: 6px;">${escapeHtml(event.description)}</div>
+              </div>
+            ` : ''}
+          </div>
+
+          <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button onclick="deleteEvent('${event.id}', '${event.agent}')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
+              Delete
+            </button>
+            <button onclick="closeEventDetails()" style="background: rgba(100, 116, 139, 0.2); border: 1px solid rgba(100, 116, 139, 0.4); color: #94a3b8; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
+              Close
+            </button>
+          </div>
+        </div>
+      `;
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeEventDetails();
+      });
+
+      document.body.appendChild(modal);
+    }
+
+    function closeEventDetails() {
+      const modal = document.getElementById('event-details-modal');
+      if (modal) modal.remove();
+    }
+
+    async function deleteEvent(eventId, agentId) {
+      if (!confirm('Delete this event?')) return;
+
+      try {
+        const response = await fetch('/api/calendar/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: eventId, agent: agentId })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          closeEventDetails();
+          refreshCalendar();
+        } else {
+          alert('Error deleting event: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Error deleting event:', error);
+        alert('Error deleting event');
+      }
+    }
+
+    // Make calendar functions globally accessible
+    window.showAgentCalendar = showAgentCalendar;
+    window.showCombinedCalendar = showCombinedCalendar;
+    window.closeCalendar = closeCalendar;
+    window.refreshCalendar = refreshCalendar;
+    window.toggleCalendarAgent = toggleCalendarAgent;
+    window.navigateCalendar = navigateCalendar;
+    window.setCalendarView = setCalendarView;
+    window.showDayEvents = showDayEvents;
+    window.closeDayEvents = closeDayEvents;
+    window.showAddEventModal = showAddEventModal;
+    window.closeAddEventModal = closeAddEventModal;
+    window.saveNewEvent = saveNewEvent;
+    window.showEventDetails = showEventDetails;
+    window.closeEventDetails = closeEventDetails;
+    window.deleteEvent = deleteEvent;
+
+    // ==================== END CALENDAR FUNCTIONS ====================
+
+    // ==================== TASK ASSIGNMENT & WEBHOOKS ====================
+
+    function showAssignTaskModal() {
+      const modal = document.createElement('div');
+      modal.id = 'assign-task-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+      `;
+
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const defaultDue = tomorrow.toISOString().slice(0, 16);
+
+      modal.innerHTML = `
+        <div style="background: rgba(15, 23, 42, 0.98); border: 2px solid rgba(34, 197, 94, 0.4); border-radius: 12px; max-width: 550px; width: 95%; padding: 24px;">
+          <h2 style="color: #e2e8f0; margin: 0 0 20px 0; font-size: 1.3rem;">📋 Assign Task (Prax → Agent)</h2>
+
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div>
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">Assign To</label>
+              <div style="display: flex; gap: 12px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px 16px; background: rgba(59, 130, 246, 0.2); border: 2px solid rgba(59, 130, 246, 0.4); border-radius: 8px; flex: 1;">
+                  <input type="radio" name="task-target" value="koda" checked style="cursor: pointer;">
+                  <span style="color: #60a5fa; font-weight: 500;">🔵 Koda (Builder)</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px 16px; background: rgba(168, 85, 247, 0.2); border: 2px solid rgba(168, 85, 247, 0.4); border-radius: 8px; flex: 1;">
+                  <input type="radio" name="task-target" value="cairn" style="cursor: pointer;">
+                  <span style="color: #c084fc; font-weight: 500;">🟣 Cairn (Architect)</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">Task Title</label>
+              <input type="text" id="task-title" placeholder="What needs to be done?" style="width: 100%; padding: 12px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; color: #e2e8f0; font-size: 1rem;">
+            </div>
+
+            <div>
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">Description (optional)</label>
+              <textarea id="task-description" rows="2" placeholder="Additional details..." style="width: 100%; padding: 12px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; color: #e2e8f0; font-size: 0.9rem; resize: vertical;"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 16px;">
+              <div style="flex: 1;">
+                <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">Due Date & Time</label>
+                <input type="datetime-local" id="task-due" value="${defaultDue}" style="width: 100%; padding: 12px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; color: #e2e8f0; font-size: 0.9rem;">
+              </div>
+              <div style="flex: 1;">
+                <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">Priority</label>
+                <select id="task-priority" style="width: 100%; padding: 12px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; color: #e2e8f0; font-size: 0.9rem;">
+                  <option value="normal">Normal</option>
+                  <option value="high">🔴 High Priority</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.3); border-radius: 8px; padding: 12px;">
+              <div style="color: #fbbf24; font-size: 0.85rem; font-weight: 500; margin-bottom: 4px;">What happens:</div>
+              <ul style="color: #94a3b8; font-size: 0.8rem; margin: 0; padding-left: 20px;">
+                <li>Task added to agent's inbox</li>
+                <li>Deadline added to agent's calendar</li>
+                <li>Reminders sent 24h and 1h before deadline</li>
+                <li>Webhooks fired at configured trigger points</li>
+              </ul>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 12px; margin-top: 24px; justify-content: flex-end;">
+            <button onclick="closeAssignTaskModal()" style="background: rgba(100, 116, 139, 0.2); border: 1px solid rgba(100, 116, 139, 0.4); color: #94a3b8; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 0.95rem;">
+              Cancel
+            </button>
+            <button onclick="submitAssignTask()" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border: none; color: white; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.95rem;">
+              Assign Task
+            </button>
+          </div>
+        </div>
+      `;
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeAssignTaskModal();
+      });
+
+      document.body.appendChild(modal);
+      document.getElementById('task-title').focus();
+    }
+
+    function closeAssignTaskModal() {
+      const modal = document.getElementById('assign-task-modal');
+      if (modal) modal.remove();
+    }
+
+    async function submitAssignTask() {
+      const target = document.querySelector('input[name="task-target"]:checked').value;
+      const title = document.getElementById('task-title').value.trim();
+      const description = document.getElementById('task-description').value.trim();
+      const dueDate = document.getElementById('task-due').value;
+      const priority = document.getElementById('task-priority').value;
+
+      if (!title) {
+        alert('Please enter a task title');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/tasks/assign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            target: target,
+            title: title,
+            description: description,
+            due_date: dueDate,
+            priority: priority,
+            from: 'prax'
+          })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          closeAssignTaskModal();
+          // Show success notification
+          showNotification(`Task assigned to ${target}!`, 'success');
+          // Refresh inbox badges
+          checkAllInboxes();
+        } else {
+          alert('Error assigning task: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Error assigning task:', error);
+        alert('Error assigning task');
+      }
+    }
+
+    // ==================== WEBHOOKS UI ====================
+
+    let currentWebhooks = [];
+
+    async function showWebhooksModal() {
+      // Fetch existing webhooks
+      try {
+        const response = await fetch('/api/webhooks/list');
+        const data = await response.json();
+        if (data.success) {
+          currentWebhooks = data.webhooks || [];
+        }
+      } catch (error) {
+        console.error('Error fetching webhooks:', error);
+        currentWebhooks = [];
+      }
+
+      const modal = document.createElement('div');
+      modal.id = 'webhooks-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+      `;
+
+      modal.innerHTML = `
+        <div style="background: rgba(15, 23, 42, 0.98); border: 2px solid rgba(99, 102, 241, 0.4); border-radius: 12px; max-width: 800px; width: 95%; max-height: 85vh; display: flex; flex-direction: column;">
+          <!-- Header -->
+          <div style="padding: 20px; border-bottom: 1px solid rgba(148, 163, 184, 0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h2 style="color: #e2e8f0; margin: 0; font-size: 1.3rem;">🔗 Webhook Configuration</h2>
+                <div style="color: #94a3b8; font-size: 0.85rem; margin-top: 4px;">${currentWebhooks.length} webhook${currentWebhooks.length !== 1 ? 's' : ''} configured</div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button onclick="showAddWebhookModal()" style="background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4); color: #4ade80; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
+                  + Add Webhook
+                </button>
+                <button onclick="processTriggers()" style="background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.4); color: #fbbf24; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;" title="Process pending triggers now">
+                  ⚡ Run Triggers
+                </button>
+                <button onclick="closeWebhooksModal()" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Webhooks List -->
+          <div id="webhooks-list" style="flex: 1; overflow-y: auto; padding: 20px;">
+            ${renderWebhooksList()}
+          </div>
+
+          <!-- Trigger Types Info -->
+          <div style="padding: 16px; border-top: 1px solid rgba(148, 163, 184, 0.2); background: rgba(30, 41, 59, 0.4);">
+            <div style="font-size: 0.85rem; font-weight: 600; color: #e2e8f0; margin-bottom: 8px;">Trigger Types:</div>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.8rem; color: #94a3b8;">
+              <span><span style="color: #60a5fa;">reminder_24h</span> - 24 hours before deadline</span>
+              <span><span style="color: #fbbf24;">reminder_1h</span> - 1 hour before deadline</span>
+              <span><span style="color: #ef4444;">task_due</span> - At deadline time</span>
+              <span><span style="color: #22c55e;">event_start</span> - When event starts</span>
+            </div>
+          </div>
+        </div>
+      `;
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeWebhooksModal();
+      });
+
+      document.body.appendChild(modal);
+    }
+
+    function renderWebhooksList() {
+      if (currentWebhooks.length === 0) {
+        return `
+          <div style="text-align: center; color: #64748b; padding: 60px 20px;">
+            <div style="font-size: 3rem; margin-bottom: 16px;">🔗</div>
+            <div style="font-size: 1rem; margin-bottom: 8px;">No webhooks configured</div>
+            <div style="font-size: 0.85rem;">Add a webhook to receive notifications when tasks are due or events trigger</div>
+          </div>
+        `;
+      }
+
+      return currentWebhooks.map(w => `
+        <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div style="flex: 1;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="color: #e2e8f0; font-weight: 600; font-size: 1rem;">${escapeHtml(w.name)}</span>
+                <span style="background: ${w.enabled ? 'rgba(34, 197, 94, 0.3)' : 'rgba(100, 116, 139, 0.3)'}; border: 1px solid ${w.enabled ? '#22c55e' : '#64748b'}; color: ${w.enabled ? '#4ade80' : '#94a3b8'}; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem;">${w.enabled ? 'ENABLED' : 'DISABLED'}</span>
+                <span style="background: rgba(99, 102, 241, 0.3); border: 1px solid #6366f1; color: #a5b4fc; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem;">${w.trigger_type}</span>
+              </div>
+              <div style="color: #94a3b8; font-size: 0.85rem; font-family: monospace; word-break: break-all;">${escapeHtml(w.url)}</div>
+              ${w.agent_filter && w.agent_filter.length > 0 ? `<div style="color: #64748b; font-size: 0.8rem; margin-top: 4px;">Agents: ${w.agent_filter.join(', ')}</div>` : ''}
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button onclick="testWebhook('${w.id}')" style="background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">
+                Test
+              </button>
+              <button onclick="toggleWebhook('${w.id}', ${!w.enabled})" style="background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.4); color: #fbbf24; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">
+                ${w.enabled ? 'Disable' : 'Enable'}
+              </button>
+              <button onclick="deleteWebhook('${w.id}')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function closeWebhooksModal() {
+      const modal = document.getElementById('webhooks-modal');
+      if (modal) modal.remove();
+    }
+
+    function showAddWebhookModal() {
+      const modal = document.createElement('div');
+      modal.id = 'add-webhook-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2100;
+      `;
+
+      modal.innerHTML = `
+        <div style="background: rgba(15, 23, 42, 0.98); border: 2px solid rgba(34, 197, 94, 0.4); border-radius: 12px; max-width: 550px; width: 95%; padding: 24px;">
+          <h3 style="color: #e2e8f0; margin: 0 0 20px 0; font-size: 1.2rem;">🔗 Add New Webhook</h3>
+
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div>
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">Name</label>
+              <input type="text" id="webhook-name" placeholder="My Webhook" style="width: 100%; padding: 10px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0; font-size: 0.9rem;">
+            </div>
+
+            <div>
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">URL</label>
+              <input type="url" id="webhook-url" placeholder="https://your-server.com/webhook" style="width: 100%; padding: 10px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0; font-size: 0.9rem; font-family: monospace;">
+            </div>
+
+            <div>
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">Trigger Type</label>
+              <select id="webhook-trigger" style="width: 100%; padding: 10px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0; font-size: 0.9rem;">
+                <option value="reminder_24h">24 Hour Reminder</option>
+                <option value="reminder_1h">1 Hour Reminder</option>
+                <option value="task_due">Task Due (Deadline)</option>
+                <option value="event_start">Event Start</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">Filter by Agent (optional)</label>
+              <div style="display: flex; gap: 12px;">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <input type="checkbox" id="webhook-agent-koda" style="cursor: pointer;">
+                  <span style="color: #60a5fa; font-size: 0.85rem;">Koda</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <input type="checkbox" id="webhook-agent-cairn" style="cursor: pointer;">
+                  <span style="color: #c084fc; font-size: 0.85rem;">Cairn</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <input type="checkbox" id="webhook-agent-prax" style="cursor: pointer;">
+                  <span style="color: #fbbf24; font-size: 0.85rem;">Prax</span>
+                </label>
+              </div>
+              <div style="color: #64748b; font-size: 0.75rem; margin-top: 4px;">Leave all unchecked to fire for all agents</div>
+            </div>
+
+            <div>
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">Authorization Header (optional)</label>
+              <input type="text" id="webhook-auth" placeholder="Bearer your-token-here" style="width: 100%; padding: 10px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0; font-size: 0.9rem; font-family: monospace;">
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 12px; margin-top: 24px; justify-content: flex-end;">
+            <button onclick="closeAddWebhookModal()" style="background: rgba(100, 116, 139, 0.2); border: 1px solid rgba(100, 116, 139, 0.4); color: #94a3b8; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
+              Cancel
+            </button>
+            <button onclick="saveNewWebhook()" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border: none; color: white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem;">
+              Save Webhook
+            </button>
+          </div>
+        </div>
+      `;
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeAddWebhookModal();
+      });
+
+      document.body.appendChild(modal);
+      document.getElementById('webhook-name').focus();
+    }
+
+    function closeAddWebhookModal() {
+      const modal = document.getElementById('add-webhook-modal');
+      if (modal) modal.remove();
+    }
+
+    async function saveNewWebhook() {
+      const name = document.getElementById('webhook-name').value.trim();
+      const url = document.getElementById('webhook-url').value.trim();
+      const triggerType = document.getElementById('webhook-trigger').value;
+      const auth = document.getElementById('webhook-auth').value.trim();
+
+      const agentFilter = [];
+      if (document.getElementById('webhook-agent-koda').checked) agentFilter.push('koda');
+      if (document.getElementById('webhook-agent-cairn').checked) agentFilter.push('cairn');
+      if (document.getElementById('webhook-agent-prax').checked) agentFilter.push('prax');
+
+      if (!name || !url) {
+        alert('Name and URL are required');
+        return;
+      }
+
+      const headers = {};
+      if (auth) {
+        headers['Authorization'] = auth;
+      }
+
+      try {
+        const response = await fetch('/api/webhooks/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name,
+            url: url,
+            trigger_type: triggerType,
+            agent_filter: agentFilter,
+            headers: headers,
+            enabled: true
+          })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          closeAddWebhookModal();
+          closeWebhooksModal();
+          showWebhooksModal();
+          showNotification('Webhook saved!', 'success');
+        } else {
+          alert('Error saving webhook: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Error saving webhook:', error);
+        alert('Error saving webhook');
+      }
+    }
+
+    async function testWebhook(webhookId) {
+      const webhook = currentWebhooks.find(w => w.id === webhookId);
+      if (!webhook) return;
+
+      showNotification('Testing webhook...', 'info');
+
+      try {
+        const response = await fetch('/api/webhooks/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: webhook.url,
+            headers: webhook.headers || {}
+          })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          showNotification(`Webhook test successful! Status: ${data.status_code}`, 'success');
+        } else {
+          showNotification(`Webhook test failed: ${data.error || 'Unknown error'}`, 'error');
+        }
+      } catch (error) {
+        showNotification('Error testing webhook', 'error');
+      }
+    }
+
+    async function toggleWebhook(webhookId, enabled) {
+      const webhook = currentWebhooks.find(w => w.id === webhookId);
+      if (!webhook) return;
+
+      try {
+        const response = await fetch('/api/webhooks/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...webhook, enabled: enabled })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          closeWebhooksModal();
+          showWebhooksModal();
+        }
+      } catch (error) {
+        console.error('Error toggling webhook:', error);
+      }
+    }
+
+    async function deleteWebhook(webhookId) {
+      if (!confirm('Delete this webhook?')) return;
+
+      try {
+        const response = await fetch('/api/webhooks/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: webhookId })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          closeWebhooksModal();
+          showWebhooksModal();
+          showNotification('Webhook deleted', 'success');
+        }
+      } catch (error) {
+        console.error('Error deleting webhook:', error);
+      }
+    }
+
+    async function processTriggers() {
+      showNotification('Processing triggers...', 'info');
+
+      try {
+        const response = await fetch('/api/triggers/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          if (data.processed_count > 0) {
+            showNotification(`Processed ${data.processed_count} trigger(s)!`, 'success');
+            checkAllInboxes();
+          } else {
+            showNotification('No pending triggers to process', 'info');
+          }
+        } else {
+          showNotification('Error processing triggers: ' + (data.error || 'Unknown'), 'error');
+        }
+      } catch (error) {
+        showNotification('Error processing triggers', 'error');
+      }
+    }
+
+    function showNotification(message, type = 'info') {
+      const existing = document.getElementById('notification-toast');
+      if (existing) existing.remove();
+
+      const colors = {
+        success: { bg: 'rgba(34, 197, 94, 0.9)', border: '#22c55e' },
+        error: { bg: 'rgba(239, 68, 68, 0.9)', border: '#ef4444' },
+        info: { bg: 'rgba(59, 130, 246, 0.9)', border: '#3b82f6' }
+      };
+
+      const color = colors[type] || colors.info;
+
+      const toast = document.createElement('div');
+      toast.id = 'notification-toast';
+      toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: ${color.bg};
+        border: 1px solid ${color.border};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        z-index: 3000;
+        animation: slideIn 0.3s ease;
+      `;
+      toast.textContent = message;
+
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    async function checkAllInboxes() {
+      // Update inbox badges for all agents
+      for (const agent of ['koda', 'cairn', 'prax']) {
+        try {
+          const response = await fetch(`/api/inbox/${agent}`);
+          const data = await response.json();
+          if (data.success && data.messages) {
+            const unread = data.messages.filter(m => !m.read).length;
+            updateInboxBadge(agent, unread > 0);
+          }
+        } catch (e) { }
+      }
+    }
+
+    // Make task/webhook functions globally accessible
+    window.showAssignTaskModal = showAssignTaskModal;
+    window.closeAssignTaskModal = closeAssignTaskModal;
+    window.submitAssignTask = submitAssignTask;
+    window.showWebhooksModal = showWebhooksModal;
+    window.closeWebhooksModal = closeWebhooksModal;
+    window.showAddWebhookModal = showAddWebhookModal;
+    window.closeAddWebhookModal = closeAddWebhookModal;
+    window.saveNewWebhook = saveNewWebhook;
+    window.testWebhook = testWebhook;
+    window.toggleWebhook = toggleWebhook;
+    window.deleteWebhook = deleteWebhook;
+    window.processTriggers = processTriggers;
+    window.showNotification = showNotification;
+    window.checkAllInboxes = checkAllInboxes;
+
+    // ==================== END TASK ASSIGNMENT & WEBHOOKS ====================
+
+    // ==================== TODO SYSTEM ====================
+
+    const todoAgentColors = {
+      'koda': { bg: 'rgba(59, 130, 246, 0.2)', border: '#3b82f6', text: '#60a5fa' },
+      'cairn': { bg: 'rgba(168, 85, 247, 0.2)', border: '#a855f7', text: '#c084fc' },
+      'prax': { bg: 'rgba(234, 179, 8, 0.2)', border: '#eab308', text: '#fbbf24' }
+    };
+
+    const todoAgentNames = {
+      'koda': 'Koda (Builder)',
+      'cairn': 'Cairn (Architect)',
+      'prax': 'Prax (Orchestrator)'
+    };
+
+    const todoStatusColors = {
+      'pending': { bg: 'rgba(100, 116, 139, 0.3)', text: '#94a3b8' },
+      'in_progress': { bg: 'rgba(59, 130, 246, 0.3)', text: '#60a5fa' },
+      'completed': { bg: 'rgba(34, 197, 94, 0.3)', text: '#4ade80' },
+      'blocked': { bg: 'rgba(239, 68, 68, 0.3)', text: '#fca5a5' }
+    };
+
+    let currentTodosAgent = null;
+    let currentTodosData = [];
+
+    async function showAgentTodos(agentId) {
+      currentTodosAgent = agentId;
+
+      let todos = [];
+      let stats = {};
+      try {
+        const response = await fetch(`/api/todos/${agentId}`);
+        const data = await response.json();
+        if (data.success) {
+          todos = data.todos || [];
+          stats = data.stats || {};
+        }
+      } catch (error) {
+        console.error('Error fetching todos:', error);
+      }
+
+      currentTodosData = todos;
+      const colors = todoAgentColors[agentId] || todoAgentColors.koda;
+
+      const modal = document.createElement('div');
+      modal.id = 'todos-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+      `;
+
+      modal.innerHTML = `
+        <div style="background: rgba(15, 23, 42, 0.98); border: 2px solid ${colors.border}; border-radius: 12px; max-width: 900px; width: 95%; max-height: 85vh; display: flex; flex-direction: column;">
+          <div style="padding: 20px; border-bottom: 1px solid rgba(148, 163, 184, 0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div>
+                <h2 style="color: #e2e8f0; margin: 0; font-size: 1.3rem;">✅ ${todoAgentNames[agentId]} Todos</h2>
+                <div style="display: flex; gap: 16px; margin-top: 8px; font-size: 0.8rem;">
+                  <span style="color: #94a3b8;">${stats.pending || 0} pending</span>
+                  <span style="color: #60a5fa;">${stats.in_progress || 0} in progress</span>
+                  <span style="color: #4ade80;">${stats.completed || 0} completed</span>
+                  ${stats.blocked ? `<span style="color: #fca5a5;">${stats.blocked} blocked</span>` : ''}
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button onclick="showAddTodoModal('${agentId}')" style="background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4); color: #4ade80; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">+ Add Todo</button>
+                <button onclick="refreshTodos('${agentId}')" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #a5b4fc; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Refresh</button>
+                <button onclick="closeTodosModal()" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Close</button>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button onclick="filterTodosByStatus('${agentId}', null)" class="todo-filter-btn active" style="background: rgba(148, 163, 184, 0.2); border: 1px solid rgba(148, 163, 184, 0.3); color: #e2e8f0; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">All</button>
+              <button onclick="filterTodosByStatus('${agentId}', 'pending')" class="todo-filter-btn" style="background: transparent; border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">Pending</button>
+              <button onclick="filterTodosByStatus('${agentId}', 'in_progress')" class="todo-filter-btn" style="background: transparent; border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">In Progress</button>
+              <button onclick="filterTodosByStatus('${agentId}', 'completed')" class="todo-filter-btn" style="background: transparent; border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">Completed</button>
+            </div>
+          </div>
+          <div id="todos-list" style="flex: 1; overflow-y: auto; padding: 20px;">
+            ${renderTodosList(todos, agentId)}
+          </div>
+        </div>
+      `;
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeTodosModal();
+      });
+
+      document.body.appendChild(modal);
+    }
+
+    async function showUnifiedTodos() {
+      let todos = [];
+      let stats = {};
+      try {
+        const response = await fetch('/api/todos/unified');
+        const data = await response.json();
+        if (data.success) {
+          todos = data.todos || [];
+          stats = data.stats || {};
+        }
+      } catch (error) {
+        console.error('Error fetching unified todos:', error);
+      }
+
+      currentTodosData = todos;
+
+      const modal = document.createElement('div');
+      modal.id = 'todos-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+      `;
+
+      modal.innerHTML = `
+        <div style="background: rgba(15, 23, 42, 0.98); border: 2px solid rgba(16, 185, 129, 0.4); border-radius: 12px; max-width: 1000px; width: 95%; max-height: 85vh; display: flex; flex-direction: column;">
+          <div style="padding: 20px; border-bottom: 1px solid rgba(148, 163, 184, 0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div>
+                <h2 style="color: #e2e8f0; margin: 0; font-size: 1.3rem;">📊 Unified Todos - All Agents</h2>
+                <div style="display: flex; gap: 16px; margin-top: 8px; font-size: 0.8rem;">
+                  <span style="color: #60a5fa;">Koda: ${stats.by_agent?.koda || 0}</span>
+                  <span style="color: #c084fc;">Cairn: ${stats.by_agent?.cairn || 0}</span>
+                  <span style="color: #fbbf24;">Prax: ${stats.by_agent?.prax || 0}</span>
+                  <span style="color: #94a3b8;">|</span>
+                  <span style="color: #94a3b8;">Pending: ${stats.by_status?.pending || 0}</span>
+                  <span style="color: #60a5fa;">In Progress: ${stats.by_status?.in_progress || 0}</span>
+                  <span style="color: #4ade80;">Done: ${stats.by_status?.completed || 0}</span>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button onclick="refreshUnifiedTodos()" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #a5b4fc; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Refresh</button>
+                <button onclick="closeTodosModal()" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Close</button>
+              </div>
+            </div>
+          </div>
+          <div id="todos-list" style="flex: 1; overflow-y: auto; padding: 20px;">
+            ${renderUnifiedTodosList(todos)}
+          </div>
+        </div>
+      `;
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeTodosModal();
+      });
+
+      document.body.appendChild(modal);
+    }
+
+    function renderTodosList(todos, agentId) {
+      if (todos.length === 0) {
+        return `<div style="text-align: center; color: #64748b; padding: 40px;">No todos yet. Click "+ Add Todo" to create one.</div>`;
+      }
+
+      return todos.map(todo => renderTodoItem(todo, agentId)).join('');
+    }
+
+    function renderUnifiedTodosList(todos) {
+      if (todos.length === 0) {
+        return `<div style="text-align: center; color: #64748b; padding: 40px;">No todos across any agent.</div>`;
+      }
+
+      return todos.map(todo => renderTodoItem(todo, todo.agent, true)).join('');
+    }
+
+    function renderTodoItem(todo, agentId, showAgent = false) {
+      const statusColors = todoStatusColors[todo.status] || todoStatusColors.pending;
+      const priorityIcon = todo.priority === 'high' ? '🔴' : todo.priority === 'low' ? '⚪' : '🟡';
+      const agentColor = todoAgentColors[agentId] || todoAgentColors.koda;
+
+      return `
+        <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(148, 163, 184, 0.2); border-left: 4px solid ${statusColors.text}; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div style="flex: 1;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                ${priorityIcon}
+                <span style="color: #e2e8f0; font-weight: 500; font-size: 1rem;">${escapeHtml(todo.title)}</span>
+                <span style="background: ${statusColors.bg}; color: ${statusColors.text}; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; text-transform: uppercase;">${todo.status.replace('_', ' ')}</span>
+                ${showAgent ? `<span style="background: ${agentColor.bg}; color: ${agentColor.text}; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem;">${agentId}</span>` : ''}
+                ${todo.prd_title ? `<span style="background: rgba(236, 72, 153, 0.2); color: #f472b6; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem;">PRD</span>` : ''}
+              </div>
+              ${todo.description ? `<div style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 8px;">${escapeHtml(todo.description).substring(0, 150)}${todo.description.length > 150 ? '...' : ''}</div>` : ''}
+              <div style="display: flex; gap: 12px; font-size: 0.75rem; color: #64748b;">
+                ${todo.due_date ? `<span>📅 Due: ${formatTodoDate(todo.due_date)}</span>` : ''}
+                ${todo.calendar_event_id ? '<span style="color: #4ade80;">📅 Synced</span>' : ''}
+                ${todo.inbox_message_id ? '<span style="color: #60a5fa;">📬 Sent</span>' : ''}
+                ${todo.prd_title ? `<span>📑 ${escapeHtml(todo.prd_title)}</span>` : ''}
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <select onchange="updateTodoStatus('${todo.id}', '${agentId}', this.value)" style="padding: 4px 8px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 4px; color: #e2e8f0; font-size: 0.75rem; cursor: pointer;">
+                <option value="pending" ${todo.status === 'pending' ? 'selected' : ''}>Pending</option>
+                <option value="in_progress" ${todo.status === 'in_progress' ? 'selected' : ''}>In Progress</option>
+                <option value="completed" ${todo.status === 'completed' ? 'selected' : ''}>Completed</option>
+                <option value="blocked" ${todo.status === 'blocked' ? 'selected' : ''}>Blocked</option>
+              </select>
+              <div style="display: flex; gap: 4px;">
+                ${!todo.calendar_event_id && todo.due_date ? `<button onclick="syncTodoToCalendar('${todo.id}', '${agentId}')" style="background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">📅</button>` : ''}
+                ${!todo.inbox_message_id ? `<button onclick="syncTodoToInbox('${todo.id}', '${agentId}')" style="background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.3); color: #fbbf24; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">📬</button>` : ''}
+                <button onclick="deleteTodo('${todo.id}', '${agentId}')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">🗑</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function formatTodoDate(dateStr) {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+             (dateStr.includes('T') ? ' ' + dateStr.split('T')[1]?.substring(0, 5) : '');
+    }
+
+    function closeTodosModal() {
+      const modal = document.getElementById('todos-modal');
+      if (modal) modal.remove();
+    }
+
+    async function refreshTodos(agentId) {
+      closeTodosModal();
+      await showAgentTodos(agentId);
+    }
+
+    async function refreshUnifiedTodos() {
+      closeTodosModal();
+      await showUnifiedTodos();
+    }
+
+    function filterTodosByStatus(agentId, status) {
+      const filtered = status ? currentTodosData.filter(t => t.status === status) : currentTodosData;
+      document.getElementById('todos-list').innerHTML = renderTodosList(filtered, agentId);
+    }
+
+    function showAddTodoModal(agentId) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const defaultDue = tomorrow.toISOString().slice(0, 16);
+
+      const modal = document.createElement('div');
+      modal.id = 'add-todo-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2100;
+      `;
+
+      modal.innerHTML = `
+        <div style="background: rgba(15, 23, 42, 0.98); border: 2px solid rgba(34, 197, 94, 0.4); border-radius: 12px; max-width: 500px; width: 95%; padding: 24px;">
+          <h3 style="color: #e2e8f0; margin: 0 0 20px 0; font-size: 1.2rem;">✅ Add Todo for ${todoAgentNames[agentId]}</h3>
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div>
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">Title</label>
+              <input type="text" id="new-todo-title" placeholder="What needs to be done?" style="width: 100%; padding: 12px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; color: #e2e8f0; font-size: 1rem;">
+            </div>
+            <div>
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">Description</label>
+              <textarea id="new-todo-desc" rows="2" placeholder="Additional details..." style="width: 100%; padding: 12px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; color: #e2e8f0; font-size: 0.9rem;"></textarea>
+            </div>
+            <div style="display: flex; gap: 12px;">
+              <div style="flex: 1;">
+                <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">Due Date</label>
+                <input type="datetime-local" id="new-todo-due" value="${defaultDue}" style="width: 100%; padding: 10px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0;">
+              </div>
+              <div style="flex: 1;">
+                <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">Priority</label>
+                <select id="new-todo-priority" style="width: 100%; padding: 10px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0;">
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+            </div>
+            <div style="display: flex; gap: 16px;">
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="new-todo-sync-cal" checked>
+                <span style="color: #94a3b8; font-size: 0.85rem;">Sync to Calendar</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="new-todo-sync-inbox">
+                <span style="color: #94a3b8; font-size: 0.85rem;">Send to Inbox</span>
+              </label>
+            </div>
+          </div>
+          <div style="display: flex; gap: 12px; margin-top: 24px; justify-content: flex-end;">
+            <button onclick="closeAddTodoModal()" style="background: rgba(100, 116, 139, 0.2); border: 1px solid rgba(100, 116, 139, 0.4); color: #94a3b8; padding: 10px 20px; border-radius: 6px; cursor: pointer;">Cancel</button>
+            <button onclick="saveTodo('${agentId}')" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border: none; color: white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">Add Todo</button>
+          </div>
+        </div>
+      `;
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeAddTodoModal();
+      });
+
+      document.body.appendChild(modal);
+      document.getElementById('new-todo-title').focus();
+    }
+
+    function closeAddTodoModal() {
+      const modal = document.getElementById('add-todo-modal');
+      if (modal) modal.remove();
+    }
+
+    async function saveTodo(agentId) {
+      const title = document.getElementById('new-todo-title').value.trim();
+      const description = document.getElementById('new-todo-desc').value.trim();
+      const dueDate = document.getElementById('new-todo-due').value;
+      const priority = document.getElementById('new-todo-priority').value;
+      const syncCalendar = document.getElementById('new-todo-sync-cal').checked;
+      const syncInbox = document.getElementById('new-todo-sync-inbox').checked;
+
+      if (!title) {
+        alert('Please enter a title');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/todos/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agent: agentId,
+            title: title,
+            description: description,
+            due_date: dueDate,
+            priority: priority,
+            sync_calendar: syncCalendar,
+            sync_inbox: syncInbox
+          })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          closeAddTodoModal();
+          showNotification('Todo created!', 'success');
+          refreshTodos(agentId);
+        } else {
+          alert('Error: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        alert('Error creating todo');
+      }
+    }
+
+    async function updateTodoStatus(todoId, agentId, newStatus) {
+      try {
+        await fetch('/api/todos/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: todoId, agent: agentId, status: newStatus })
+        });
+        showNotification(`Status updated to ${newStatus}`, 'success');
+      } catch (error) {
+        showNotification('Error updating status', 'error');
+      }
+    }
+
+    async function syncTodoToCalendar(todoId, agentId) {
+      try {
+        const response = await fetch('/api/todos/sync-calendar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: todoId, agent: agentId })
+        });
+        const data = await response.json();
+        if (data.success) {
+          showNotification('Synced to calendar!', 'success');
+          if (currentTodosAgent) refreshTodos(currentTodosAgent);
+          else refreshUnifiedTodos();
+        }
+      } catch (error) {
+        showNotification('Error syncing to calendar', 'error');
+      }
+    }
+
+    async function syncTodoToInbox(todoId, agentId) {
+      try {
+        const response = await fetch('/api/todos/sync-inbox', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: todoId, agent: agentId, from: 'prax' })
+        });
+        const data = await response.json();
+        if (data.success) {
+          showNotification('Sent to inbox!', 'success');
+          if (currentTodosAgent) refreshTodos(currentTodosAgent);
+          else refreshUnifiedTodos();
+        }
+      } catch (error) {
+        showNotification('Error syncing to inbox', 'error');
+      }
+    }
+
+    async function deleteTodo(todoId, agentId) {
+      if (!confirm('Delete this todo?')) return;
+
+      try {
+        await fetch('/api/todos/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: todoId, agent: agentId })
+        });
+        showNotification('Todo deleted', 'success');
+        if (currentTodosAgent) refreshTodos(currentTodosAgent);
+        else refreshUnifiedTodos();
+      } catch (error) {
+        showNotification('Error deleting todo', 'error');
+      }
+    }
+
+    // ==================== PRD SPLITTER ====================
+
+    let prdTasks = [];
+
+    function showPrdSplitterModal() {
+      prdTasks = [];
+
+      const modal = document.createElement('div');
+      modal.id = 'prd-splitter-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+      `;
+
+      modal.innerHTML = `
+        <div style="background: rgba(15, 23, 42, 0.98); border: 2px solid rgba(236, 72, 153, 0.4); border-radius: 12px; max-width: 900px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+          <div style="padding: 20px; border-bottom: 1px solid rgba(148, 163, 184, 0.2);">
+            <h2 style="color: #e2e8f0; margin: 0 0 8px 0; font-size: 1.3rem;">📑 PRD Task Splitter</h2>
+            <div style="color: #94a3b8; font-size: 0.85rem;">Break down a PRD into tasks and assign to Koda/Cairn</div>
+          </div>
+
+          <div style="flex: 1; overflow-y: auto; padding: 20px;">
+            <div style="margin-bottom: 20px;">
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">PRD Title</label>
+              <input type="text" id="prd-title" placeholder="Feature Name / PRD Title" style="width: 100%; padding: 12px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; color: #e2e8f0; font-size: 1rem;">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+              <label style="color: #94a3b8; font-size: 0.85rem; display: block; margin-bottom: 6px;">PRD Content / Requirements</label>
+              <textarea id="prd-content" rows="4" placeholder="Paste your PRD or requirements here..." style="width: 100%; padding: 12px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; color: #e2e8f0; font-size: 0.9rem;"></textarea>
+            </div>
+
+            <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="color: #e2e8f0; margin: 0; font-size: 1rem;">Tasks (<span id="prd-task-count">0</span>)</h3>
+                <button onclick="addPrdTask()" style="background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4); color: #4ade80; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">+ Add Task</button>
+              </div>
+              <div id="prd-tasks-list" style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="text-align: center; color: #64748b; padding: 20px; font-size: 0.9rem;">
+                  Click "Add Task" to create tasks from this PRD
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 16px;">
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="prd-sync-calendar" checked>
+                <span style="color: #94a3b8; font-size: 0.85rem;">Auto-sync to Calendar</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="prd-sync-inbox" checked>
+                <span style="color: #94a3b8; font-size: 0.85rem;">Auto-send to Inbox</span>
+              </label>
+            </div>
+          </div>
+
+          <div style="padding: 16px; border-top: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: flex-end; gap: 12px;">
+            <button onclick="closePrdSplitterModal()" style="background: rgba(100, 116, 139, 0.2); border: 1px solid rgba(100, 116, 139, 0.4); color: #94a3b8; padding: 10px 24px; border-radius: 6px; cursor: pointer;">Cancel</button>
+            <button onclick="submitPrdTasks()" style="background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); border: none; color: white; padding: 10px 24px; border-radius: 6px; cursor: pointer; font-weight: 600;">Create All Tasks</button>
+          </div>
+        </div>
+      `;
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closePrdSplitterModal();
+      });
+
+      document.body.appendChild(modal);
+    }
+
+    function closePrdSplitterModal() {
+      const modal = document.getElementById('prd-splitter-modal');
+      if (modal) modal.remove();
+      prdTasks = [];
+    }
+
+    function addPrdTask() {
+      const taskId = Date.now();
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 7);
+      const defaultDue = tomorrow.toISOString().slice(0, 16);
+
+      prdTasks.push({ id: taskId, agent: 'koda', title: '', description: '', priority: 'normal', due_date: defaultDue });
+
+      renderPrdTasks();
+    }
+
+    function removePrdTask(taskId) {
+      prdTasks = prdTasks.filter(t => t.id !== taskId);
+      renderPrdTasks();
+    }
+
+    function renderPrdTasks() {
+      const container = document.getElementById('prd-tasks-list');
+      document.getElementById('prd-task-count').textContent = prdTasks.length;
+
+      if (prdTasks.length === 0) {
+        container.innerHTML = `<div style="text-align: center; color: #64748b; padding: 20px; font-size: 0.9rem;">Click "Add Task" to create tasks from this PRD</div>`;
+        return;
+      }
+
+      container.innerHTML = prdTasks.map((task, idx) => `
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 8px; padding: 12px;">
+          <div style="display: flex; gap: 12px; align-items: start;">
+            <div style="flex: 1;">
+              <input type="text" placeholder="Task title" value="${escapeHtml(task.title)}" onchange="updatePrdTask(${task.id}, 'title', this.value)" style="width: 100%; padding: 8px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; color: #e2e8f0; font-size: 0.9rem; margin-bottom: 8px;">
+              <div style="display: flex; gap: 8px;">
+                <select onchange="updatePrdTask(${task.id}, 'agent', this.value)" style="padding: 6px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 4px; color: #e2e8f0; font-size: 0.8rem;">
+                  <option value="koda" ${task.agent === 'koda' ? 'selected' : ''}>🔵 Koda</option>
+                  <option value="cairn" ${task.agent === 'cairn' ? 'selected' : ''}>🟣 Cairn</option>
+                </select>
+                <select onchange="updatePrdTask(${task.id}, 'priority', this.value)" style="padding: 6px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 4px; color: #e2e8f0; font-size: 0.8rem;">
+                  <option value="high" ${task.priority === 'high' ? 'selected' : ''}>🔴 High</option>
+                  <option value="normal" ${task.priority === 'normal' ? 'selected' : ''}>🟡 Normal</option>
+                  <option value="low" ${task.priority === 'low' ? 'selected' : ''}>⚪ Low</option>
+                </select>
+                <input type="datetime-local" value="${task.due_date}" onchange="updatePrdTask(${task.id}, 'due_date', this.value)" style="padding: 6px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 4px; color: #e2e8f0; font-size: 0.8rem;">
+              </div>
+            </div>
+            <button onclick="removePrdTask(${task.id})" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; padding: 6px 10px; border-radius: 4px; cursor: pointer;">✕</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updatePrdTask(taskId, field, value) {
+      const task = prdTasks.find(t => t.id === taskId);
+      if (task) task[field] = value;
+    }
+
+    async function submitPrdTasks() {
+      const title = document.getElementById('prd-title').value.trim();
+      const content = document.getElementById('prd-content').value.trim();
+      const syncCalendar = document.getElementById('prd-sync-calendar').checked;
+      const syncInbox = document.getElementById('prd-sync-inbox').checked;
+
+      // Validate
+      const validTasks = prdTasks.filter(t => t.title.trim());
+      if (!title) {
+        alert('Please enter a PRD title');
+        return;
+      }
+      if (validTasks.length === 0) {
+        alert('Please add at least one task with a title');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/todos/split-prd', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: title,
+            content: content,
+            tasks: validTasks,
+            sync_calendar: syncCalendar,
+            sync_inbox: syncInbox
+          })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          closePrdSplitterModal();
+          showNotification(`Created ${data.count} tasks from PRD!`, 'success');
+          checkAllInboxes();
+        } else {
+          alert('Error: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        alert('Error splitting PRD');
+      }
+    }
+
+    // Make todo/PRD functions globally accessible
+    window.showAgentTodos = showAgentTodos;
+    window.showUnifiedTodos = showUnifiedTodos;
+    window.closeTodosModal = closeTodosModal;
+    window.refreshTodos = refreshTodos;
+    window.refreshUnifiedTodos = refreshUnifiedTodos;
+    window.filterTodosByStatus = filterTodosByStatus;
+    window.showAddTodoModal = showAddTodoModal;
+    window.closeAddTodoModal = closeAddTodoModal;
+    window.saveTodo = saveTodo;
+    window.updateTodoStatus = updateTodoStatus;
+    window.syncTodoToCalendar = syncTodoToCalendar;
+    window.syncTodoToInbox = syncTodoToInbox;
+    window.deleteTodo = deleteTodo;
+    window.showPrdSplitterModal = showPrdSplitterModal;
+    window.closePrdSplitterModal = closePrdSplitterModal;
+    window.addPrdTask = addPrdTask;
+    window.removePrdTask = removePrdTask;
+    window.updatePrdTask = updatePrdTask;
+    window.submitPrdTasks = submitPrdTasks;
+
+    // ==================== END TODO SYSTEM ====================
 
     function updateAgentControlDisplay(agentControl) {
       if (!agentControl) return;
@@ -10541,12 +12988,20 @@ ${currentConversation.display}
       const canvasPanel = document.getElementById('canvas-panel');
       if (!canvasPanel) return;
 
-      if (canvasPanel.style.display === 'none' || !canvasPanel.style.display) {
-        canvasPanel.style.display = 'flex';
-        // Load canvas document for session
-        loadCanvasDocument();
+      // Use the workspace layout manager if available
+      if (window.workspaceLayoutManager) {
+        window.workspaceLayoutManager.togglePanelVisibility('canvas');
+        if (window.workspaceLayoutManager.panels.canvas.visible) {
+          loadCanvasDocument();
+        }
       } else {
-        canvasPanel.style.display = 'none';
+        // Fallback for legacy behavior
+        if (canvasPanel.classList.contains('hidden')) {
+          canvasPanel.classList.remove('hidden');
+          loadCanvasDocument();
+        } else {
+          canvasPanel.classList.add('hidden');
+        }
       }
     }
 
@@ -10947,44 +13402,6 @@ ${currentConversation.display}
       }).join('');
     }
 
-    function showNotification(message, type = 'info') {
-      // Create toast notification
-      const toast = document.createElement('div');
-      const colors = {
-        info: 'rgba(59, 130, 246, 0.9)',
-        success: 'rgba(16, 185, 129, 0.9)',
-        warning: 'rgba(234, 179, 8, 0.9)',
-        error: 'rgba(239, 68, 68, 0.9)'
-      };
-
-      toast.style.cssText = `
-        position: fixed;
-        top: 80px;
-        right: 20px;
-        background: ${colors[type] || colors.info};
-        color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        z-index: 10000;
-        font-size: 0.9rem;
-        font-weight: 500;
-        max-width: 350px;
-        animation: slideIn 0.3s ease-out;
-      `;
-
-      toast.textContent = message;
-      document.body.appendChild(toast);
-
-      // Auto-remove after 3 seconds
-      setTimeout(() => {
-        toast.style.animation = 'slideOut 0.3s ease-out';
-        setTimeout(() => document.body.removeChild(toast), 300);
-      }, 3000);
-
-      console.log('[Workspace]', message);
-    }
-
     // Typing indicator debounce
     let typingTimeout = null;
     let cursorTimeout = null;
@@ -11127,53 +13544,410 @@ ${currentConversation.display}
     });
 
     // =========================================================================
-    // PANEL RESIZING
+    // N8N-STYLE WORKSPACE LAYOUT MANAGER
     // =========================================================================
 
-    window.isResizing = false;
-    let startX = 0;
-    let startWidth = 0;
+    class WorkspaceLayoutManager {
+      constructor() {
+        this.grid = null;
+        this.isResizing = false;
+        this.activeHandle = null;
+        this.startPos = { x: 0, y: 0 };
+        this.startSizes = {};
+        this.storageKey = 'claude-workspace-layout';
+        this.activePreset = 'default';
 
-    document.addEventListener('DOMContentLoaded', () => {
-      const resizeHandle = document.getElementById('resize-handle');
-      const topPanels = document.getElementById('top-panels');
+        this.panels = {
+          koda: { visible: true, minimized: false },
+          cairn: { visible: true, minimized: false },
+          moderator: { visible: true, minimized: false },
+          canvas: { visible: true, minimized: false },
+          teamChat: { visible: false, minimized: false }
+        };
 
-      if (resizeHandle && topPanels) {
-        resizeHandle.addEventListener('mousedown', (e) => {
-          window.isResizing = true;
-          startX = e.clientX;
-          const leftPanel = topPanels.children[0];
-          startWidth = leftPanel.offsetWidth;
-          document.body.style.cursor = 'col-resize';
-          document.body.style.userSelect = 'none';
-          e.preventDefault();
+        // Layout: Koda (left) | Canvas (middle) | Cairn (right)
+        this.presets = {
+          default: {
+            cols: ['1fr', '1.2fr', '1fr'],
+            rows: ['1.5fr', '1fr'],
+            panels: { koda: true, cairn: true, moderator: true, canvas: true, teamChat: false }
+          },
+          chat: {
+            cols: ['1fr', '0.8fr', '1fr'],
+            rows: ['1.5fr', '1fr'],
+            panels: { koda: true, cairn: true, moderator: true, canvas: false, teamChat: true }
+          },
+          document: {
+            cols: ['0.8fr', '1.4fr', '0.8fr'],
+            rows: ['1.5fr', '0.8fr'],
+            panels: { koda: true, cairn: true, moderator: true, canvas: true, teamChat: false }
+          },
+          focus: {
+            cols: ['1fr', '0fr', '0fr'],
+            rows: ['1fr', '0fr'],
+            panels: { koda: true, cairn: false, moderator: false, canvas: false, teamChat: false }
+          }
+        };
+      }
+
+      init() {
+        this.grid = document.getElementById('workspace-grid');
+        if (!this.grid) return;
+
+        this.loadLayout();
+        this.setupResizeHandlers();
+        this.updateUI();
+      }
+
+      setupResizeHandlers() {
+        const handles = this.grid.querySelectorAll('.resize-handle-v, .resize-handle-h');
+
+        handles.forEach(handle => {
+          handle.addEventListener('mousedown', (e) => this.startResize(e, handle));
         });
 
-        document.addEventListener('mousemove', (e) => {
-          if (!window.isResizing) return;
+        document.addEventListener('mousemove', (e) => this.onResize(e));
+        document.addEventListener('mouseup', () => this.endResize());
+      }
 
-          const deltaX = e.clientX - startX;
-          const containerWidth = topPanels.offsetWidth;
-          const newLeftWidth = startWidth + deltaX;
-          const leftPercent = (newLeftWidth / containerWidth) * 100;
-          const rightPercent = 100 - leftPercent;
+      startResize(e, handle) {
+        this.isResizing = true;
+        this.activeHandle = handle;
+        this.startPos = { x: e.clientX, y: e.clientY };
 
-          // Constrain between 20% and 80%
-          if (leftPercent >= 20 && leftPercent <= 80) {
-            topPanels.style.gridTemplateColumns = `${leftPercent}% ${rightPercent}%`;
+        const computed = getComputedStyle(this.grid);
+        this.startSizes = {
+          cols: computed.getPropertyValue('--col1') || '1fr',
+          col2: computed.getPropertyValue('--col2') || '1fr',
+          col3: computed.getPropertyValue('--col3') || '0fr',
+          rows: computed.getPropertyValue('--row1') || '1.5fr',
+          row2: computed.getPropertyValue('--row2') || '1fr'
+        };
+
+        handle.classList.add('active');
+        document.body.style.cursor = handle.classList.contains('resize-handle-v') ? 'col-resize' : 'row-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      }
+
+      onResize(e) {
+        if (!this.isResizing || !this.activeHandle) return;
+
+        const gridRect = this.grid.getBoundingClientRect();
+        const resizeType = this.activeHandle.dataset.resize;
+
+        if (this.activeHandle.classList.contains('resize-handle-v')) {
+          const deltaX = e.clientX - this.startPos.x;
+          const totalWidth = gridRect.width;
+          const deltaPercent = (deltaX / totalWidth) * 100;
+
+          if (resizeType === 'col1') {
+            const currentCol1 = this.parseFr(this.startSizes.cols);
+            const currentCol2 = this.parseFr(this.startSizes.col2);
+            const total = currentCol1 + currentCol2;
+
+            let newCol1 = currentCol1 + (deltaPercent / 100) * total;
+            let newCol2 = currentCol2 - (deltaPercent / 100) * total;
+
+            newCol1 = Math.max(0.3, Math.min(newCol1, total - 0.3));
+            newCol2 = total - newCol1;
+
+            this.grid.style.setProperty('--col1', `${newCol1}fr`);
+            this.grid.style.setProperty('--col2', `${newCol2}fr`);
+          } else if (resizeType === 'col2') {
+            const currentCol2 = this.parseFr(this.startSizes.col2);
+            const currentCol3 = this.parseFr(this.startSizes.col3);
+            const total = currentCol2 + currentCol3;
+
+            let newCol2 = currentCol2 + (deltaPercent / 100) * (total || 2);
+            let newCol3 = (total || 2) - newCol2;
+
+            newCol2 = Math.max(0.3, newCol2);
+            newCol3 = Math.max(0, newCol3);
+
+            this.grid.style.setProperty('--col2', `${newCol2}fr`);
+            this.grid.style.setProperty('--col3', `${newCol3}fr`);
+          }
+        } else {
+          const deltaY = e.clientY - this.startPos.y;
+          const totalHeight = gridRect.height;
+          const deltaPercent = (deltaY / totalHeight) * 100;
+
+          const currentRow1 = this.parseFr(this.startSizes.rows);
+          const currentRow2 = this.parseFr(this.startSizes.row2);
+          const total = currentRow1 + currentRow2;
+
+          let newRow1 = currentRow1 + (deltaPercent / 100) * total;
+          let newRow2 = currentRow2 - (deltaPercent / 100) * total;
+
+          newRow1 = Math.max(0.3, Math.min(newRow1, total - 0.3));
+          newRow2 = total - newRow1;
+
+          this.grid.style.setProperty('--row1', `${newRow1}fr`);
+          this.grid.style.setProperty('--row2', `${newRow2}fr`);
+        }
+
+        this.activePreset = 'custom';
+        this.updatePresetButtons();
+      }
+
+      endResize() {
+        if (this.isResizing) {
+          this.isResizing = false;
+          if (this.activeHandle) {
+            this.activeHandle.classList.remove('active');
+          }
+          this.activeHandle = null;
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+        }
+      }
+
+      parseFr(value) {
+        if (!value) return 1;
+        const match = value.toString().match(/^([\d.]+)/);
+        return match ? parseFloat(match[1]) : 1;
+      }
+
+      togglePanelMinimize(panelId) {
+        this.panels[panelId].minimized = !this.panels[panelId].minimized;
+
+        const panelMap = {
+          koda: 'agent-a-panel',
+          cairn: 'agent-b-panel',
+          moderator: 'moderator-panel',
+          canvas: 'canvas-panel',
+          teamChat: 'human-chat-sidebar'
+        };
+
+        const panel = document.getElementById(panelMap[panelId]);
+        if (panel) {
+          panel.classList.toggle('minimized', this.panels[panelId].minimized);
+          const btn = panel.querySelector('.panel-minimize-btn');
+          if (btn) {
+            btn.textContent = this.panels[panelId].minimized ? '+' : '−';
+            btn.title = this.panels[panelId].minimized ? 'Expand' : 'Minimize';
+          }
+        }
+
+        this.activePreset = 'custom';
+        this.updatePresetButtons();
+      }
+
+      togglePanelVisibility(panelId) {
+        this.panels[panelId].visible = !this.panels[panelId].visible;
+
+        const panelMap = {
+          koda: 'agent-a-panel',
+          cairn: 'agent-b-panel',
+          moderator: 'moderator-panel',
+          canvas: 'canvas-panel',
+          teamChat: 'human-chat-sidebar'
+        };
+
+        const panel = document.getElementById(panelMap[panelId]);
+        if (panel) {
+          panel.classList.toggle('hidden', !this.panels[panelId].visible);
+        }
+
+        // Update grid columns based on visibility
+        this.updateGridForVisibility();
+        this.updatePanelToggles();
+        this.activePreset = 'custom';
+        this.updatePresetButtons();
+      }
+
+      updateGridForVisibility() {
+        const canvasVisible = this.panels.canvas.visible;
+        const teamChatVisible = this.panels.teamChat.visible;
+
+        if (canvasVisible || teamChatVisible) {
+          this.grid.style.setProperty('--col3', '0.8fr');
+        } else {
+          this.grid.style.setProperty('--col3', '0fr');
+        }
+      }
+
+      applyPreset(presetName) {
+        const preset = this.presets[presetName];
+        if (!preset) return;
+
+        this.activePreset = presetName;
+
+        // Apply grid sizes
+        this.grid.style.setProperty('--col1', preset.cols[0]);
+        this.grid.style.setProperty('--col2', preset.cols[1]);
+        this.grid.style.setProperty('--col3', preset.cols[2]);
+        this.grid.style.setProperty('--row1', preset.rows[0]);
+        this.grid.style.setProperty('--row2', preset.rows[1]);
+
+        // Apply panel visibility
+        const panelMap = {
+          koda: 'agent-a-panel',
+          cairn: 'agent-b-panel',
+          moderator: 'moderator-panel',
+          canvas: 'canvas-panel',
+          teamChat: 'human-chat-sidebar'
+        };
+
+        Object.entries(preset.panels).forEach(([panelId, visible]) => {
+          this.panels[panelId].visible = visible;
+          this.panels[panelId].minimized = false;
+          const panel = document.getElementById(panelMap[panelId]);
+          if (panel) {
+            panel.classList.toggle('hidden', !visible);
+            panel.classList.remove('minimized');
+            const btn = panel.querySelector('.panel-minimize-btn');
+            if (btn) {
+              btn.textContent = '−';
+              btn.title = 'Minimize';
+            }
           }
         });
 
-        document.addEventListener('mouseup', () => {
-          if (window.isResizing) {
-            window.isResizing = false;
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-            resizeHandle.style.background = 'rgba(148, 163, 184, 0.2)';
-          }
+        this.updateUI();
+      }
+
+      updateUI() {
+        this.updatePresetButtons();
+        this.updatePanelToggles();
+      }
+
+      updatePresetButtons() {
+        document.querySelectorAll('.preset-btn[data-preset]').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.preset === this.activePreset);
         });
       }
+
+      updatePanelToggles() {
+        document.querySelectorAll('.panel-toggle[data-panel]').forEach(btn => {
+          const panelId = btn.dataset.panel;
+          btn.classList.toggle('active', this.panels[panelId].visible);
+        });
+      }
+
+      saveLayout() {
+        const computed = getComputedStyle(this.grid);
+        const layout = {
+          version: 1,
+          activePreset: this.activePreset,
+          gridState: {
+            col1: computed.getPropertyValue('--col1'),
+            col2: computed.getPropertyValue('--col2'),
+            col3: computed.getPropertyValue('--col3'),
+            row1: computed.getPropertyValue('--row1'),
+            row2: computed.getPropertyValue('--row2')
+          },
+          panels: { ...this.panels }
+        };
+
+        try {
+          localStorage.setItem(this.storageKey, JSON.stringify(layout));
+          console.log('Workspace layout saved');
+        } catch (e) {
+          console.warn('Failed to save layout:', e);
+        }
+      }
+
+      loadLayout() {
+        try {
+          const saved = localStorage.getItem(this.storageKey);
+          if (!saved) return;
+
+          const layout = JSON.parse(saved);
+          if (layout.version !== 1) return;
+
+          this.activePreset = layout.activePreset || 'default';
+
+          if (layout.gridState) {
+            Object.entries(layout.gridState).forEach(([key, value]) => {
+              if (value) {
+                this.grid.style.setProperty(`--${key}`, value);
+              }
+            });
+          }
+
+          if (layout.panels) {
+            const panelMap = {
+              koda: 'agent-a-panel',
+              cairn: 'agent-b-panel',
+              moderator: 'moderator-panel',
+              canvas: 'canvas-panel',
+              teamChat: 'human-chat-sidebar'
+            };
+
+            Object.entries(layout.panels).forEach(([panelId, state]) => {
+              this.panels[panelId] = state;
+              const panel = document.getElementById(panelMap[panelId]);
+              if (panel) {
+                panel.classList.toggle('hidden', !state.visible);
+                panel.classList.toggle('minimized', state.minimized);
+                const btn = panel.querySelector('.panel-minimize-btn');
+                if (btn) {
+                  btn.textContent = state.minimized ? '+' : '−';
+                }
+              }
+            });
+          }
+
+          console.log('Workspace layout loaded');
+        } catch (e) {
+          console.warn('Failed to load layout:', e);
+        }
+      }
+
+      reset() {
+        localStorage.removeItem(this.storageKey);
+        this.applyPreset('default');
+      }
+    }
+
+    // Global instance
+    window.workspaceLayoutManager = null;
+
+    // Global functions for onclick handlers
+    function applyLayoutPreset(presetName) {
+      if (window.workspaceLayoutManager) {
+        window.workspaceLayoutManager.applyPreset(presetName);
+      }
+    }
+
+    function togglePanelMinimize(panelId) {
+      if (window.workspaceLayoutManager) {
+        window.workspaceLayoutManager.togglePanelMinimize(panelId);
+      }
+    }
+
+    function togglePanelVisibility(panelId) {
+      if (window.workspaceLayoutManager) {
+        window.workspaceLayoutManager.togglePanelVisibility(panelId);
+      }
+    }
+
+    function saveWorkspaceLayout() {
+      if (window.workspaceLayoutManager) {
+        window.workspaceLayoutManager.saveLayout();
+      }
+    }
+
+    function resetWorkspaceLayout() {
+      if (window.workspaceLayoutManager) {
+        window.workspaceLayoutManager.reset();
+      }
+    }
+
+    // Initialize on DOM ready
+    document.addEventListener('DOMContentLoaded', () => {
+      window.workspaceLayoutManager = new WorkspaceLayoutManager();
+      window.workspaceLayoutManager.init();
     });
+
+    // Expose functions globally
+    window.applyLayoutPreset = applyLayoutPreset;
+    window.togglePanelMinimize = togglePanelMinimize;
+    window.togglePanelVisibility = togglePanelVisibility;
+    window.saveWorkspaceLayout = saveWorkspaceLayout;
+    window.resetWorkspaceLayout = resetWorkspaceLayout;
 
     // =========================================================================
     // HUMAN-TO-HUMAN CHAT

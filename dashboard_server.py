@@ -12,8 +12,9 @@ import uuid
 from pathlib import Path
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-from datetime import datetime
+from datetime import datetime, timedelta
 import subprocess
+import hashlib
 import asyncio
 import websockets
 import threading
@@ -183,7 +184,44 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             session_id = path.split('/')[-1]
             self.serve_session_info(session_id)
             return
+        # Webhook & Triggers GET endpoints
+        elif path == '/api/webhooks/list':
+            self.serve_webhooks_list()
+            return
+        elif path == '/api/triggers/pending':
+            self.serve_pending_triggers()
+            return
+        # TODO System API
+        elif path == '/api/todos/unified':
+            self.serve_todos_unified(parsed_path.query)
+            return
+        elif path == '/api/todos/stats':
+            self.serve_todos_stats()
+            return
+        elif path.startswith('/api/todos/'):
+            parts = path.split('/')
+            if len(parts) >= 4:
+                agent_id = parts[3]  # koda, cairn, prax
+                self.serve_todos(agent_id, parsed_path.query)
+            return
         # Phase 4C.2: Canvas Collaboration GET endpoints
+        # Calendar API
+        elif path == '/api/calendar/combined':
+            self.serve_calendar_combined(parsed_path.query)
+            return
+        elif path.startswith('/api/calendar/'):
+            parts = path.split('/')
+            if len(parts) >= 4:
+                agent_id = parts[3]  # koda, cairn, prax, user
+                self.serve_calendar(agent_id, parsed_path.query)
+            return
+        # Inbox Collab API
+        elif path.startswith('/api/inbox/'):
+            parts = path.split('/')
+            if len(parts) >= 4:
+                agent_id = parts[3]  # koda, cairn, prax
+                self.serve_inbox(agent_id, parsed_path.query)
+            return
         elif path.startswith('/api/canvas/') and '/export' in path:
             parts = path.split('/')
             session_id = parts[3]
@@ -328,6 +366,60 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif path.startswith('/api/canvas/') and '/edit' in path:
             session_id = path.split('/')[3]
             self.edit_canvas_section(session_id, data)
+            return
+        # Inbox Collab API - Send message
+        elif path == '/api/inbox/send':
+            self.send_inbox_message(data)
+            return
+        elif path == '/api/inbox/mark-read':
+            self.mark_inbox_read(data)
+            return
+        # Calendar API - Create/Update event
+        elif path == '/api/calendar/event':
+            self.create_calendar_event(data)
+            return
+        elif path == '/api/calendar/delete':
+            self.delete_calendar_event(data)
+            return
+        # Task Assignment API (Prax -> Koda/Cairn)
+        elif path == '/api/tasks/assign':
+            self.assign_task(data)
+            return
+        # Webhook Configuration API
+        elif path == '/api/webhooks/save':
+            self.save_webhook(data)
+            return
+        elif path == '/api/webhooks/delete':
+            self.delete_webhook(data)
+            return
+        elif path == '/api/webhooks/test':
+            self.test_webhook(data)
+            return
+        # Calendar Triggers API
+        elif path == '/api/triggers/process':
+            self.process_calendar_triggers(data)
+            return
+        # TODO System API
+        elif path == '/api/todos/create':
+            self.create_todo(data)
+            return
+        elif path == '/api/todos/update':
+            self.update_todo(data)
+            return
+        elif path == '/api/todos/delete':
+            self.delete_todo(data)
+            return
+        elif path == '/api/todos/split-prd':
+            self.split_prd_to_todos(data)
+            return
+        elif path == '/api/todos/sync-calendar':
+            self.sync_todo_to_calendar(data)
+            return
+        elif path == '/api/todos/sync-inbox':
+            self.sync_todo_to_inbox(data)
+            return
+        elif path == '/api/todos/bulk-update':
+            self.bulk_update_todos(data)
             return
         else:
             self.send_error(404, "Not found")
@@ -3210,6 +3302,1432 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
         except Exception as e:
             self.serve_json({'error': str(e)}, status=500)
+
+    # =========================================================================
+    # INBOX COLLAB API
+    # =========================================================================
+
+    def _get_inbox_path(self, agent_id):
+        """Get the FSL inbox file path for an agent."""
+        inbox_dir = Path.home() / ".fsl" / "collab"
+        agent_map = {
+            'koda': 'inbox_b.fsl',
+            'cairn': 'inbox_a.fsl',
+            'prax': 'inbox_d.fsl',
+            'moderator': 'inbox_d.fsl',
+            'all': 'inbox_all.fsl'
+        }
+        filename = agent_map.get(agent_id.lower(), f'inbox_{agent_id}.fsl')
+        return inbox_dir / filename
+
+    def _parse_fsl_messages(self, content, limit=50):
+        """Parse FSL inbox messages into structured format."""
+        import re
+        import hashlib
+
+        messages = []
+        # Pattern for §MSG§{FROM}→{TO}§{TYPE}§§{CONTENT}§{TIMESTAMP}§{HASH}§
+        msg_pattern = re.compile(
+            r'§MSG§([A-Z]+)→([A-Z]+)§([a-z]?)§§(.+?)§(\d{10,})§([a-f0-9]+)§',
+            re.DOTALL
+        )
+
+        # Pattern for stone format §T:{TARGET}§o:{objective}§p:{PRIORITY}§...
+        stone_pattern = re.compile(
+            r'§T:([A-Z]+)§o:([^§]+)§p:([HML])§(?:stone:([a-f0-9]+)§)?(?:c:([^§]*)§)?from:([A-Z]+)§',
+            re.DOTALL
+        )
+
+        sender_names = {
+            'D': 'Prax', 'K': 'Koda', 'B': 'Koda',
+            'A': 'Cairn', 'C': 'Cairn', 'H': 'Helper',
+            'O': 'Operator', 'PHI': 'Phi'
+        }
+
+        priority_map = {'H': 'high', 'M': 'normal', 'L': 'low', 'h': 'high', 'n': 'normal'}
+
+        lines = content.strip().split('\n')
+        for line in reversed(lines):
+            if len(messages) >= limit:
+                break
+
+            line = line.strip()
+            if not line:
+                continue
+
+            # Try MSG format
+            match = msg_pattern.search(line)
+            if match:
+                from_id, to_id, msg_type, content_text, timestamp, msg_hash = match.groups()
+                messages.append({
+                    'id': msg_hash,
+                    'from_agent': sender_names.get(from_id, from_id),
+                    'from_id': from_id,
+                    'to_id': to_id,
+                    'content': content_text[:500],
+                    'timestamp': int(timestamp) * 1000,  # Convert to ms
+                    'priority': priority_map.get(msg_type, 'normal'),
+                    'read': False,
+                    'type': 'message'
+                })
+                continue
+
+            # Try stone format
+            match = stone_pattern.search(line)
+            if match:
+                target, objective, priority, stone_hash, context, sender = match.groups()
+                msg_hash = hashlib.md5(line.encode()).hexdigest()[:12]
+                messages.append({
+                    'id': msg_hash,
+                    'from_agent': sender_names.get(sender, sender),
+                    'from_id': sender,
+                    'to_id': target,
+                    'content': f"Task: {objective}" + (f" (context: {context})" if context else ""),
+                    'timestamp': int(datetime.now().timestamp() * 1000),
+                    'priority': priority_map.get(priority, 'normal'),
+                    'read': False,
+                    'type': 'task',
+                    'metadata': {
+                        'stone_hash': stone_hash,
+                        'objective': objective
+                    }
+                })
+
+        return messages
+
+    def serve_inbox(self, agent_id, query_string):
+        """Get inbox messages for an agent."""
+        try:
+            inbox_path = self._get_inbox_path(agent_id)
+
+            if not inbox_path.exists():
+                # Create empty inbox if it doesn't exist
+                inbox_path.parent.mkdir(parents=True, exist_ok=True)
+                inbox_path.write_text('')
+                self.serve_json({
+                    'success': True,
+                    'agent': agent_id,
+                    'messages': [],
+                    'count': 0
+                })
+                return
+
+            content = inbox_path.read_text()
+            messages = self._parse_fsl_messages(content)
+
+            # Also check inbox_all.fsl for broadcast messages
+            all_inbox = self._get_inbox_path('all')
+            if all_inbox.exists():
+                all_content = all_inbox.read_text()
+                all_messages = self._parse_fsl_messages(all_content, limit=20)
+                messages.extend(all_messages)
+
+            # Sort by timestamp descending
+            messages.sort(key=lambda m: m['timestamp'], reverse=True)
+
+            self.serve_json({
+                'success': True,
+                'agent': agent_id,
+                'messages': messages[:50],
+                'count': len(messages)
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def send_inbox_message(self, data):
+        """Send a message to an agent's inbox."""
+        import hashlib
+        import time
+
+        try:
+            target = data.get('target', '').lower()
+            message = data.get('message', '')
+            sender = data.get('from', 'D')  # Default to Prax/Desktop
+            priority = data.get('priority', 'n')
+            msg_type = data.get('type', 'message')
+
+            if not target or not message:
+                self.serve_json({'success': False, 'error': 'Missing target or message'}, status=400)
+                return
+
+            # Map agent names to IDs
+            target_map = {
+                'koda': 'B', 'cairn': 'A', 'prax': 'D',
+                'moderator': 'D', 'all': 'ALL'
+            }
+            sender_map = {
+                'koda': 'K', 'cairn': 'C', 'prax': 'D',
+                'moderator': 'D', 'operator': 'O'
+            }
+
+            target_id = target_map.get(target, target.upper())
+            sender_id = sender_map.get(sender.lower(), sender.upper())
+
+            timestamp = int(time.time())
+            msg_hash = hashlib.md5(f"{timestamp}{message[:50]}".encode()).hexdigest()[:12]
+
+            # Format: §MSG§{FROM}→{TO}§{TYPE}§§{CONTENT}§{TIMESTAMP}§{HASH}§
+            priority_char = 'h' if priority in ['high', 'H'] else 'n'
+            fsl_msg = f"§MSG§{sender_id}→{target_id}§{priority_char}§§{message}§{timestamp}§{msg_hash}§\n"
+
+            # Write to target inbox
+            inbox_path = self._get_inbox_path(target)
+            inbox_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(inbox_path, 'a') as f:
+                f.write(fsl_msg)
+
+            self.serve_json({
+                'success': True,
+                'message_id': msg_hash,
+                'target': target,
+                'timestamp': timestamp
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def mark_inbox_read(self, data):
+        """Mark inbox messages as read (stored in separate tracking file)."""
+        try:
+            agent_id = data.get('agent', '')
+            message_ids = data.get('message_ids', [])
+
+            if not agent_id or not message_ids:
+                self.serve_json({'success': False, 'error': 'Missing agent or message_ids'}, status=400)
+                return
+
+            # Store read status in a separate file
+            read_file = Path.home() / ".fsl" / "collab" / f"read_{agent_id}.json"
+            read_file.parent.mkdir(parents=True, exist_ok=True)
+
+            existing = {}
+            if read_file.exists():
+                try:
+                    existing = json.loads(read_file.read_text())
+                except:
+                    pass
+
+            for msg_id in message_ids:
+                existing[msg_id] = int(datetime.now().timestamp() * 1000)
+
+            read_file.write_text(json.dumps(existing, indent=2))
+
+            self.serve_json({'success': True, 'marked': len(message_ids)})
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    # ==================== CALENDAR API ====================
+
+    def _get_calendar_path(self, agent_id):
+        """Get the calendar JSON file path for an agent."""
+        calendar_dir = Path.home() / ".fsl" / "collab" / "calendars"
+        calendar_dir.mkdir(parents=True, exist_ok=True)
+        agent_map = {
+            'koda': 'calendar_koda.json',
+            'cairn': 'calendar_cairn.json',
+            'prax': 'calendar_prax.json',
+            'user': 'calendar_user.json'
+        }
+        filename = agent_map.get(agent_id.lower(), f'calendar_{agent_id}.json')
+        return calendar_dir / filename
+
+    def _get_calendar_events(self, agent_id):
+        """Load calendar events for an agent."""
+        calendar_path = self._get_calendar_path(agent_id)
+        if not calendar_path.exists():
+            return []
+        try:
+            return json.loads(calendar_path.read_text())
+        except:
+            return []
+
+    def _save_calendar_events(self, agent_id, events):
+        """Save calendar events for an agent."""
+        calendar_path = self._get_calendar_path(agent_id)
+        calendar_path.write_text(json.dumps(events, indent=2))
+
+    def serve_calendar(self, agent_id, query_string):
+        """Get calendar events for an agent."""
+        try:
+            params = parse_qs(query_string)
+            start_date = params.get('start', [None])[0]
+            end_date = params.get('end', [None])[0]
+
+            events = self._get_calendar_events(agent_id)
+
+            # Filter by date range if provided
+            if start_date or end_date:
+                filtered = []
+                for event in events:
+                    event_start = event.get('start', '')
+                    event_end = event.get('end', event_start)
+                    # Simple string comparison works for ISO dates
+                    if start_date and event_end < start_date:
+                        continue
+                    if end_date and event_start > end_date:
+                        continue
+                    filtered.append(event)
+                events = filtered
+
+            # Add agent color to events
+            agent_colors = {
+                'koda': '#3b82f6',    # Blue
+                'cairn': '#a855f7',   # Purple
+                'prax': '#eab308',    # Yellow/Gold
+                'user': '#22c55e'     # Green
+            }
+            for event in events:
+                if 'color' not in event:
+                    event['color'] = agent_colors.get(agent_id.lower(), '#6b7280')
+                event['agent'] = agent_id
+
+            self.serve_json({
+                'success': True,
+                'agent': agent_id,
+                'events': events,
+                'count': len(events)
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def serve_calendar_combined(self, query_string):
+        """Get combined calendar events from multiple agents."""
+        try:
+            params = parse_qs(query_string)
+            agents = params.get('agents', ['koda,cairn,prax,user'])[0].split(',')
+            start_date = params.get('start', [None])[0]
+            end_date = params.get('end', [None])[0]
+
+            agent_colors = {
+                'koda': '#3b82f6',    # Blue
+                'cairn': '#a855f7',   # Purple
+                'prax': '#eab308',    # Yellow/Gold
+                'user': '#22c55e'     # Green
+            }
+
+            all_events = []
+            for agent_id in agents:
+                agent_id = agent_id.strip().lower()
+                events = self._get_calendar_events(agent_id)
+
+                for event in events:
+                    # Filter by date range
+                    if start_date or end_date:
+                        event_start = event.get('start', '')
+                        event_end = event.get('end', event_start)
+                        if start_date and event_end < start_date:
+                            continue
+                        if end_date and event_start > end_date:
+                            continue
+
+                    # Add agent info
+                    event['agent'] = agent_id
+                    if 'color' not in event:
+                        event['color'] = agent_colors.get(agent_id, '#6b7280')
+                    all_events.append(event)
+
+            # Sort by start date
+            all_events.sort(key=lambda e: e.get('start', ''))
+
+            self.serve_json({
+                'success': True,
+                'agents': agents,
+                'events': all_events,
+                'count': len(all_events)
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def create_calendar_event(self, data):
+        """Create or update a calendar event."""
+        import hashlib
+
+        try:
+            agent_id = data.get('agent', 'user').lower()
+            event_id = data.get('id')
+            title = data.get('title', 'Untitled Event')
+            start = data.get('start')  # ISO date string: 2024-01-17T10:00
+            end = data.get('end', start)
+            event_type = data.get('type', 'event')  # event, meeting, task, deadline
+            description = data.get('description', '')
+            color = data.get('color')
+
+            if not start:
+                self.serve_json({'success': False, 'error': 'Missing start date'}, status=400)
+                return
+
+            events = self._get_calendar_events(agent_id)
+
+            # Generate ID if not provided (new event)
+            if not event_id:
+                event_id = hashlib.md5(f"{agent_id}{start}{title}{datetime.now().timestamp()}".encode()).hexdigest()[:12]
+                is_new = True
+            else:
+                is_new = not any(e.get('id') == event_id for e in events)
+
+            event = {
+                'id': event_id,
+                'title': title,
+                'start': start,
+                'end': end,
+                'type': event_type,
+                'description': description,
+                'created': datetime.now().isoformat() if is_new else data.get('created', datetime.now().isoformat()),
+                'updated': datetime.now().isoformat()
+            }
+
+            if color:
+                event['color'] = color
+
+            if is_new:
+                events.append(event)
+            else:
+                # Update existing event
+                events = [e if e.get('id') != event_id else event for e in events]
+
+            self._save_calendar_events(agent_id, events)
+
+            self.serve_json({
+                'success': True,
+                'event': event,
+                'is_new': is_new
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def delete_calendar_event(self, data):
+        """Delete a calendar event."""
+        try:
+            agent_id = data.get('agent', 'user').lower()
+            event_id = data.get('id')
+
+            if not event_id:
+                self.serve_json({'success': False, 'error': 'Missing event id'}, status=400)
+                return
+
+            events = self._get_calendar_events(agent_id)
+            original_count = len(events)
+            events = [e for e in events if e.get('id') != event_id]
+
+            if len(events) == original_count:
+                self.serve_json({'success': False, 'error': 'Event not found'}, status=404)
+                return
+
+            self._save_calendar_events(agent_id, events)
+
+            self.serve_json({
+                'success': True,
+                'deleted': event_id
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    # ==================== END CALENDAR API ====================
+
+    # ==================== TASK ASSIGNMENT & WEBHOOKS ====================
+
+    def _get_webhooks_path(self):
+        """Get the webhooks configuration file path."""
+        webhooks_dir = Path.home() / ".fsl" / "collab"
+        webhooks_dir.mkdir(parents=True, exist_ok=True)
+        return webhooks_dir / "webhooks.json"
+
+    def _get_triggers_log_path(self):
+        """Get the triggers log file path."""
+        triggers_dir = Path.home() / ".fsl" / "collab"
+        triggers_dir.mkdir(parents=True, exist_ok=True)
+        return triggers_dir / "triggers_log.json"
+
+    def _load_webhooks(self):
+        """Load webhook configurations."""
+        path = self._get_webhooks_path()
+        if not path.exists():
+            return []
+        try:
+            return json.loads(path.read_text())
+        except:
+            return []
+
+    def _save_webhooks(self, webhooks):
+        """Save webhook configurations."""
+        path = self._get_webhooks_path()
+        path.write_text(json.dumps(webhooks, indent=2))
+
+    def _load_triggers_log(self):
+        """Load triggers log (tracks what's been fired)."""
+        path = self._get_triggers_log_path()
+        if not path.exists():
+            return {}
+        try:
+            return json.loads(path.read_text())
+        except:
+            return {}
+
+    def _save_triggers_log(self, log):
+        """Save triggers log."""
+        path = self._get_triggers_log_path()
+        path.write_text(json.dumps(log, indent=2))
+
+    def assign_task(self, data):
+        """Assign a task from Prax to Koda/Cairn - creates inbox message + calendar event."""
+        import hashlib
+        import time
+
+        try:
+            target_agent = data.get('target', '').lower()  # koda, cairn
+            title = data.get('title', 'Untitled Task')
+            description = data.get('description', '')
+            due_date = data.get('due_date')  # ISO datetime string
+            priority = data.get('priority', 'normal')  # high, normal, low
+            from_agent = data.get('from', 'prax').lower()
+
+            if not target_agent or target_agent not in ['koda', 'cairn']:
+                self.serve_json({'success': False, 'error': 'Invalid target agent'}, status=400)
+                return
+
+            if not due_date:
+                self.serve_json({'success': False, 'error': 'Due date required'}, status=400)
+                return
+
+            timestamp = int(time.time())
+            task_id = hashlib.md5(f"{target_agent}{title}{timestamp}".encode()).hexdigest()[:12]
+
+            # 1. Create calendar event (deadline)
+            calendar_event = {
+                'id': task_id,
+                'title': f"[TASK] {title}",
+                'start': due_date,
+                'end': due_date,
+                'type': 'deadline',
+                'description': description,
+                'assigned_by': from_agent,
+                'priority': priority,
+                'status': 'pending',
+                'created': datetime.now().isoformat(),
+                'updated': datetime.now().isoformat()
+            }
+
+            events = self._get_calendar_events(target_agent)
+            events.append(calendar_event)
+            self._save_calendar_events(target_agent, events)
+
+            # 2. Create inbox message
+            sender_map = {'prax': 'D', 'koda': 'K', 'cairn': 'C'}
+            target_map = {'koda': 'B', 'cairn': 'A'}
+            sender_id = sender_map.get(from_agent, 'D')
+            target_id = target_map.get(target_agent, 'B')
+
+            priority_char = 'h' if priority == 'high' else 'n'
+            msg_content = f"TASK: {title}"
+            if description:
+                msg_content += f" | {description[:100]}"
+            msg_content += f" | Due: {due_date}"
+
+            fsl_msg = f"§MSG§{sender_id}→{target_id}§{priority_char}§§{msg_content}§{timestamp}§{task_id}§\n"
+
+            inbox_path = self._get_inbox_path(target_agent)
+            inbox_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(inbox_path, 'a') as f:
+                f.write(fsl_msg)
+
+            # 3. Schedule triggers (24h and 1h reminders)
+            triggers_log = self._load_triggers_log()
+            due_dt = datetime.fromisoformat(due_date.replace('Z', '+00:00') if due_date.endswith('Z') else due_date)
+
+            # Calculate reminder times
+            reminder_24h = (due_dt - timedelta(hours=24)).isoformat()
+            reminder_1h = (due_dt - timedelta(hours=1)).isoformat()
+
+            triggers_log[task_id] = {
+                'task_id': task_id,
+                'title': title,
+                'target_agent': target_agent,
+                'due_date': due_date,
+                'reminders': {
+                    '24h': {'time': reminder_24h, 'fired': False},
+                    '1h': {'time': reminder_1h, 'fired': False},
+                    'due': {'time': due_date, 'fired': False}
+                },
+                'webhooks_fired': []
+            }
+            self._save_triggers_log(triggers_log)
+
+            self.serve_json({
+                'success': True,
+                'task_id': task_id,
+                'calendar_event': calendar_event,
+                'inbox_sent': True,
+                'triggers_scheduled': ['24h', '1h', 'due']
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def serve_webhooks_list(self):
+        """List all configured webhooks."""
+        try:
+            webhooks = self._load_webhooks()
+            self.serve_json({
+                'success': True,
+                'webhooks': webhooks,
+                'count': len(webhooks)
+            })
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def save_webhook(self, data):
+        """Save a webhook configuration."""
+        import hashlib
+
+        try:
+            webhook_id = data.get('id')
+            name = data.get('name', 'Unnamed Webhook')
+            url = data.get('url')
+            trigger_type = data.get('trigger_type', 'event_start')  # event_start, reminder_24h, reminder_1h, task_due
+            agent_filter = data.get('agent_filter', [])  # empty = all agents
+            event_type_filter = data.get('event_type_filter', [])  # empty = all types
+            enabled = data.get('enabled', True)
+            headers = data.get('headers', {})
+            payload_template = data.get('payload_template', None)
+
+            if not url:
+                self.serve_json({'success': False, 'error': 'URL required'}, status=400)
+                return
+
+            webhooks = self._load_webhooks()
+
+            if not webhook_id:
+                webhook_id = hashlib.md5(f"{url}{name}{datetime.now().timestamp()}".encode()).hexdigest()[:12]
+                is_new = True
+            else:
+                is_new = not any(w.get('id') == webhook_id for w in webhooks)
+
+            webhook = {
+                'id': webhook_id,
+                'name': name,
+                'url': url,
+                'trigger_type': trigger_type,
+                'agent_filter': agent_filter,
+                'event_type_filter': event_type_filter,
+                'enabled': enabled,
+                'headers': headers,
+                'payload_template': payload_template,
+                'created': datetime.now().isoformat() if is_new else data.get('created'),
+                'updated': datetime.now().isoformat()
+            }
+
+            if is_new:
+                webhooks.append(webhook)
+            else:
+                webhooks = [w if w.get('id') != webhook_id else webhook for w in webhooks]
+
+            self._save_webhooks(webhooks)
+
+            self.serve_json({
+                'success': True,
+                'webhook': webhook,
+                'is_new': is_new
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def delete_webhook(self, data):
+        """Delete a webhook configuration."""
+        try:
+            webhook_id = data.get('id')
+            if not webhook_id:
+                self.serve_json({'success': False, 'error': 'Webhook ID required'}, status=400)
+                return
+
+            webhooks = self._load_webhooks()
+            original_count = len(webhooks)
+            webhooks = [w for w in webhooks if w.get('id') != webhook_id]
+
+            if len(webhooks) == original_count:
+                self.serve_json({'success': False, 'error': 'Webhook not found'}, status=404)
+                return
+
+            self._save_webhooks(webhooks)
+            self.serve_json({'success': True, 'deleted': webhook_id})
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def test_webhook(self, data):
+        """Test a webhook by sending a test payload."""
+        import urllib.request
+        import urllib.error
+
+        try:
+            url = data.get('url')
+            headers = data.get('headers', {})
+
+            if not url:
+                self.serve_json({'success': False, 'error': 'URL required'}, status=400)
+                return
+
+            # Build test payload
+            test_payload = {
+                'type': 'test',
+                'message': 'Webhook test from Trinity Calendar',
+                'timestamp': datetime.now().isoformat(),
+                'source': 'trinity_dashboard'
+            }
+
+            payload_bytes = json.dumps(test_payload).encode('utf-8')
+
+            req = urllib.request.Request(url, data=payload_bytes, method='POST')
+            req.add_header('Content-Type', 'application/json')
+            for key, value in headers.items():
+                req.add_header(key, value)
+
+            try:
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    status = response.status
+                    response_body = response.read().decode('utf-8')[:500]
+                    self.serve_json({
+                        'success': True,
+                        'status_code': status,
+                        'response': response_body
+                    })
+            except urllib.error.HTTPError as e:
+                self.serve_json({
+                    'success': False,
+                    'status_code': e.code,
+                    'error': str(e.reason)
+                })
+            except urllib.error.URLError as e:
+                self.serve_json({
+                    'success': False,
+                    'error': f'Connection failed: {str(e.reason)}'
+                })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def serve_pending_triggers(self):
+        """Get pending triggers that need to fire."""
+        try:
+            triggers_log = self._load_triggers_log()
+            now = datetime.now()
+            pending = []
+
+            for task_id, trigger_info in triggers_log.items():
+                for reminder_type, reminder_data in trigger_info.get('reminders', {}).items():
+                    if not reminder_data.get('fired', False):
+                        reminder_time = datetime.fromisoformat(reminder_data['time'].replace('Z', '+00:00') if reminder_data['time'].endswith('Z') else reminder_data['time'])
+                        if reminder_time <= now:
+                            pending.append({
+                                'task_id': task_id,
+                                'title': trigger_info.get('title'),
+                                'target_agent': trigger_info.get('target_agent'),
+                                'reminder_type': reminder_type,
+                                'reminder_time': reminder_data['time'],
+                                'due_date': trigger_info.get('due_date')
+                            })
+
+            self.serve_json({
+                'success': True,
+                'pending': pending,
+                'count': len(pending)
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def process_calendar_triggers(self, data):
+        """Process pending calendar triggers - send reminders and fire webhooks."""
+        import urllib.request
+        import urllib.error
+        import time
+
+        try:
+            triggers_log = self._load_triggers_log()
+            webhooks = self._load_webhooks()
+            now = datetime.now()
+            processed = []
+            errors = []
+
+            for task_id, trigger_info in list(triggers_log.items()):
+                target_agent = trigger_info.get('target_agent')
+                title = trigger_info.get('title')
+
+                for reminder_type, reminder_data in trigger_info.get('reminders', {}).items():
+                    if reminder_data.get('fired', False):
+                        continue
+
+                    try:
+                        reminder_time = datetime.fromisoformat(
+                            reminder_data['time'].replace('Z', '+00:00') if reminder_data['time'].endswith('Z') else reminder_data['time']
+                        )
+                    except:
+                        continue
+
+                    if reminder_time <= now:
+                        # 1. Send inbox reminder
+                        reminder_msgs = {
+                            '24h': f"REMINDER: Task '{title}' is due in 24 hours!",
+                            '1h': f"URGENT: Task '{title}' is due in 1 hour!",
+                            'due': f"DEADLINE NOW: Task '{title}' is due!"
+                        }
+
+                        msg = reminder_msgs.get(reminder_type, f"Reminder for: {title}")
+                        timestamp = int(time.time())
+                        msg_hash = hashlib.md5(f"{timestamp}{msg[:20]}".encode()).hexdigest()[:12]
+                        priority_char = 'h' if reminder_type in ['1h', 'due'] else 'n'
+                        target_map = {'koda': 'B', 'cairn': 'A'}
+                        target_id = target_map.get(target_agent, 'B')
+
+                        fsl_msg = f"§MSG§SYS→{target_id}§{priority_char}§§{msg}§{timestamp}§{msg_hash}§\n"
+
+                        inbox_path = self._get_inbox_path(target_agent)
+                        with open(inbox_path, 'a') as f:
+                            f.write(fsl_msg)
+
+                        # 2. Fire matching webhooks
+                        trigger_type_map = {
+                            '24h': 'reminder_24h',
+                            '1h': 'reminder_1h',
+                            'due': 'task_due'
+                        }
+                        webhook_trigger = trigger_type_map.get(reminder_type)
+
+                        for webhook in webhooks:
+                            if not webhook.get('enabled', True):
+                                continue
+                            if webhook.get('trigger_type') != webhook_trigger:
+                                continue
+                            if webhook.get('agent_filter') and target_agent not in webhook.get('agent_filter'):
+                                continue
+
+                            # Fire webhook
+                            webhook_payload = {
+                                'type': webhook_trigger,
+                                'task_id': task_id,
+                                'title': title,
+                                'target_agent': target_agent,
+                                'due_date': trigger_info.get('due_date'),
+                                'timestamp': datetime.now().isoformat()
+                            }
+
+                            try:
+                                payload_bytes = json.dumps(webhook_payload).encode('utf-8')
+                                req = urllib.request.Request(webhook['url'], data=payload_bytes, method='POST')
+                                req.add_header('Content-Type', 'application/json')
+                                for key, value in webhook.get('headers', {}).items():
+                                    req.add_header(key, value)
+
+                                with urllib.request.urlopen(req, timeout=10) as response:
+                                    trigger_info.setdefault('webhooks_fired', []).append({
+                                        'webhook_id': webhook['id'],
+                                        'trigger_type': webhook_trigger,
+                                        'fired_at': datetime.now().isoformat(),
+                                        'status': response.status
+                                    })
+                            except Exception as webhook_error:
+                                errors.append({
+                                    'webhook_id': webhook['id'],
+                                    'error': str(webhook_error)
+                                })
+
+                        # Mark as fired
+                        reminder_data['fired'] = True
+                        reminder_data['fired_at'] = datetime.now().isoformat()
+
+                        processed.append({
+                            'task_id': task_id,
+                            'reminder_type': reminder_type,
+                            'target_agent': target_agent
+                        })
+
+            self._save_triggers_log(triggers_log)
+
+            self.serve_json({
+                'success': True,
+                'processed': processed,
+                'processed_count': len(processed),
+                'errors': errors
+            })
+
+        except Exception as e:
+            import traceback
+            self.serve_json({'success': False, 'error': str(e), 'traceback': traceback.format_exc()}, status=500)
+
+    # ==================== END TASK ASSIGNMENT & WEBHOOKS ====================
+
+    # ==================== TODO SYSTEM ====================
+
+    def _get_todos_path(self, agent_id):
+        """Get the todos JSON file path for an agent."""
+        todos_dir = Path.home() / ".fsl" / "collab" / "todos"
+        todos_dir.mkdir(parents=True, exist_ok=True)
+        return todos_dir / f"todos_{agent_id}.json"
+
+    def _get_prds_path(self):
+        """Get the PRDs storage path."""
+        prds_dir = Path.home() / ".fsl" / "collab" / "prds"
+        prds_dir.mkdir(parents=True, exist_ok=True)
+        return prds_dir
+
+    def _load_todos(self, agent_id):
+        """Load todos for an agent."""
+        path = self._get_todos_path(agent_id)
+        if not path.exists():
+            return []
+        try:
+            return json.loads(path.read_text())
+        except:
+            return []
+
+    def _save_todos(self, agent_id, todos):
+        """Save todos for an agent."""
+        path = self._get_todos_path(agent_id)
+        path.write_text(json.dumps(todos, indent=2))
+
+    def _load_all_todos(self):
+        """Load todos from all agents."""
+        all_todos = []
+        for agent in ['koda', 'cairn', 'prax']:
+            todos = self._load_todos(agent)
+            for todo in todos:
+                todo['agent'] = agent
+            all_todos.extend(todos)
+        return all_todos
+
+    def serve_todos(self, agent_id, query_string):
+        """Get todos for an agent."""
+        try:
+            params = parse_qs(query_string)
+            status_filter = params.get('status', [None])[0]
+            priority_filter = params.get('priority', [None])[0]
+            include_subtasks = params.get('subtasks', ['true'])[0] == 'true'
+
+            todos = self._load_todos(agent_id)
+
+            # Apply filters
+            if status_filter:
+                todos = [t for t in todos if t.get('status') == status_filter]
+            if priority_filter:
+                todos = [t for t in todos if t.get('priority') == priority_filter]
+
+            # Sort by priority then due date
+            priority_order = {'high': 0, 'normal': 1, 'low': 2}
+            todos.sort(key=lambda t: (
+                priority_order.get(t.get('priority', 'normal'), 1),
+                t.get('due_date', '9999')
+            ))
+
+            # Count by status
+            all_todos = self._load_todos(agent_id)
+            stats = {
+                'total': len(all_todos),
+                'pending': len([t for t in all_todos if t.get('status') == 'pending']),
+                'in_progress': len([t for t in all_todos if t.get('status') == 'in_progress']),
+                'completed': len([t for t in all_todos if t.get('status') == 'completed']),
+                'blocked': len([t for t in all_todos if t.get('status') == 'blocked'])
+            }
+
+            self.serve_json({
+                'success': True,
+                'agent': agent_id,
+                'todos': todos,
+                'stats': stats,
+                'count': len(todos)
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def serve_todos_unified(self, query_string):
+        """Get unified todos from all agents."""
+        try:
+            params = parse_qs(query_string)
+            status_filter = params.get('status', [None])[0]
+            agents_filter = params.get('agents', [None])[0]
+
+            all_todos = []
+            agents_list = agents_filter.split(',') if agents_filter else ['koda', 'cairn', 'prax']
+
+            for agent in agents_list:
+                agent = agent.strip()
+                todos = self._load_todos(agent)
+                for todo in todos:
+                    todo['agent'] = agent
+                    if status_filter and todo.get('status') != status_filter:
+                        continue
+                    all_todos.append(todo)
+
+            # Sort by priority then due date
+            priority_order = {'high': 0, 'normal': 1, 'low': 2}
+            all_todos.sort(key=lambda t: (
+                priority_order.get(t.get('priority', 'normal'), 1),
+                t.get('due_date', '9999')
+            ))
+
+            # Aggregate stats
+            stats = {
+                'total': len(all_todos),
+                'by_agent': {},
+                'by_status': {
+                    'pending': 0, 'in_progress': 0, 'completed': 0, 'blocked': 0
+                }
+            }
+            for todo in all_todos:
+                agent = todo.get('agent', 'unknown')
+                status = todo.get('status', 'pending')
+                stats['by_agent'][agent] = stats['by_agent'].get(agent, 0) + 1
+                stats['by_status'][status] = stats['by_status'].get(status, 0) + 1
+
+            self.serve_json({
+                'success': True,
+                'todos': all_todos,
+                'stats': stats,
+                'count': len(all_todos)
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def serve_todos_stats(self):
+        """Get aggregated stats for all todos."""
+        try:
+            stats = {
+                'total': 0,
+                'by_agent': {},
+                'by_status': {'pending': 0, 'in_progress': 0, 'completed': 0, 'blocked': 0},
+                'by_priority': {'high': 0, 'normal': 0, 'low': 0},
+                'overdue': 0,
+                'due_today': 0,
+                'due_this_week': 0
+            }
+
+            now = datetime.now()
+            today = now.strftime('%Y-%m-%d')
+            week_end = (now + timedelta(days=7)).strftime('%Y-%m-%d')
+
+            for agent in ['koda', 'cairn', 'prax']:
+                todos = self._load_todos(agent)
+                stats['by_agent'][agent] = {
+                    'total': len(todos),
+                    'pending': 0, 'in_progress': 0, 'completed': 0
+                }
+
+                for todo in todos:
+                    stats['total'] += 1
+                    status = todo.get('status', 'pending')
+                    priority = todo.get('priority', 'normal')
+                    due = todo.get('due_date', '')[:10] if todo.get('due_date') else ''
+
+                    stats['by_status'][status] = stats['by_status'].get(status, 0) + 1
+                    stats['by_priority'][priority] = stats['by_priority'].get(priority, 0) + 1
+                    stats['by_agent'][agent][status] = stats['by_agent'][agent].get(status, 0) + 1
+
+                    if due and status not in ['completed']:
+                        if due < today:
+                            stats['overdue'] += 1
+                        elif due == today:
+                            stats['due_today'] += 1
+                        elif due <= week_end:
+                            stats['due_this_week'] += 1
+
+            self.serve_json({'success': True, 'stats': stats})
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def create_todo(self, data):
+        """Create a new todo."""
+        try:
+            agent_id = data.get('agent', 'koda').lower()
+            title = data.get('title', 'Untitled Task')
+            description = data.get('description', '')
+            status = data.get('status', 'pending')
+            priority = data.get('priority', 'normal')
+            due_date = data.get('due_date')
+            parent_id = data.get('parent_id')  # For subtasks
+            prd_id = data.get('prd_id')  # Link to PRD
+            tags = data.get('tags', [])
+            created_by = data.get('created_by', 'user')
+            sync_calendar = data.get('sync_calendar', False)
+            sync_inbox = data.get('sync_inbox', False)
+
+            todo_id = hashlib.md5(f"{agent_id}{title}{datetime.now().timestamp()}".encode()).hexdigest()[:12]
+
+            todo = {
+                'id': todo_id,
+                'title': title,
+                'description': description,
+                'status': status,
+                'priority': priority,
+                'due_date': due_date,
+                'parent_id': parent_id,
+                'prd_id': prd_id,
+                'tags': tags,
+                'created_by': created_by,
+                'created': datetime.now().isoformat(),
+                'updated': datetime.now().isoformat(),
+                'calendar_event_id': None,
+                'inbox_message_id': None,
+                'subtasks': []
+            }
+
+            todos = self._load_todos(agent_id)
+            todos.append(todo)
+            self._save_todos(agent_id, todos)
+
+            # Sync to calendar if requested
+            if sync_calendar and due_date:
+                self._sync_todo_to_calendar_internal(todo, agent_id)
+
+            # Sync to inbox if requested
+            if sync_inbox:
+                self._sync_todo_to_inbox_internal(todo, agent_id, created_by)
+
+            self.serve_json({
+                'success': True,
+                'todo': todo,
+                'agent': agent_id
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def update_todo(self, data):
+        """Update an existing todo."""
+        try:
+            agent_id = data.get('agent', '').lower()
+            todo_id = data.get('id')
+
+            if not agent_id or not todo_id:
+                self.serve_json({'success': False, 'error': 'Agent and todo ID required'}, status=400)
+                return
+
+            todos = self._load_todos(agent_id)
+            todo_index = next((i for i, t in enumerate(todos) if t.get('id') == todo_id), None)
+
+            if todo_index is None:
+                self.serve_json({'success': False, 'error': 'Todo not found'}, status=404)
+                return
+
+            todo = todos[todo_index]
+
+            # Update fields
+            updateable_fields = ['title', 'description', 'status', 'priority', 'due_date', 'tags', 'parent_id']
+            for field in updateable_fields:
+                if field in data:
+                    todo[field] = data[field]
+
+            todo['updated'] = datetime.now().isoformat()
+
+            todos[todo_index] = todo
+            self._save_todos(agent_id, todos)
+
+            # Re-sync calendar if due date changed
+            if 'due_date' in data and todo.get('calendar_event_id'):
+                self._sync_todo_to_calendar_internal(todo, agent_id)
+
+            self.serve_json({
+                'success': True,
+                'todo': todo
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def delete_todo(self, data):
+        """Delete a todo."""
+        try:
+            agent_id = data.get('agent', '').lower()
+            todo_id = data.get('id')
+
+            if not agent_id or not todo_id:
+                self.serve_json({'success': False, 'error': 'Agent and todo ID required'}, status=400)
+                return
+
+            todos = self._load_todos(agent_id)
+            original_count = len(todos)
+            todos = [t for t in todos if t.get('id') != todo_id]
+
+            if len(todos) == original_count:
+                self.serve_json({'success': False, 'error': 'Todo not found'}, status=404)
+                return
+
+            self._save_todos(agent_id, todos)
+
+            self.serve_json({
+                'success': True,
+                'deleted': todo_id
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def split_prd_to_todos(self, data):
+        """Split a PRD into multiple todos for different agents (Prax feature)."""
+        try:
+            prd_title = data.get('title', 'Untitled PRD')
+            prd_content = data.get('content', '')
+            tasks = data.get('tasks', [])  # Pre-split tasks from UI
+            auto_sync_calendar = data.get('sync_calendar', True)
+            auto_sync_inbox = data.get('sync_inbox', True)
+
+            if not tasks:
+                self.serve_json({'success': False, 'error': 'No tasks provided'}, status=400)
+                return
+
+            # Generate PRD ID
+            prd_id = hashlib.md5(f"{prd_title}{datetime.now().timestamp()}".encode()).hexdigest()[:12]
+
+            # Save PRD for reference
+            prd = {
+                'id': prd_id,
+                'title': prd_title,
+                'content': prd_content,
+                'created': datetime.now().isoformat(),
+                'task_count': len(tasks)
+            }
+
+            prd_path = self._get_prds_path() / f"{prd_id}.json"
+            prd_path.write_text(json.dumps(prd, indent=2))
+
+            created_todos = []
+
+            for task in tasks:
+                agent_id = task.get('agent', 'koda').lower()
+                title = task.get('title', 'Untitled Task')
+                description = task.get('description', '')
+                priority = task.get('priority', 'normal')
+                due_date = task.get('due_date')
+
+                todo_id = hashlib.md5(f"{agent_id}{title}{datetime.now().timestamp()}{len(created_todos)}".encode()).hexdigest()[:12]
+
+                todo = {
+                    'id': todo_id,
+                    'title': title,
+                    'description': description,
+                    'status': 'pending',
+                    'priority': priority,
+                    'due_date': due_date,
+                    'parent_id': None,
+                    'prd_id': prd_id,
+                    'prd_title': prd_title,
+                    'tags': ['prd', prd_id[:6]],
+                    'created_by': 'prax',
+                    'created': datetime.now().isoformat(),
+                    'updated': datetime.now().isoformat(),
+                    'calendar_event_id': None,
+                    'inbox_message_id': None,
+                    'subtasks': []
+                }
+
+                # Save to agent's todos
+                todos = self._load_todos(agent_id)
+                todos.append(todo)
+                self._save_todos(agent_id, todos)
+
+                # Sync to calendar
+                if auto_sync_calendar and due_date:
+                    self._sync_todo_to_calendar_internal(todo, agent_id)
+
+                # Sync to inbox
+                if auto_sync_inbox:
+                    self._sync_todo_to_inbox_internal(todo, agent_id, 'prax')
+
+                created_todos.append({
+                    'id': todo_id,
+                    'agent': agent_id,
+                    'title': title
+                })
+
+            self.serve_json({
+                'success': True,
+                'prd_id': prd_id,
+                'created_todos': created_todos,
+                'count': len(created_todos)
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def _sync_todo_to_calendar_internal(self, todo, agent_id):
+        """Internal helper to sync a todo to calendar."""
+        try:
+            if not todo.get('due_date'):
+                return None
+
+            event = {
+                'id': f"todo_{todo['id']}",
+                'title': f"[TODO] {todo['title']}",
+                'start': todo['due_date'],
+                'end': todo['due_date'],
+                'type': 'deadline',
+                'description': todo.get('description', ''),
+                'todo_id': todo['id'],
+                'priority': todo.get('priority', 'normal'),
+                'created': datetime.now().isoformat(),
+                'updated': datetime.now().isoformat()
+            }
+
+            events = self._get_calendar_events(agent_id)
+            # Remove existing event if any
+            events = [e for e in events if e.get('id') != event['id']]
+            events.append(event)
+            self._save_calendar_events(agent_id, events)
+
+            # Update todo with calendar link
+            todos = self._load_todos(agent_id)
+            for t in todos:
+                if t.get('id') == todo['id']:
+                    t['calendar_event_id'] = event['id']
+                    break
+            self._save_todos(agent_id, todos)
+
+            return event['id']
+
+        except Exception as e:
+            print(f"Error syncing todo to calendar: {e}")
+            return None
+
+    def _sync_todo_to_inbox_internal(self, todo, target_agent, from_agent='prax'):
+        """Internal helper to sync a todo to inbox."""
+        import time
+
+        try:
+            sender_map = {'prax': 'D', 'koda': 'K', 'cairn': 'C', 'user': 'O'}
+            target_map = {'koda': 'B', 'cairn': 'A', 'prax': 'D'}
+
+            sender_id = sender_map.get(from_agent, 'D')
+            target_id = target_map.get(target_agent, 'B')
+
+            timestamp = int(time.time())
+            msg_hash = hashlib.md5(f"{timestamp}{todo['id']}".encode()).hexdigest()[:12]
+
+            priority_char = 'h' if todo.get('priority') == 'high' else 'n'
+            msg_content = f"TODO: {todo['title']}"
+            if todo.get('due_date'):
+                msg_content += f" | Due: {todo['due_date']}"
+            if todo.get('prd_title'):
+                msg_content += f" | PRD: {todo['prd_title']}"
+
+            fsl_msg = f"§MSG§{sender_id}→{target_id}§{priority_char}§§{msg_content}§{timestamp}§{msg_hash}§\n"
+
+            inbox_path = self._get_inbox_path(target_agent)
+            with open(inbox_path, 'a') as f:
+                f.write(fsl_msg)
+
+            # Update todo with inbox link
+            todos = self._load_todos(target_agent)
+            for t in todos:
+                if t.get('id') == todo['id']:
+                    t['inbox_message_id'] = msg_hash
+                    break
+            self._save_todos(target_agent, todos)
+
+            return msg_hash
+
+        except Exception as e:
+            print(f"Error syncing todo to inbox: {e}")
+            return None
+
+    def sync_todo_to_calendar(self, data):
+        """Sync a todo to calendar (API endpoint)."""
+        try:
+            agent_id = data.get('agent', '').lower()
+            todo_id = data.get('id')
+
+            if not agent_id or not todo_id:
+                self.serve_json({'success': False, 'error': 'Agent and todo ID required'}, status=400)
+                return
+
+            todos = self._load_todos(agent_id)
+            todo = next((t for t in todos if t.get('id') == todo_id), None)
+
+            if not todo:
+                self.serve_json({'success': False, 'error': 'Todo not found'}, status=404)
+                return
+
+            event_id = self._sync_todo_to_calendar_internal(todo, agent_id)
+
+            self.serve_json({
+                'success': True,
+                'calendar_event_id': event_id
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def sync_todo_to_inbox(self, data):
+        """Sync a todo to inbox (API endpoint)."""
+        try:
+            agent_id = data.get('agent', '').lower()
+            todo_id = data.get('id')
+            from_agent = data.get('from', 'prax')
+
+            if not agent_id or not todo_id:
+                self.serve_json({'success': False, 'error': 'Agent and todo ID required'}, status=400)
+                return
+
+            todos = self._load_todos(agent_id)
+            todo = next((t for t in todos if t.get('id') == todo_id), None)
+
+            if not todo:
+                self.serve_json({'success': False, 'error': 'Todo not found'}, status=404)
+                return
+
+            msg_id = self._sync_todo_to_inbox_internal(todo, agent_id, from_agent)
+
+            self.serve_json({
+                'success': True,
+                'inbox_message_id': msg_id
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    def bulk_update_todos(self, data):
+        """Bulk update multiple todos (for drag-drop reordering, status changes, etc.)."""
+        try:
+            updates = data.get('updates', [])
+            results = []
+
+            for update in updates:
+                agent_id = update.get('agent', '').lower()
+                todo_id = update.get('id')
+
+                if not agent_id or not todo_id:
+                    continue
+
+                todos = self._load_todos(agent_id)
+                todo_index = next((i for i, t in enumerate(todos) if t.get('id') == todo_id), None)
+
+                if todo_index is not None:
+                    for field in ['status', 'priority', 'order']:
+                        if field in update:
+                            todos[todo_index][field] = update[field]
+                    todos[todo_index]['updated'] = datetime.now().isoformat()
+                    self._save_todos(agent_id, todos)
+                    results.append({'id': todo_id, 'success': True})
+                else:
+                    results.append({'id': todo_id, 'success': False, 'error': 'Not found'})
+
+            self.serve_json({
+                'success': True,
+                'results': results,
+                'updated_count': len([r for r in results if r.get('success')])
+            })
+
+        except Exception as e:
+            self.serve_json({'success': False, 'error': str(e)}, status=500)
+
+    # ==================== END TODO SYSTEM ====================
 
     def serve_storage_stats(self):
         """Get stats for all Claude storage locations."""
