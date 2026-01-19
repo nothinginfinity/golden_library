@@ -7962,9 +7962,29 @@ async def handle_workspace_message(session_id, user_id, data, websocket):
 
         # Get session and orchestrator
         session = session_manager.get_session(session_id)
-        if not session or not session.orchestrator:
-            print(f"[WebSocket] No orchestrator available for session {session_id}")
+        if not session:
+            print(f"[WebSocket] Session {session_id} not found!")
             return
+        if not session.orchestrator:
+            print(f"[WebSocket] No orchestrator for session {session_id}. Users: {list(session.users.keys())}")
+            # Try to reinitialize orchestrator if missing
+            from workspace_session_manager import get_api_key
+            api_key = get_api_key()
+            if api_key and AgentOrchestrator:
+                try:
+                    session.orchestrator = AgentOrchestrator(
+                        api_key=api_key,
+                        session_users=session.users,
+                        session_manager=session_manager,
+                        session_id=session_id
+                    )
+                    print(f"[WebSocket] Re-initialized orchestrator for session {session_id}")
+                except Exception as e:
+                    print(f"[WebSocket] Failed to re-init orchestrator: {e}")
+                    return
+            else:
+                print(f"[WebSocket] Cannot init orchestrator - no API key or AgentOrchestrator")
+                return
 
         # Start streaming indicator
         await session_manager.broadcast_to_session(
