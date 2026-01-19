@@ -8776,6 +8776,24 @@ async def aiohttp_websocket_handler(request):
                             aiohttp_session_clients[session_id] = {}
                         aiohttp_session_clients[session_id][user_id] = (ws, user_name)
 
+                        # CRITICAL: Also register with session_manager for orchestrator support
+                        if session_manager:
+                            existing_session = session_manager.get_session(session_id)
+                            if existing_session:
+                                # Join existing session
+                                session_manager.join_session(session_id, user_id, user_name, ws)
+                                print(f"[WebSocket/aiohttp] User {user_name} joined existing session {session_id}")
+                            else:
+                                # Create new session with orchestrator
+                                new_session = session_manager.create_session(user_id, user_name, ws)
+                                # Override the auto-generated session_id with the requested one
+                                if new_session and session_id:
+                                    session_manager.sessions[session_id] = new_session
+                                    if new_session.id != session_id:
+                                        session_manager.sessions.pop(new_session.id, None)
+                                    new_session.id = session_id
+                                print(f"[WebSocket/aiohttp] Created new session {session_id} with orchestrator")
+
                         print(f"[WebSocket] User {user_name} ({user_id}) joined session {session_id}")
 
                         # Notify the joining user
