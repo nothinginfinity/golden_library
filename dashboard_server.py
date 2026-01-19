@@ -540,6 +540,10 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             file_id = path.split('/')[3]
             self.extract_file_to_memory(file_id)
             return
+        elif path.startswith('/api/files/') and '/to-canvas' in path:
+            file_id = path.split('/')[3]
+            self.convert_file_to_canvas(file_id, data)
+            return
         elif path.startswith('/api/files/') and '/delete' in path:
             file_id = path.split('/')[3]
             self.delete_file(file_id)
@@ -1171,6 +1175,132 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
         except Exception as e:
             self.serve_json({'error': str(e)}, status=500)
+
+    def convert_file_to_canvas(self, file_id, data):
+        """Convert an uploaded file to a canvas document section."""
+        try:
+            # Get file metadata
+            index = self.load_uploads_index()
+            file_meta = None
+            for f in index.get('files', []):
+                if f.get('id') == file_id:
+                    file_meta = f
+                    break
+
+            if not file_meta:
+                self.serve_json({'error': 'File not found'}, status=404)
+                return
+
+            file_path = Path(file_meta.get('path', ''))
+            if not file_path.exists():
+                self.serve_json({'error': 'File path not found'}, status=404)
+                return
+
+            category = file_meta.get('category', 'document')
+            filename = file_meta.get('filename', 'untitled')
+            ext = file_path.suffix.lower()
+
+            # Extract content based on file type
+            content = ''
+            section_type = 'markdown'
+
+            # Text-based files
+            text_extensions = ['.txt', '.md', '.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf', '.log', '.csv', '.tsv']
+            code_extensions = ['.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.go', '.rs', '.rb', '.php', '.swift', '.kt', '.scala', '.r', '.sql', '.sh', '.bash', '.zsh', '.ps1', '.html', '.css', '.scss', '.less', '.vue', '.svelte']
+
+            if ext in text_extensions:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                section_type = 'markdown'
+
+            elif ext in code_extensions:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                section_type = 'code'
+                # Wrap in code fence with language hint
+                lang = ext[1:]  # Remove the dot
+                lang_map = {'js': 'javascript', 'ts': 'typescript', 'py': 'python', 'rb': 'ruby', 'rs': 'rust', 'kt': 'kotlin'}
+                lang = lang_map.get(lang, lang)
+                content = f"```{lang}\n{content}\n```"
+
+            elif ext == '.pdf':
+                # Try to extract text from PDF
+                content = self._extract_pdf_text(file_path)
+                if not content:
+                    content = f"[PDF file: {filename} - Text extraction failed. View original file.]"
+                section_type = 'markdown'
+
+            elif category == 'images':
+                # For images, create a reference
+                content = f"![{filename}](/api/files/{file_id}/content)\n\n*Image file: {filename}*"
+                section_type = 'markdown'
+
+            elif category == 'videos':
+                content = f"[Video: {filename}](/api/files/{file_id}/content)\n\n*Video file: {filename}*"
+                section_type = 'markdown'
+
+            else:
+                # Try to read as text
+                try:
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                except:
+                    content = f"[Binary file: {filename} - Cannot display content]"
+                section_type = 'markdown'
+
+            # Get session_id from request data if provided
+            session_id = data.get('session_id')
+
+            # Return the extracted content for client-side handling
+            self.serve_json({
+                'ok': True,
+                'file_id': file_id,
+                'filename': filename,
+                'content': content,
+                'section_type': section_type,
+                'suggested_name': file_path.stem  # Filename without extension
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'error': str(e)}, status=500)
+
+    def _extract_pdf_text(self, file_path):
+        """Extract text from PDF file."""
+        try:
+            # Try pdfplumber first (better quality)
+            try:
+                import pdfplumber
+                text_parts = []
+                with pdfplumber.open(file_path) as pdf:
+                    for page in pdf.pages[:20]:  # Limit to first 20 pages
+                        page_text = page.extract_text()
+                        if page_text:
+                            text_parts.append(page_text)
+                if text_parts:
+                    return '\n\n---\n\n'.join(text_parts)
+            except ImportError:
+                pass
+
+            # Fallback to PyPDF2
+            try:
+                from PyPDF2 import PdfReader
+                reader = PdfReader(file_path)
+                text_parts = []
+                for page in reader.pages[:20]:  # Limit to first 20 pages
+                    page_text = page.extract_text()
+                    if page_text:
+                        text_parts.append(page_text)
+                if text_parts:
+                    return '\n\n---\n\n'.join(text_parts)
+            except ImportError:
+                pass
+
+            return None
+        except Exception as e:
+            print(f"[PDF] Text extraction failed: {e}")
+            return None
 
     # =========================================================================
     # VIDEO EDITING API (FFmpeg)

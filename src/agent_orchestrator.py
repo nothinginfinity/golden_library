@@ -402,6 +402,31 @@ Prax can delegate formal tasks to Cairn and Koda. Delegated tasks have structure
 **Hierarchical Workflow Pattern:**
 1. User requests feature → Prax receives
 2. Prax delegates design to Cairn with canvas section "design"
+
+---
+
+CANVAS DOCUMENT ACCESS (Phase 5):
+
+You can read and edit the shared canvas document in collaborative sessions:
+
+**Reading Documents:**
+- "Read canvas document" - Get the full canvas document content
+- "Read section 'section_name'" - Read a specific section
+- "List canvas sections" - See all available sections
+
+**Editing Documents:**
+- "Edit section 'section_name': new content here" - Replace section content
+- "Add section 'section_name' (type: markdown): content here" - Add new section
+- "Delete section 'section_name'" - Remove a section
+
+**Examples:**
+- "Read canvas document" - View all sections
+- "Read section 'requirements'" - View requirements section
+- "Edit section 'implementation': Updated code here with fixes..."
+- "Add section 'testing' (type: code): def test_auth()..."
+- "Delete section 'draft'"
+
+All edits are broadcast in real-time to other users and agents in the session
 3. Cairn acknowledges, researches, completes task writing to canvas
 4. Prax delegates implementation to Koda referencing Cairn's work
 5. Koda implements, writes to canvas section "implementation"
@@ -988,11 +1013,210 @@ Delegate to koda: Implement authentication endpoint following HIPAA requirements
             except Exception as e:
                 feedback_parts.append(f"❌ Tool execution error: {str(e)}")
 
+        # ===== Phase 5: Canvas Document Access =====
+
+        # Pattern: Read canvas document / Read the canvas document
+        if re.search(r'Read (?:the )?canvas document', response_text, re.IGNORECASE):
+            try:
+                from canvas_sync_manager import get_canvas_sync_manager
+                canvas_manager = get_canvas_sync_manager(self.session_manager)
+                docs = canvas_manager.get_session_documents(self.session_id)
+
+                if docs:
+                    doc = docs[0]
+                    content = self._format_document_for_agent(doc)
+                    feedback_parts.append(f"📄 Canvas Document: {doc.name}\n{content}")
+                else:
+                    feedback_parts.append("📄 No canvas document found in this session")
+            except ImportError:
+                feedback_parts.append("⚠️ Canvas manager not available")
+            except Exception as e:
+                feedback_parts.append(f"❌ Error reading canvas: {str(e)}")
+
+        # Pattern: Read section '[name]' or Read section "name"
+        section_read_pattern = r"Read section ['\"]([^'\"]+)['\"]"
+        for match in re.finditer(section_read_pattern, response_text, re.IGNORECASE):
+            section_name = match.group(1)
+            try:
+                from canvas_sync_manager import get_canvas_sync_manager
+                canvas_manager = get_canvas_sync_manager(self.session_manager)
+                docs = canvas_manager.get_session_documents(self.session_id)
+
+                if docs:
+                    doc = docs[0]
+                    section = doc.sections.get(section_name)
+                    if section:
+                        feedback_parts.append(f"📝 Section '{section_name}' (v{section.version}):\n{section.content}")
+                    else:
+                        available = ', '.join(doc.section_order) if doc.section_order else 'none'
+                        feedback_parts.append(f"❌ Section '{section_name}' not found. Available: {available}")
+                else:
+                    feedback_parts.append("📄 No canvas document found")
+            except Exception as e:
+                feedback_parts.append(f"❌ Error reading section: {str(e)}")
+
+        # Pattern: List canvas sections
+        if re.search(r'List canvas sections', response_text, re.IGNORECASE):
+            try:
+                from canvas_sync_manager import get_canvas_sync_manager
+                canvas_manager = get_canvas_sync_manager(self.session_manager)
+                docs = canvas_manager.get_session_documents(self.session_id)
+
+                if docs:
+                    doc = docs[0]
+                    if doc.section_order:
+                        feedback_parts.append(f"📑 Canvas sections ({len(doc.section_order)}):")
+                        for s_name in doc.section_order:
+                            section = doc.sections.get(s_name)
+                            s_type = section.section_type if section else 'unknown'
+                            preview = (section.content[:50] + '...') if section and len(section.content) > 50 else (section.content if section else '')
+                            feedback_parts.append(f"  - {s_name} ({s_type}): {preview}")
+                    else:
+                        feedback_parts.append("📑 No sections in canvas document")
+                else:
+                    feedback_parts.append("📄 No canvas document found")
+            except Exception as e:
+                feedback_parts.append(f"❌ Error listing sections: {str(e)}")
+
+        # ===== Phase 5B: Canvas Document EDIT =====
+
+        # Pattern: Edit section '[name]': content (multi-line content ends at next pattern or double newline)
+        edit_pattern = r"Edit section ['\"]([^'\"]+)['\"]:\s*(.+?)(?=\n\nEdit section|\n\nAdd section|\n\nDelete section|\Z)"
+        for match in re.finditer(edit_pattern, response_text, re.IGNORECASE | re.DOTALL):
+            section_name = match.group(1)
+            new_content = match.group(2).strip()
+
+            try:
+                from canvas_sync_manager import get_canvas_sync_manager
+                canvas_manager = get_canvas_sync_manager(self.session_manager)
+                docs = canvas_manager.get_session_documents(self.session_id)
+
+                if docs:
+                    doc = docs[0]
+                    if section_name in doc.sections:
+                        success, edit = canvas_manager.apply_edit(
+                            doc_id=doc.id,
+                            section_name=section_name,
+                            author_id=f"agent_{from_agent}",
+                            author_name=from_agent.capitalize(),
+                            content=new_content,
+                            operation='replace'
+                        )
+
+                        if success:
+                            feedback_parts.append(f"✏️ Section '{section_name}' updated by {from_agent.capitalize()}")
+
+                            # Queue WebSocket event for real-time broadcast
+                            self.session_manager._queue_ws_event(self.session_id, 'canvas_edit', {
+                                'document_id': doc.id,
+                                'section_name': section_name,
+                                'new_content': new_content,
+                                'version': doc.sections[section_name].version if section_name in doc.sections else 1,
+                                'edit': {
+                                    'author_id': f"agent_{from_agent}",
+                                    'author_name': from_agent.capitalize()
+                                }
+                            })
+                        else:
+                            feedback_parts.append(f"❌ Failed to edit section '{section_name}'")
+                    else:
+                        available = ', '.join(doc.section_order) if doc.section_order else 'none'
+                        feedback_parts.append(f"❌ Section '{section_name}' not found. Available: {available}")
+                else:
+                    feedback_parts.append("📄 No canvas document found. Create one first.")
+            except Exception as e:
+                feedback_parts.append(f"❌ Error editing section: {str(e)}")
+
+        # Pattern: Add section '[name]' (type: [type]): content
+        add_section_pattern = r"Add section ['\"]([^'\"]+)['\"](?:\s*\(type:\s*(\w+)\))?:\s*(.+?)(?=\n\nEdit section|\n\nAdd section|\n\nDelete section|\Z)"
+        for match in re.finditer(add_section_pattern, response_text, re.IGNORECASE | re.DOTALL):
+            section_name = match.group(1)
+            section_type = match.group(2) or 'markdown'
+            content = match.group(3).strip()
+
+            try:
+                from canvas_sync_manager import get_canvas_sync_manager
+                canvas_manager = get_canvas_sync_manager(self.session_manager)
+                docs = canvas_manager.get_session_documents(self.session_id)
+
+                if docs:
+                    doc = docs[0]
+                    section = canvas_manager.add_section(
+                        doc_id=doc.id,
+                        section_name=section_name,
+                        section_type=section_type,
+                        content=content,
+                        owner=f"agent_{from_agent}"
+                    )
+
+                    if section:
+                        feedback_parts.append(f"➕ Section '{section_name}' added by {from_agent.capitalize()}")
+
+                        # Queue WebSocket event
+                        self.session_manager._queue_ws_event(self.session_id, 'canvas_section_added', {
+                            'document_id': doc.id,
+                            'section_name': section_name,
+                            'section_type': section_type,
+                            'author': from_agent.capitalize()
+                        })
+                    else:
+                        feedback_parts.append(f"❌ Failed to add section '{section_name}'")
+                else:
+                    feedback_parts.append("📄 No canvas document found. Create one first.")
+            except Exception as e:
+                feedback_parts.append(f"❌ Error adding section: {str(e)}")
+
+        # Pattern: Delete section '[name]'
+        delete_section_pattern = r"Delete section ['\"]([^'\"]+)['\"]"
+        for match in re.finditer(delete_section_pattern, response_text, re.IGNORECASE):
+            section_name = match.group(1)
+
+            try:
+                from canvas_sync_manager import get_canvas_sync_manager
+                canvas_manager = get_canvas_sync_manager(self.session_manager)
+                docs = canvas_manager.get_session_documents(self.session_id)
+
+                if docs:
+                    doc = docs[0]
+                    if section_name in doc.sections:
+                        # Remove section
+                        if canvas_manager.delete_section(doc.id, section_name):
+                            feedback_parts.append(f"🗑️ Section '{section_name}' deleted by {from_agent.capitalize()}")
+
+                            # Queue WebSocket event
+                            self.session_manager._queue_ws_event(self.session_id, 'canvas_section_deleted', {
+                                'document_id': doc.id,
+                                'section_name': section_name,
+                                'author': from_agent.capitalize()
+                            })
+                        else:
+                            feedback_parts.append(f"❌ Failed to delete section '{section_name}'")
+                    else:
+                        feedback_parts.append(f"❌ Section '{section_name}' not found")
+                else:
+                    feedback_parts.append("📄 No canvas document found")
+            except Exception as e:
+                feedback_parts.append(f"❌ Error deleting section: {str(e)}")
+
         # Return combined feedback if any tools were executed
         if feedback_parts:
             return "\n".join(feedback_parts)
 
         return None
+
+    def _format_document_for_agent(self, doc) -> str:
+        """Format a canvas document for agent consumption."""
+        parts = [f"# {doc.name}"]
+
+        if doc.section_order:
+            for section_name in doc.section_order:
+                section = doc.sections.get(section_name)
+                if section:
+                    parts.append(f"\n## {section_name}")
+                    parts.append(f"*Type: {section.section_type}, Version: {section.version}*")
+                    parts.append(section.content if section.content else "(empty)")
+
+        return "\n".join(parts)
 
 
 # Example usage and testing

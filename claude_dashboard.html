@@ -13652,7 +13652,11 @@ ${currentConversation.display}
     }
 
     async function loadCanvasDocument() {
-      if (!currentSessionId) return;
+      if (!currentSessionId) {
+        // No session - try loading local document
+        loadLocalDocument();
+        return;
+      }
 
       try {
         const response = await fetch(`${API_BASE}/api/canvas/${currentSessionId}`);
@@ -13667,28 +13671,66 @@ ${currentConversation.display}
     }
 
     async function createCanvasDocument() {
-      if (!currentSessionId) return;
-
       const name = prompt('Document name:', 'Shared Document');
       if (!name) return;
 
-      try {
-        const response = await fetch(`${API_BASE}/api/canvas/${currentSessionId}/create`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name })
-        });
+      if (currentSessionId) {
+        // Session mode - use server API
+        try {
+          const response = await fetch(`${API_BASE}/api/canvas/${currentSessionId}/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name })
+          });
 
-        if (response.ok) {
-          const data = await response.json();
-          canvasDocument = data.document;
-          renderCanvasSections();
-          document.getElementById('canvas-doc-name').textContent = name;
+          if (response.ok) {
+            const data = await response.json();
+            canvasDocument = data.document;
+            renderCanvasSections();
+            document.getElementById('canvas-doc-name').textContent = name;
+            showNotification(`Document "${name}" created`, 'success');
+          }
+        } catch (error) {
+          console.error('Error creating canvas:', error);
+          alert('Failed to create document');
         }
-      } catch (error) {
-        console.error('Error creating canvas:', error);
-        alert('Failed to create document');
+      } else {
+        // Local mode - store in memory/localStorage
+        canvasDocument = {
+          id: 'local_' + Date.now(),
+          name: name,
+          section_order: [],
+          sections: {},
+          isLocal: true
+        };
+        saveLocalDocument();
+        renderCanvasSections();
+        document.getElementById('canvas-doc-name').textContent = name;
+        showNotification(`Local document "${name}" created`, 'success');
       }
+    }
+
+    function saveLocalDocument() {
+      if (canvasDocument?.isLocal) {
+        localStorage.setItem('local_canvas_document', JSON.stringify(canvasDocument));
+      }
+    }
+
+    function loadLocalDocument() {
+      const saved = localStorage.getItem('local_canvas_document');
+      if (saved) {
+        try {
+          canvasDocument = JSON.parse(saved);
+          renderCanvasSections();
+          if (canvasDocument.name) {
+            document.getElementById('canvas-doc-name').textContent = canvasDocument.name;
+          }
+          return true;
+        } catch (e) {
+          console.error('Error loading local document:', e);
+        }
+      }
+      return false;
     }
 
     async function addCanvasSection() {
@@ -13702,24 +13744,43 @@ ${currentConversation.display}
 
       const sectionType = prompt('Section type (markdown/code/diagram):', 'markdown');
 
-      try {
-        const response = await fetch(`${API_BASE}/api/canvas/${currentSessionId}/section`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            document_id: canvasDocument.id,
-            section_name: name,
-            section_type: sectionType || 'markdown',
-            owner: currentUserId
-          })
-        });
-
-        if (response.ok) {
-          await loadCanvasDocument();
+      if (canvasDocument.isLocal) {
+        // Local mode - store directly
+        canvasDocument.sections[name] = {
+          name: name,
+          section_type: sectionType || 'markdown',
+          content: '',
+          owner: currentUserId || 'local_user',
+          version: 1,
+          created_at: new Date().toISOString()
+        };
+        if (!canvasDocument.section_order.includes(name)) {
+          canvasDocument.section_order.push(name);
         }
-      } catch (error) {
-        console.error('Error adding section:', error);
-        alert('Failed to add section');
+        saveLocalDocument();
+        renderCanvasSections();
+        showNotification(`Section "${name}" added`, 'success');
+      } else {
+        // Session mode - use server API
+        try {
+          const response = await fetch(`${API_BASE}/api/canvas/${currentSessionId}/section`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              document_id: canvasDocument.id,
+              section_name: name,
+              section_type: sectionType || 'markdown',
+              owner: currentUserId
+            })
+          });
+
+          if (response.ok) {
+            await loadCanvasDocument();
+          }
+        } catch (error) {
+          console.error('Error adding section:', error);
+          alert('Failed to add section');
+        }
       }
     }
 
@@ -13802,35 +13863,49 @@ ${currentConversation.display}
 
       statusEl.textContent = 'Saving...';
 
-      try {
-        const response = await fetch(`${API_BASE}/api/canvas/${currentSessionId}/edit`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            document_id: canvasDocument.id,
-            section_name: activeSectionName,
-            content: content,
-            author_id: currentUserId,
-            author_name: currentUserName
-          })
-        });
+      if (canvasDocument.isLocal) {
+        // Local mode - save to localStorage
+        if (canvasDocument.sections[activeSectionName]) {
+          canvasDocument.sections[activeSectionName].content = content;
+          canvasDocument.sections[activeSectionName].version = (canvasDocument.sections[activeSectionName].version || 0) + 1;
+          canvasDocument.sections[activeSectionName].updated_at = new Date().toISOString();
+        }
+        saveLocalDocument();
+        document.getElementById('canvas-editor-version').textContent = `v${canvasDocument.sections[activeSectionName].version}`;
+        statusEl.textContent = 'Saved ✓';
+        renderCanvasSections();
+      } else {
+        // Session mode - use server API
+        try {
+          const response = await fetch(`${API_BASE}/api/canvas/${currentSessionId}/edit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              document_id: canvasDocument.id,
+              section_name: activeSectionName,
+              content: content,
+              author_id: currentUserId,
+              author_name: currentUserName
+            })
+          });
 
-        if (response.ok) {
-          const data = await response.json();
-          // Update local state
-          if (canvasDocument.sections[activeSectionName]) {
-            canvasDocument.sections[activeSectionName].content = content;
-            canvasDocument.sections[activeSectionName].version = data.version || (canvasDocument.sections[activeSectionName].version + 1);
+          if (response.ok) {
+            const data = await response.json();
+            // Update local state
+            if (canvasDocument.sections[activeSectionName]) {
+              canvasDocument.sections[activeSectionName].content = content;
+              canvasDocument.sections[activeSectionName].version = data.version || (canvasDocument.sections[activeSectionName].version + 1);
+            }
+            document.getElementById('canvas-editor-version').textContent = `v${canvasDocument.sections[activeSectionName].version}`;
+            statusEl.textContent = 'Saved ✓';
+            renderCanvasSections();
+          } else {
+            statusEl.textContent = 'Save failed';
           }
-          document.getElementById('canvas-editor-version').textContent = `v${canvasDocument.sections[activeSectionName].version}`;
-          statusEl.textContent = 'Saved ✓';
-          renderCanvasSections();
-        } else {
+        } catch (error) {
+          console.error('Error saving section:', error);
           statusEl.textContent = 'Save failed';
         }
-      } catch (error) {
-        console.error('Error saving section:', error);
-        statusEl.textContent = 'Save failed';
       }
     }
 
@@ -13872,6 +13947,13 @@ ${currentConversation.display}
               section.content = data.new_content;
               section.version = data.version;
 
+              // Show editing indicator
+              const isAgent = data.edit.author_id?.startsWith('agent_');
+              const authorDisplay = isAgent
+                ? `Agent ${data.edit.author_name}`
+                : data.edit.author_name || 'Someone';
+              showEditingIndicator(data.section_name, authorDisplay, isAgent);
+
               // If this section is active, update editor (unless user is typing)
               if (data.section_name === activeSectionName) {
                 const editor = document.getElementById('canvas-editor-textarea');
@@ -13887,16 +13969,89 @@ ${currentConversation.display}
 
         case 'canvas_section_added':
           if (data.document_id === canvasDocument.id) {
+            const authorDisplay = data.author || 'Someone';
+            showNotification(`${authorDisplay} added section "${data.section_name}"`, 'info');
             loadCanvasDocument();
           }
           break;
 
         case 'canvas_section_deleted':
           if (data.document_id === canvasDocument.id) {
+            const authorDisplay = data.author || 'Someone';
+            showNotification(`${authorDisplay} deleted section "${data.section_name}"`, 'warning');
             loadCanvasDocument();
           }
           break;
       }
+    }
+
+    // Show editing indicator toast
+    function showEditingIndicator(sectionName, authorName, isAgent = false) {
+      // Remove existing editing indicators
+      const existing = document.querySelectorAll('.editing-indicator');
+      existing.forEach(el => el.remove());
+
+      const indicator = document.createElement('div');
+      indicator.className = 'editing-indicator';
+      indicator.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        right: 20px;
+        background: ${isAgent ? 'rgba(168, 85, 247, 0.95)' : 'rgba(59, 130, 246, 0.95)'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: slideInRight 0.3s ease-out;
+      `;
+
+      const icon = isAgent ? '🤖' : '✏️';
+      indicator.innerHTML = `
+        <span style="font-size: 1.2rem;">${icon}</span>
+        <span><strong>${authorName}</strong> edited section <em>"${sectionName}"</em></span>
+      `;
+
+      document.body.appendChild(indicator);
+
+      // Auto-remove after 3 seconds
+      setTimeout(() => {
+        indicator.style.animation = 'slideOutRight 0.3s ease-in forwards';
+        setTimeout(() => indicator.remove(), 300);
+      }, 3000);
+    }
+
+    // Add CSS animation for editing indicator
+    if (!document.getElementById('editing-indicator-styles')) {
+      const style = document.createElement('style');
+      style.id = 'editing-indicator-styles';
+      style.textContent = `
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        @keyframes slideOutRight {
+          from {
+            transform: translateX(0);
+            opacity: 1;
+          }
+          to {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+        }
+      `;
+      document.head.appendChild(style);
     }
 
     // Expose canvas functions to window
@@ -14195,6 +14350,11 @@ ${currentConversation.display}
       const workspaceTab = document.getElementById('tab-workspace');
       if (workspaceTab) {
         connectWorkspaceWebSocket();
+      }
+
+      // Load local canvas document if no session
+      if (!currentSessionId) {
+        loadLocalDocument();
       }
 
       // Add typing indicators and cursor tracking to input fields
@@ -14931,6 +15091,7 @@ ${currentConversation.display}
               ${file.category === 'images' ? `<button class="file-card-btn" onclick="editImage('${file.id}')">✏️ Edit</button>` : ''}
               ${file.category === 'videos' ? `<button class="file-card-btn" onclick="editVideo('${file.id}')">🎬 Edit</button>` : ''}
               <button class="file-card-btn success" onclick="extractToMemory('${file.id}')">🧠 Extract</button>
+              <button class="file-card-btn" onclick="convertFileToCanvas('${file.id}')">📄 To Canvas</button>
               <button class="file-card-btn" onclick="sendFileToAgent('${file.id}')">📤 To Agent</button>
               <button class="file-card-btn danger" onclick="deleteFile('${file.id}')">🗑️ Delete</button>
             </div>
@@ -15094,6 +15255,86 @@ ${escapeHtml(file.extracted_preview)}
         alert(`File reference sent to ${agent}`);
       } else {
         alert('Unknown agent. Use: koda, cairn, or prax');
+      }
+    }
+
+    async function convertFileToCanvas(fileId) {
+      // Ensure we have a canvas document
+      if (!canvasDocument) {
+        const createNew = confirm('No canvas document exists. Create one now?');
+        if (!createNew) return;
+        await createCanvasDocument();
+        if (!canvasDocument) return;
+      }
+
+      try {
+        showNotification('Converting file to canvas...', 'info');
+
+        const response = await fetch(`${API_BASE}/api/files/${fileId}/to-canvas`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: currentSessionId })
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || 'Failed to convert file');
+        }
+
+        const data = await response.json();
+
+        // Prompt for section name
+        const sectionName = prompt('Section name:', data.suggested_name || data.filename);
+        if (!sectionName) return;
+
+        if (canvasDocument.isLocal) {
+          // Local mode - add directly
+          canvasDocument.sections[sectionName] = {
+            name: sectionName,
+            section_type: data.section_type || 'markdown',
+            content: data.content,
+            owner: currentUserId || 'local_user',
+            version: 1,
+            created_at: new Date().toISOString(),
+            source_file: data.filename
+          };
+          if (!canvasDocument.section_order.includes(sectionName)) {
+            canvasDocument.section_order.push(sectionName);
+          }
+          saveLocalDocument();
+          renderCanvasSections();
+          showNotification(`File converted to section "${sectionName}"`, 'success');
+        } else {
+          // Session mode - use server API
+          const createResponse = await fetch(`${API_BASE}/api/canvas/${currentSessionId}/section`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              document_id: canvasDocument.id,
+              section_name: sectionName,
+              section_type: data.section_type || 'markdown',
+              content: data.content,
+              owner: currentUserId
+            })
+          });
+
+          if (createResponse.ok) {
+            await loadCanvasDocument();
+            showNotification(`File converted to section "${sectionName}"`, 'success');
+          } else {
+            throw new Error('Failed to create canvas section');
+          }
+        }
+
+        // Auto-select the new section
+        selectCanvasSection(sectionName);
+
+        // Switch to sections view
+        switchCanvasMode('sections');
+
+      } catch (error) {
+        console.error('Error converting file to canvas:', error);
+        showNotification('Failed to convert file: ' + error.message, 'error');
       }
     }
 
