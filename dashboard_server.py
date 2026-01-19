@@ -8813,6 +8813,70 @@ async def aiohttp_websocket_handler(request):
                                 exclude_user=None  # Send to everyone including sender for confirmation
                             )
 
+                            # Process agent message through orchestrator if this is an agent panel
+                            if agent_id in ['prax', 'koda', 'cairn', 'moderator', 'a', 'b'] and session_manager:
+                                print(f"[WebSocket/aiohttp] Processing agent message for {agent_id} in session {session_id}")
+
+                                # Get session and orchestrator
+                                session = session_manager.get_session(session_id)
+                                if session:
+                                    # Initialize orchestrator if missing
+                                    if not session.orchestrator:
+                                        print(f"[WebSocket/aiohttp] No orchestrator, attempting init for {session_id}")
+                                        from workspace_session_manager import get_api_key
+                                        api_key = get_api_key()
+                                        if api_key and AgentOrchestrator:
+                                            try:
+                                                session.orchestrator = AgentOrchestrator(
+                                                    api_key=api_key,
+                                                    session_users=session.users,
+                                                    session_manager=session_manager,
+                                                    session_id=session_id
+                                                )
+                                                print(f"[WebSocket/aiohttp] Orchestrator initialized for {session_id}")
+                                            except Exception as e:
+                                                print(f"[WebSocket/aiohttp] Failed to init orchestrator: {e}")
+
+                                    if session.orchestrator:
+                                        # Broadcast thinking indicator
+                                        await aiohttp_broadcast_to_session(
+                                            session_id, 'agent_thinking',
+                                            {'agent_id': agent_id}
+                                        )
+
+                                        # Map agent names to orchestrator IDs
+                                        AGENT_ID_MAP = {'prax': 'moderator', 'cairn': 'b', 'koda': 'a'}
+                                        orchestrator_agent_id = AGENT_ID_MAP.get(agent_id, agent_id)
+
+                                        # Stream response from orchestrator
+                                        try:
+                                            full_response = []
+                                            for chunk in session.orchestrator.send_message(
+                                                orchestrator_agent_id, msg_content, sender_user_id=user_id
+                                            ):
+                                                full_response.append(chunk)
+                                                await aiohttp_broadcast_to_session(
+                                                    session_id, 'agent_response_chunk',
+                                                    {'agent_id': agent_id, 'chunk': chunk}
+                                                )
+
+                                            # Broadcast completion
+                                            await aiohttp_broadcast_to_session(
+                                                session_id, 'agent_response_complete',
+                                                {'agent_id': agent_id, 'response': ''.join(full_response)}
+                                            )
+                                            print(f"[WebSocket/aiohttp] Agent {agent_id} response complete")
+                                        except Exception as e:
+                                            print(f"[WebSocket/aiohttp] Agent error: {e}")
+                                            await aiohttp_broadcast_to_session(
+                                                session_id, 'agent_error',
+                                                {'agent_id': agent_id, 'error': str(e)}
+                                            )
+                                    else:
+                                        print(f"[WebSocket/aiohttp] No orchestrator available for {session_id}")
+                                else:
+                                    print(f"[WebSocket/aiohttp] Session {session_id} not found")
+
                     elif msg_type == 'user_typing':
                         if session_id:
                             await aiohttp_broadcast_to_session(
