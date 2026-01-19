@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-01-17T15:01:50.888976",
+  "files_scanned": 70,
+  "summary": {
+    "total_findings": 0,
+    "by_severity": {
+      "HIGH": 0,
+      "MEDIUM": 0,
+      "LOW": 0,
+      "INFO": 0
+    },
+    "by_category": {},
+    "high_severity": 0,
+    "pass": true
+  },
+  "findings": []
+}

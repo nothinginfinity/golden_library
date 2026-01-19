@@ -3483,24 +3483,47 @@
             </div>
           </div>
 
-          <!-- Active Section Editor -->
-          <div id="canvas-editor-container" class="panel-footer" style="display: none;">
-            <div style="padding: 8px 0; display: flex; justify-content: space-between; align-items: center;">
-              <span id="canvas-editor-section-name" style="color: #e2e8f0; font-size: 0.85rem; font-weight: 500;"></span>
-              <div style="display: flex; gap: 4px; align-items: center;">
+          <!-- Active Section Editor with Preview -->
+          <div id="canvas-editor-container" class="panel-footer" style="display: none; flex-direction: column; height: 100%; min-height: 300px;">
+            <!-- Header -->
+            <div style="padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(148, 163, 184, 0.2);">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="canvas-editor-section-name" style="color: #e2e8f0; font-size: 0.9rem; font-weight: 600;"></span>
+                <span id="canvas-editor-type-badge" style="font-size: 0.65rem; background: rgba(99, 102, 241, 0.2); color: #a5b4fc; padding: 2px 6px; border-radius: 3px;"></span>
+              </div>
+              <div style="display: flex; gap: 6px; align-items: center;">
                 <span id="canvas-editor-owner" style="font-size: 0.7rem; color: #64748b;"></span>
                 <span id="canvas-editor-version" style="font-size: 0.7rem; color: #94a3b8; background: rgba(99, 102, 241, 0.2); padding: 1px 6px; border-radius: 3px;"></span>
+                <button onclick="toggleCanvasPreviewMode()" id="canvas-preview-toggle" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #a5b4fc; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">Preview</button>
+                <button onclick="downloadCanvasSection()" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">Download</button>
               </div>
             </div>
-            <textarea
-              id="canvas-editor-textarea"
-              style="width: 100%; height: 150px; padding: 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 6px; color: #e2e8f0; font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; resize: vertical;"
-              placeholder="Start typing..."
-              oninput="onCanvasEditorInput()"
-            ></textarea>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+
+            <!-- Editor/Preview Split View -->
+            <div id="canvas-edit-area" style="flex: 1; display: flex; gap: 0; overflow: hidden;">
+              <!-- Editor Pane -->
+              <div id="canvas-editor-pane" style="flex: 1; display: flex; flex-direction: column; border-right: 1px solid rgba(148, 163, 184, 0.2);">
+                <textarea
+                  id="canvas-editor-textarea"
+                  style="flex: 1; width: 100%; padding: 12px; background: rgba(15, 23, 42, 0.8); border: none; color: #e2e8f0; font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; resize: none; outline: none;"
+                  placeholder="Start typing..."
+                  oninput="onCanvasEditorInput()"
+                ></textarea>
+              </div>
+
+              <!-- Preview Pane -->
+              <div id="canvas-preview-pane" style="flex: 1; overflow: auto; padding: 12px; background: rgba(15, 23, 42, 0.5);">
+                <div id="canvas-preview-content" style="color: #e2e8f0; font-size: 0.9rem; line-height: 1.6;"></div>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-top: 1px solid rgba(148, 163, 184, 0.2);">
               <span id="canvas-editor-status" style="font-size: 0.7rem; color: #64748b;">Ready</span>
-              <button onclick="saveCanvasSection()" style="background: rgba(16, 185, 129, 0.3); border: 1px solid rgba(16, 185, 129, 0.5); color: #34d399; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Save</button>
+              <div style="display: flex; gap: 8px;">
+                <button onclick="askAIToEdit()" style="background: rgba(168, 85, 247, 0.3); border: 1px solid rgba(168, 85, 247, 0.5); color: #c4b5fd; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">🤖 Ask AI</button>
+                <button onclick="saveCanvasSection()" style="background: rgba(16, 185, 129, 0.3); border: 1px solid rgba(16, 185, 129, 0.5); color: #34d399; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">💾 Save</button>
+              </div>
             </div>
           </div>
         </div>
@@ -13832,7 +13855,7 @@ ${currentConversation.display}
 
       // Show editor
       const editorContainer = document.getElementById('canvas-editor-container');
-      editorContainer.style.display = 'block';
+      editorContainer.style.display = 'flex';
 
       document.getElementById('canvas-editor-section-name').textContent = sectionName;
       document.getElementById('canvas-editor-owner').textContent = section.owner ? `Owner: ${section.owner}` : '';
@@ -13840,12 +13863,26 @@ ${currentConversation.display}
       document.getElementById('canvas-editor-textarea').value = section.content || '';
       document.getElementById('canvas-editor-status').textContent = 'Ready';
 
+      // Update type badge
+      const typeBadge = document.getElementById('canvas-editor-type-badge');
+      if (typeBadge) {
+        typeBadge.textContent = section.section_type || 'markdown';
+      }
+
+      // Update preview
+      updateCanvasPreview();
+
       // Re-render sections list to update highlighting
       renderCanvasSections();
     }
 
+    let canvasPreviewMode = 'split'; // 'split', 'edit', 'preview'
+
     function onCanvasEditorInput() {
       document.getElementById('canvas-editor-status').textContent = 'Editing...';
+
+      // Update preview in real-time
+      updateCanvasPreview();
 
       // Debounce auto-save
       clearTimeout(canvasEditorDebounceTimer);
@@ -13853,6 +13890,143 @@ ${currentConversation.display}
         // Auto-save after 2 seconds of inactivity
         saveCanvasSection();
       }, 2000);
+    }
+
+    function updateCanvasPreview() {
+      const content = document.getElementById('canvas-editor-textarea').value;
+      const previewEl = document.getElementById('canvas-preview-content');
+      const section = canvasDocument?.sections?.[activeSectionName];
+      const sectionType = section?.section_type || 'markdown';
+
+      if (!previewEl) return;
+
+      // Render based on section type
+      if (sectionType === 'code') {
+        // Code preview with syntax highlighting hint
+        previewEl.innerHTML = `<pre style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; overflow-x: auto; font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem;"><code>${escapeHtml(content)}</code></pre>`;
+      } else if (section?.file_id && section?.source_file?.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i)) {
+        // Image preview
+        previewEl.innerHTML = `<img src="${API_BASE}/api/files/${section.file_id}/content" style="max-width: 100%; border-radius: 8px;" />`;
+      } else {
+        // Markdown preview - simple rendering
+        previewEl.innerHTML = renderMarkdown(content);
+      }
+    }
+
+    function renderMarkdown(text) {
+      if (!text) return '<span style="color: #64748b;">No content</span>';
+
+      // Simple markdown rendering
+      let html = escapeHtml(text);
+
+      // Headers
+      html = html.replace(/^### (.+)$/gm, '<h3 style="color: #a5b4fc; margin: 16px 0 8px;">$1</h3>');
+      html = html.replace(/^## (.+)$/gm, '<h2 style="color: #c4b5fd; margin: 20px 0 10px; font-size: 1.2rem;">$1</h2>');
+      html = html.replace(/^# (.+)$/gm, '<h1 style="color: #e2e8f0; margin: 24px 0 12px; font-size: 1.4rem;">$1</h1>');
+
+      // Code blocks
+      html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; margin: 12px 0; overflow-x: auto;"><code>$2</code></pre>');
+
+      // Inline code
+      html = html.replace(/`([^`]+)`/g, '<code style="background: rgba(99, 102, 241, 0.2); padding: 2px 6px; border-radius: 3px;">$1</code>');
+
+      // Bold
+      html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+      // Italic
+      html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+      // Links
+      html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color: #60a5fa;">$1</a>');
+
+      // Images
+      html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; border-radius: 8px; margin: 12px 0;" />');
+
+      // Lists
+      html = html.replace(/^- (.+)$/gm, '<li style="margin-left: 20px;">$1</li>');
+      html = html.replace(/^(\d+)\. (.+)$/gm, '<li style="margin-left: 20px;">$2</li>');
+
+      // Line breaks
+      html = html.replace(/\n/g, '<br>');
+
+      return `<div style="line-height: 1.7;">${html}</div>`;
+    }
+
+    function toggleCanvasPreviewMode() {
+      const editorPane = document.getElementById('canvas-editor-pane');
+      const previewPane = document.getElementById('canvas-preview-pane');
+      const toggleBtn = document.getElementById('canvas-preview-toggle');
+
+      if (canvasPreviewMode === 'split') {
+        // Switch to preview only
+        canvasPreviewMode = 'preview';
+        editorPane.style.display = 'none';
+        previewPane.style.flex = '1';
+        previewPane.style.borderRight = 'none';
+        toggleBtn.textContent = 'Edit';
+      } else if (canvasPreviewMode === 'preview') {
+        // Switch to edit only
+        canvasPreviewMode = 'edit';
+        editorPane.style.display = 'flex';
+        editorPane.style.flex = '1';
+        previewPane.style.display = 'none';
+        toggleBtn.textContent = 'Split';
+      } else {
+        // Switch back to split
+        canvasPreviewMode = 'split';
+        editorPane.style.display = 'flex';
+        editorPane.style.flex = '1';
+        previewPane.style.display = 'block';
+        previewPane.style.flex = '1';
+        previewPane.style.borderRight = 'none';
+        toggleBtn.textContent = 'Preview';
+      }
+
+      updateCanvasPreview();
+    }
+
+    function downloadCanvasSection() {
+      if (!canvasDocument || !activeSectionName) {
+        showNotification('No section selected', 'warning');
+        return;
+      }
+
+      const section = canvasDocument.sections[activeSectionName];
+      const content = section?.content || '';
+      const ext = section?.section_type === 'code' ? '.txt' : '.md';
+
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${activeSectionName}${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      showNotification(`Downloaded ${activeSectionName}${ext}`, 'success');
+    }
+
+    async function askAIToEdit() {
+      if (!canvasDocument || !activeSectionName) {
+        showNotification('No section selected', 'warning');
+        return;
+      }
+
+      const instruction = prompt('What should the AI do with this content?', 'Improve this document');
+      if (!instruction) return;
+
+      const section = canvasDocument.sections[activeSectionName];
+      const content = section?.content || '';
+
+      // Send to Koda (or whichever agent) with the edit instruction
+      const agentInput = document.getElementById('agent-a-input');
+      if (agentInput) {
+        agentInput.value = `Edit section '${activeSectionName}': ${instruction}\n\nCurrent content:\n${content.substring(0, 500)}${content.length > 500 ? '...' : ''}`;
+        showNotification('Instruction sent to Koda. Send the message to execute.', 'info');
+
+        // Focus the input
+        agentInput.focus();
+      }
     }
 
     async function saveCanvasSection() {
@@ -14062,6 +14236,12 @@ ${currentConversation.display}
     window.saveCanvasSection = saveCanvasSection;
     window.exportCanvasMarkdown = exportCanvasMarkdown;
     window.onCanvasEditorInput = onCanvasEditorInput;
+    window.toggleCanvasPreviewMode = toggleCanvasPreviewMode;
+    window.downloadCanvasSection = downloadCanvasSection;
+    window.askAIToEdit = askAIToEdit;
+    window.autoConvertFileToCanvas = autoConvertFileToCanvas;
+    window.convertFileToCanvas = convertFileToCanvas;
+    window.updateCanvasPreview = updateCanvasPreview;
 
     // =========================================================================
     // END CANVAS COLLABORATION
@@ -14974,10 +15154,21 @@ ${currentConversation.display}
 
         if (data.ok) {
           statusEl.textContent = `Uploaded ${data.count} file(s) successfully`;
+
+          // Auto-convert uploaded files to canvas
+          if (data.files && data.files.length > 0) {
+            statusEl.textContent = `Converting to canvas...`;
+            for (const file of data.files) {
+              await autoConvertFileToCanvas(file.id, file.filename);
+            }
+          }
+
           setTimeout(() => {
             progressDiv.style.display = 'none';
             loadUploadedFiles();
-          }, 1500);
+            // Switch to sections view to show the converted documents
+            switchCanvasMode('sections');
+          }, 1000);
         } else {
           statusEl.textContent = 'Upload failed: ' + (data.error || 'Unknown error');
         }
@@ -15255,6 +15446,76 @@ ${escapeHtml(file.extracted_preview)}
         alert(`File reference sent to ${agent}`);
       } else {
         alert('Unknown agent. Use: koda, cairn, or prax');
+      }
+    }
+
+    // Auto-convert file to canvas without prompts (used during upload)
+    async function autoConvertFileToCanvas(fileId, filename) {
+      // Ensure we have a canvas document
+      if (!canvasDocument) {
+        // Auto-create document in local mode
+        canvasDocument = {
+          id: 'local_' + Date.now(),
+          name: 'Uploaded Documents',
+          section_order: [],
+          sections: {},
+          isLocal: !currentSessionId
+        };
+        if (!currentSessionId) {
+          saveLocalDocument();
+        }
+        document.getElementById('canvas-doc-name').textContent = canvasDocument.name;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/files/${fileId}/to-canvas`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: currentSessionId })
+        });
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const sectionName = data.suggested_name || filename.replace(/\.[^/.]+$/, '');
+
+        if (canvasDocument.isLocal) {
+          canvasDocument.sections[sectionName] = {
+            name: sectionName,
+            section_type: data.section_type || 'markdown',
+            content: data.content,
+            owner: currentUserId || 'local_user',
+            version: 1,
+            created_at: new Date().toISOString(),
+            source_file: data.filename,
+            file_id: fileId
+          };
+          if (!canvasDocument.section_order.includes(sectionName)) {
+            canvasDocument.section_order.push(sectionName);
+          }
+          saveLocalDocument();
+        } else {
+          await fetch(`${API_BASE}/api/canvas/${currentSessionId}/section`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              document_id: canvasDocument.id,
+              section_name: sectionName,
+              section_type: data.section_type || 'markdown',
+              content: data.content,
+              owner: currentUserId
+            })
+          });
+          await loadCanvasDocument();
+        }
+
+        renderCanvasSections();
+        // Auto-select the first uploaded section
+        if (canvasDocument.section_order.length === 1) {
+          selectCanvasSection(sectionName);
+        }
+      } catch (error) {
+        console.error('Auto-convert error:', error);
       }
     }
 

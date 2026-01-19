@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat Debug Test</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    #chat {
+      background: #2a2a2a;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .message {
+      margin-bottom: 12px;
+      padding: 8px;
+      background: #3a3a3a;
+      border-radius: 4px;
+    }
+    .user { border-left: 3px solid #4a9eff; }
+    .assistant { border-left: 3px solid #4aff9e; }
+    .error { border-left: 3px solid #ff4a4a; }
+    input {
+      width: 70%;
+      padding: 10px;
+      background: #2a2a2a;
+      border: 1px solid #4a4a4a;
+      color: #fff;
+      border-radius: 4px;
+    }
+    button {
+      padding: 10px 20px;
+      background: #4a9eff;
+      border: none;
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+    #debug {
+      background: #1a1a1a;
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid #4a4a4a;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .debug-line {
+      margin: 4px 0;
+      color: #888;
+    }
+    .debug-error { color: #ff4a4a; }
+    .debug-success { color: #4aff9e; }
+    .debug-info { color: #4a9eff; }
+  </style>
+</head>
+<body>
+  <h1>🔍 Chat Debug Test</h1>
+  <p>Testing the AI Research Assistant endpoint directly with detailed logging.</p>
+
+  <div id="chat">
+    <div class="message assistant">
+      <strong>Assistant:</strong> Ready to test! Type a message below.
+    </div>
+  </div>
+
+  <div>
+    <input type="text" id="input" placeholder="Type your message..." onkeypress="if(event.key==='Enter') sendMessage()">
+    <button id="send-btn" onclick="sendMessage()">Send</button>
+    <select id="model">
+      <option value="claude">Claude</option>
+      <option value="deepseek">DeepSeek</option>
+    </select>
+  </div>
+
+  <h2 style="margin-top: 30px;">📊 Debug Log</h2>
+  <div id="debug"></div>
+
+  <script>
+    const API_BASE = 'http://localhost:8080';
+    let history = [];
+
+    function log(message, type = 'info') {
+      const debugEl = document.getElementById('debug');
+      const line = document.createElement('div');
+      line.className = `debug-line debug-${type}`;
+      line.textContent = `[${new Date().toISOString().split('T')[1].slice(0, -1)}] ${message}`;
+      debugEl.appendChild(line);
+      debugEl.scrollTop = debugEl.scrollHeight;
+      console.log(message);
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('input');
+      const message = input.value.trim();
+
+      if (!message) {
+        log('No message entered', 'error');
+        return;
+      }
+
+      input.value = '';
+      const btn = document.getElementById('send-btn');
+      btn.textContent = 'Sending...';
+      btn.disabled = true;
+
+      // Add user message to chat
+      const chatEl = document.getElementById('chat');
+      const userMsg = document.createElement('div');
+      userMsg.className = 'message user';
+      userMsg.innerHTML = `<strong>You:</strong> ${message}`;
+      chatEl.appendChild(userMsg);
+      chatEl.scrollTop = chatEl.scrollHeight;
+
+      log(`Sending message: "${message}"`, 'info');
+      log(`Model: ${document.getElementById('model').value}`, 'info');
+
+      const payload = {
+        message: message,
+        model: document.getElementById('model').value,
+        history: history
+      };
+
+      log(`Payload: ${JSON.stringify(payload)}`, 'info');
+
+      try {
+        log('Fetching /api/assistant/chat...', 'info');
+
+        const response = await fetch(`${API_BASE}/api/assistant/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        log(`Response status: ${response.status}`, response.status === 200 ? 'success' : 'error');
+        log(`Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`, 'info');
+
+        if (response.status !== 200) {
+          throw new Error(`Server returned ${response.status}`);
+        }
+
+        // Create assistant message element
+        const assistantMsg = document.createElement('div');
+        assistantMsg.className = 'message assistant';
+        assistantMsg.innerHTML = '<strong>Assistant:</strong> <em>Thinking...</em>';
+        chatEl.appendChild(assistantMsg);
+        chatEl.scrollTop = chatEl.scrollHeight;
+
+        log('Reading stream...', 'info');
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let assistantResponse = '';
+        let chunkCount = 0;
+
+        while (true) {
+          const { value, done } = await reader.read();
+
+          if (done) {
+            log('Stream ended', 'success');
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (line.trim() === '') continue;
+
+            log(`Received line: ${line.substring(0, 100)}...`, 'info');
+
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                log(`Parsed data: ${JSON.stringify(data)}`, 'success');
+
+                if (data.chunk) {
+                  chunkCount++;
+                  assistantResponse += data.chunk;
+                  assistantMsg.innerHTML = `<strong>Assistant:</strong> ${assistantResponse}`;
+                  chatEl.scrollTop = chatEl.scrollHeight;
+                  log(`Chunk ${chunkCount}: "${data.chunk.substring(0, 30)}..."`, 'success');
+
+                } else if (data.tool_call) {
+                  log(`Tool call: ${data.tool_call.name}`, 'info');
+                  assistantMsg.innerHTML += `<br><em>🔧 Calling ${data.tool_call.name}...</em>`;
+
+                } else if (data.done) {
+                  log('Response complete!', 'success');
+
+                } else if (data.error) {
+                  log(`Error from server: ${data.error}`, 'error');
+                  assistantMsg.className = 'message error';
+                  assistantMsg.innerHTML = `<strong>Error:</strong> ${data.error}`;
+                }
+
+              } catch (parseError) {
+                log(`JSON parse error: ${parseError.message}`, 'error');
+                log(`Failed to parse: ${line}`, 'error');
+              }
+            }
+          }
+        }
+
+        log(`Total chunks received: ${chunkCount}`, 'success');
+
+        if (assistantResponse) {
+          history.push({ role: 'user', content: message });
+          history.push({ role: 'assistant', content: assistantResponse });
+        }
+
+      } catch (err) {
+        log(`Error: ${err.message}`, 'error');
+        log(`Stack: ${err.stack}`, 'error');
+
+        const errorMsg = document.createElement('div');
+        errorMsg.className = 'message error';
+        errorMsg.innerHTML = `<strong>Error:</strong> ${err.message}`;
+        chatEl.appendChild(errorMsg);
+
+      } finally {
+        btn.textContent = 'Send';
+        btn.disabled = false;
+        log('Request complete', 'info');
+      }
+    }
+
+    // Initial log
+    log('Chat debug test initialized', 'success');
+    log(`API endpoint: ${API_BASE}/api/assistant/chat`, 'info');
+  </script>
+</body>
+</html>

@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Phase 4C Test Report</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+               margin: 40px; background: #f5f5f5; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                   color: white; padding: 30px; border-radius: 10px; margin-bottom: 30px; }
+        .header h1 { margin: 0 0 10px 0; }
+        .summary { display: flex; gap: 20px; margin-top: 20px; }
+        .stat { background: rgba(255,255,255,0.2); padding: 15px 25px; border-radius: 8px; }
+        .stat-value { font-size: 32px; font-weight: bold; }
+        .stat-label { font-size: 12px; opacity: 0.9; }
+        .phase { background: white; border-radius: 10px; padding: 20px; margin-bottom: 15px;
+                  box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .phase-header { display: flex; justify-content: space-between; align-items: center;
+                        border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 15px; }
+        .phase-title { font-size: 18px; font-weight: 600; }
+        .phase-status { padding: 5px 15px; border-radius: 20px; font-weight: 500; }
+        .status-pass { background: #d4edda; color: #155724; }
+        .status-fail { background: #f8d7da; color: #721c24; }
+        .phase-details { display: flex; gap: 30px; color: #666; font-size: 14px; }
+        .output { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px;
+                   font-family: monospace; font-size: 12px; max-height: 300px; overflow: auto;
+                   white-space: pre-wrap; margin-top: 15px; display: none; }
+        .toggle { cursor: pointer; color: #667eea; font-size: 14px; }
+        .timestamp { color: #999; font-size: 12px; margin-top: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 Phase 4C Test Report</h1>
+        <p>Golden Library - Collaborative Workspace</p>
+        <div class="summary">
+            <div class="stat">
+                <div class="stat-value">57</div>
+                <div class="stat-label">Total Tests</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" style="color: #90EE90;">57</div>
+                <div class="stat-label">Passed</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" style="color: #90EE90;">0</div>
+                <div class="stat-label">Failed</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">10.4s</div>
+                <div class="stat-label">Duration</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="phase">
+        <div class="phase-header">
+            <div class="phase-title">Phase 4C.1: Hierarchical Delegation</div>
+            <div class="phase-status status-pass">PASSED</div>
+        </div>
+        <div class="phase-details">
+            <span>📄 test_phase4c1_delegation.py</span>
+            <span>✓ 5 passed</span>
+            <span>✗ 0 failed</span>
+            <span>⏱ 0.56s</span>
+            <span class="toggle" onclick="this.parentElement.nextElementSibling.style.display = this.parentElement.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+                [Show Output]
+            </span>
+        </div>
+        <pre class="output">============================================================
+  Phase 4C.1 Integration Tests
+  Hierarchical Task Delegation
+============================================================
+
+============================================================
+TEST 1: TaskDelegationManager Basic Operations
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session 61gbid with MCP tools
+[SessionManager] Created session 61gbid for user Test User
+✓ Created session: 61gbid
+[SessionManager] Audit: agent_message_sent by prax in 61gbid
+[SessionManager] Agent message: prax → cairn (priority: high)
+[TaskDelegationManager] Task delegated: task_caaf94b1c3bd (prax → cairn)
+✓ Task delegated: task_caaf94b1c3bd
+✓ Task status: pending
+[SessionManager] Audit: agent_message_sent by cairn in 61gbid
+[SessionManager] Agent message: cairn → prax (priority: medium)
+[TaskDelegationManager] Task acknowledged: task_caaf94b1c3bd by cairn
+✓ Task acknowledged by Cairn
+[TaskDelegationManager] Task started: task_caaf94b1c3bd by cairn
+✓ Task started
+[TaskDelegationManager] Task progress: task_caaf94b1c3bd at 50%
+✓ Progress updated: 50%
+[SessionManager] Audit: agent_message_sent by cairn in 61gbid
+[SessionManager] Agent message: cairn → prax (priority: high)
+[SessionManager] Audit: context_shared by cairn in 61gbid
+[SessionManager] Audit: agent_message_sent by cairn in 61gbid
+[SessionManager] Agent message: cairn → prax (priority: medium)
+[SessionManager] Audit: agent_message_sent by cairn in 61gbid
+[SessionManager] Agent message: cairn → koda (priority: medium)
+[SessionManager] Context shared: canvas:compliance_analysis by cairn to all
+[TaskDelegationManager] Task completed: task_caaf94b1c3bd by cairn
+✓ Task completed
+  Result: Compiled 10 HIPAA compliance requirements across technical, administrative, and ...
+✓ Agent task tracking works: Cairn has 1 task(s)
+
+✅ All TaskDelegationManager tests passed!
+
+============================================================
+TEST 2: Session Manager Integration
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session 57tsap with MCP tools
+[SessionManager] Created session 57tsap for user Test User
+✓ Created session: 57tsap
+[SessionManager] Audit: agent_message_sent by prax in 57tsap
+[SessionManager] Agent message: prax → cairn (priority: high)
+[TaskDelegationManager] Task delegated: task_a858d2e99fdf (prax → cairn)
+✓ Delegation message in Cairn's inbox: 1 message(s)
+✓ Inbox message content verified
+✓ WebSocket event 'task_delegated' queued
+
+✅ All Session Integration tests passed!
+
+============================================================
+TEST 3: Canvas Section Management
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session jmbl1r with MCP tools
+[SessionManager] Created session jmbl1r for user Test User
+[SessionManager] Canvas section created: compliance_analysis (owner: cairn)
+✓ Created canvas section 'compliance_analysis' owned by Cairn
+✓ Retrieved canvas section: version 1
+[SessionManager] Audit: canvas_updated by cairn in jmbl1r
+[SessionManager] Canvas section updated: compliance_analysis (v2)
+✓ Updated canvas section: version 2
+✓ Listed 1 canvas section(s)
+[SessionManager] Permission denied: koda cannot update section owned by cairn
+✓ Permission denied: Koda cannot edit Cairn's section
+✓ Canvas history: 2 versions
+
+✅ All Canvas Section tests passed!
+
+============================================================
+TEST 4: Full Delegation Flow (Prax → Cairn → Result)
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session qqij69 with MCP tools
+[SessionManager] Created session qqij69 for user Test User
+
+--- Step 1: Prax delegates to Cairn ---
+[SessionManager] Audit: agent_message_sent by prax in qqij69
+[SessionManager] Agent message: prax → cairn (priority: high)
+[TaskDelegationManager] Task delegated: task_443aacbc7b1d (prax → cairn)
+  → Prax delegated task: task_443aacbc7b1d
+[SessionManager] Audit: task_delegated by prax in qqij69
+[SessionManager] Task registered: task_443aacbc7b1d
+  → Cairn workload updated: {'active_tasks': 2, 'status': 'working'}
+
+--- Step 2: Cairn acknowledges and starts ---
+[SessionManager] Audit: agent_message_sent by cairn in qqij69
+[SessionManager] Agent message: cairn → prax (priority: medium)
+[TaskDelegationManager] Task acknowledged: task_443aacbc7b1d by cairn
+[TaskDelegationManager] Task started: task_443aacbc7b1d by cairn
+  → Cairn started working on task
+  → Prax notified: 1 message(s) in inbox
+
+--- Step 3: Cairn updates progress ---
+[TaskDelegationManager] Task progress: task_443aacbc7b1d at 50%
+  → Progress: 50% - Identified 10 key requirements
+
+--- Step 4: Cairn completes and writes to canvas ---
+[SessionManager] Audit: agent_message_sent by cairn in qqij69
+[SessionManager] Agent message: cairn → prax (priority: high)
+[SessionManager] Audit: context_shared by cairn in qqij69
+[SessionManager] Audit: agent_message_sent by cairn in qqij69
+[SessionManager] Agent message: cairn → prax (priority: medium)
+[SessionManager] Audit: agent_message_sent by cairn in qqij69
+[SessionManager] Agent message: cairn → koda (priority: medium)
+[SessionManager] Context shared: canvas:hipaa_requirements by cairn to all
+[TaskDelegationManager] Task completed: task_443aacbc7b1d by cairn
+[SessionManager] Canvas section created: hipaa_requirements (owner: cairn)
+[SessionManager] Audit: canvas_updated by cairn in qqij69
+[SessionManager] Canvas section updated: hipaa_requirements (v2)
+  → Task completed and written to canvas section 'hipaa_requirements'
+  → Final task status: completed
+  → Canvas section content: 1312 chars
+  → Prax received completion notification
+  → Final Cairn workload: {'active_tasks': 1, 'status': 'working'}
+
+✅ Full Delegation Flow test passed!
+
+============================================================
+TEST 5: Blocker Reporting Flow
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session u70msh with MCP tools
+[SessionManager] Created session u70msh for user Test User
+[SessionManager] Audit: agent_message_sent by prax in u70msh
+[SessionManager] Agent message: prax → koda (priority: high)
+[TaskDelegationManager] Task delegated: task_6c74d4431afd (prax → koda)
+  → Task delegated: task_6c74d4431afd
+[SessionManager] Audit: agent_message_sent by koda in u70msh
+[SessionManager] Agent message: koda → prax (priority: medium)
+[TaskDelegationManager] Task acknowledged: task_6c74d4431afd by koda
+[TaskDelegationManager] Task started: task_6c74d4431afd by koda
+  → Koda started task
+[SessionManager] Audit: agent_message_sent by koda in u70msh
+[SessionManager] Agent message: koda → prax (priority: high)
+[SessionManager] Audit: blocker_escalated by system in u70msh
+[SessionManager] Blocker escalated: Task task_6c74d4431afd: Need clarification on token expiry policy - should access tokens expire in 15 min or 1 hour? (severity: high)
+[TaskDelegationManager] Task blocked: task_6c74d4431afd - Need clarification on token expiry policy - should access tokens expire in 15 min or 1 hour?
+  → Blocker reported: token expiry clarification needed
+  → Task status: blocked
+  → Blocker escalated to UI
+[TaskDelegationManager] Task resumed: task_6c74d4431afd
+  → Blocker resolved
+  → Task status: in_progress
+
+✅ Blocker Flow test passed!
+
+============================================================
+  RESULTS: 5 passed, 0 failed
+============================================================
+
+🎉 All Phase 4C.1 tests passed!
+
+Phase 4C.1 Implementation Complete:
+  ✓ TaskDelegationManager class
+  ✓ DelegatedTask tracking in WorkspaceSession
+  ✓ Enhanced Prax system prompt with delegation patterns
+  ✓ WebSocket events for task lifecycle
+  ✓ Canvas section assignment and management
+
+Success Criteria Met:
+  ✓ Prax can send: 'Cairn, research HIPAA compliance requirements'
+  ✓ Cairn receives structured task
+  ✓ Completes research
+  ✓ Reports results back to Prax
+  ✓ Results written to designated canvas section
+</pre>
+    </div>
+
+    <div class="phase">
+        <div class="phase-header">
+            <div class="phase-title">Phase 4C.2: Canvas Sync</div>
+            <div class="phase-status status-pass">PASSED</div>
+        </div>
+        <div class="phase-details">
+            <span>📄 test_phase4c2_canvas.py</span>
+            <span>✓ 8 passed</span>
+            <span>✗ 0 failed</span>
+            <span>⏱ 0.46s</span>
+            <span class="toggle" onclick="this.parentElement.nextElementSibling.style.display = this.parentElement.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+                [Show Output]
+            </span>
+        </div>
+        <pre class="output">============================================================
+  Phase 4C.2 Integration Tests
+  Canvas Collaboration
+============================================================
+
+============================================================
+TEST 1: Vector Clock Causality
+============================================================
+  User A edit 1: {'user_a': 1}
+  User B edit 1: {'user_b': 1}
+  ✓ Concurrent edits detected correctly
+  Merged clock: {'user_a': 1, 'user_b': 1}
+  ✓ Clocks merged correctly
+  ✓ Happens-before ordering works
+
+✅ Vector Clock tests passed!
+
+============================================================
+TEST 2: Canvas Document Creation
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session kzmiiw with MCP tools
+[SessionManager] Created session kzmiiw for user Test User
+[CanvasSyncManager] Created document: canvas_49de703deb98 (Project Pitch Deck)
+  ✓ Document created: canvas_49de703deb98
+  ✓ 3 sections created
+  ✓ Section ownership: Executive Summary → prax
+[CanvasSyncManager] Added section: Pricing Model to canvas_49de703deb98
+  ✓ Added section: Pricing Model (human editable)
+
+✅ Canvas Document Creation tests passed!
+
+============================================================
+TEST 3: Section Editing & Permissions
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session 6cuyie with MCP tools
+[SessionManager] Created session 6cuyie for user Test User
+[CanvasSyncManager] Created document: canvas_36084e4666c4 (Test Doc)
+[CanvasSyncManager] Edit applied: Cairn Section v2 by Cairn
+  ✓ Cairn edited own section (edit ID: 0ca986ba-13d)
+  ✓ Section content updated, version: 2
+[CanvasSyncManager] Permission denied: koda cannot edit section owned by cairn
+  ✓ Permission denied: Koda cannot edit Cairn's section
+[CanvasSyncManager] Edit applied: Shared Section v2 by Human User
+  ✓ Human edited shared section
+
+✅ Section Editing tests passed!
+
+============================================================
+TEST 4: Version History Tracking
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session udi77d with MCP tools
+[SessionManager] Created session udi77d for user Test User
+[CanvasSyncManager] Created document: canvas_576c5f3b13a2 (History Test)
+[CanvasSyncManager] Edit applied: Main v2 by Alice
+[CanvasSyncManager] Edit applied: Main v3 by Bob
+[CanvasSyncManager] Edit applied: Main v4 by Alice
+[CanvasSyncManager] Edit applied: Main v5 by Charlie
+  ✓ Section version: 5
+  ✓ History has 4 entries
+  ✓ Most recent: 'Final version' by Charlie
+
+✅ Version History tests passed!
+
+============================================================
+TEST 5: Concurrent Editing Simulation
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session gpg3kf with MCP tools
+[SessionManager] Created session gpg3kf for user Test User
+[CanvasSyncManager] Created document: canvas_506a0bab9a6f (Concurrent Test)
+[CanvasSyncManager] Edit applied: Shared v2 by Alice
+[CanvasSyncManager] Edit applied: Shared v3 by Bob
+  ✓ Both users edited successfully
+  ✓ Last-write-wins: content = 'Bob version'
+  ✓ History preserved both edits
+
+✅ Concurrent Editing tests passed!
+
+============================================================
+TEST 6: Export Functionality
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session wu1mox with MCP tools
+[SessionManager] Created session wu1mox for user Test User
+[CanvasSyncManager] Created document: canvas_02b77d87e0f3 (Export Test Document)
+  ✓ Markdown export: 298 chars
+  ✓ HTML export: 1129 chars
+  ✓ JSON export: 1519 chars
+
+✅ Export Functionality tests passed!
+
+============================================================
+TEST 7: Section Locking
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session go25gh with MCP tools
+[SessionManager] Created session go25gh for user Test User
+[CanvasSyncManager] Created document: canvas_7a62c97cebd1 (Lock Test)
+  ✓ User A acquired lock
+  ✓ User B denied lock (already locked)
+  ✓ User A released lock
+  ✓ User B acquired lock after release
+
+✅ Section Locking tests passed!
+
+============================================================
+TEST 8: Session Canvas Sync
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session 1vye23 with MCP tools
+[SessionManager] Created session 1vye23 for user Test User
+[SessionManager] Canvas section created: research (owner: cairn)
+[SessionManager] Canvas section created: implementation (owner: koda)
+[CanvasSyncManager] Created document: canvas_564b49e764f3 (Session 1vye23 Canvas)
+[CanvasSyncManager] Added section: research to canvas_564b49e764f3
+[CanvasSyncManager] Added section: implementation to canvas_564b49e764f3
+  ✓ Synced 2 sections from session
+  ✓ Content preserved: 'Research findings here...'
+
+✅ Session Canvas Sync tests passed!
+
+============================================================
+  RESULTS: 8 passed, 0 failed
+============================================================
+
+🎉 All Phase 4C.2 tests passed!
+
+Phase 4C.2 Implementation Complete:
+  ✓ CanvasSyncManager with CRDT-like conflict resolution
+  ✓ Section-based document organization
+  ✓ Ownership and permission enforcement
+  ✓ Version history tracking
+  ✓ Section locking
+  ✓ Export to Markdown/HTML/JSON
+  ✓ Frontend canvas UI panel
+  ✓ WebSocket real-time sync events
+
+Success Criteria Met:
+  ✓ Multiple users edit canvas simultaneously
+  ✓ Agents write to assigned sections
+  ✓ Version history shows who edited what
+  ✓ Export includes all sections
+</pre>
+    </div>
+
+    <div class="phase">
+        <div class="phase-header">
+            <div class="phase-title">Phase 4C.3: Tool Gateway</div>
+            <div class="phase-status status-pass">PASSED</div>
+        </div>
+        <div class="phase-details">
+            <span>📄 test_phase4c3_tools.py</span>
+            <span>✓ 9 passed</span>
+            <span>✗ 0 failed</span>
+            <span>⏱ 5.12s</span>
+            <span class="toggle" onclick="this.parentElement.nextElementSibling.style.display = this.parentElement.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+                [Show Output]
+            </span>
+        </div>
+        <pre class="output">============================================================
+  Phase 4C.3 Integration Tests
+  External Tool Integration
+============================================================
+
+============================================================
+TEST 1: ToolGateway Initialization
+============================================================
+[ToolGateway] Registered tool: deepseek (llm)
+[ToolGateway] Registered tool: openai (llm)
+[ToolGateway] Registered tool: claude_haiku (llm)
+[ToolGateway] Registered tool: web_search (web)
+[ToolGateway] Registered tool: url_fetch (web)
+[ToolGateway] Registered tool: code_analysis (code)
+  ✓ 6 tools registered
+  ✓ Tool categories correct
+
+✅ ToolGateway Initialization test passed!
+
+============================================================
+TEST 2: Permission Checking
+============================================================
+[ToolGateway] Registered tool: deepseek (llm)
+[ToolGateway] Registered tool: openai (llm)
+[ToolGateway] Registered tool: claude_haiku (llm)
+[ToolGateway] Registered tool: web_search (web)
+[ToolGateway] Registered tool: url_fetch (web)
+[ToolGateway] Registered tool: code_analysis (code)
+  ✓ Default permissions correct
+  ✓ Prax has limited permissions
+  ✓ Custom permissions work
+  ✓ Cairn has access to 6 tools
+
+✅ Permission Checking test passed!
+
+============================================================
+TEST 3: Code Analysis Tool
+============================================================
+  ✓ Analyzed 12 lines of code
+  ✓ Found 1 issues
+    - [high] Use of eval() is a security risk
+  ✓ Made 2 suggestions
+
+✅ Code Analysis Tool test passed!
+
+============================================================
+TEST 4: Web Search Tool (Mock)
+============================================================
+  ✓ Mock search returned 1 results
+  ✓ Query: HIPAA compliance requirements
+
+✅ Web Search Tool (Mock) test passed!
+
+============================================================
+TEST 5: URL Fetch Tool
+============================================================
+  ✓ Fetched 142 chars from example.com
+  ✓ Content type: text/html
+
+✅ URL Fetch Tool test passed!
+
+============================================================
+TEST 6: Tool Execution via Gateway
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session gjgw9z with MCP tools
+[SessionManager] Created session gjgw9z for user Test User
+[ToolGateway] Registered tool: deepseek (llm)
+[ToolGateway] Registered tool: openai (llm)
+[ToolGateway] Registered tool: claude_haiku (llm)
+[ToolGateway] Registered tool: web_search (web)
+[ToolGateway] Registered tool: url_fetch (web)
+[ToolGateway] Registered tool: code_analysis (code)
+[SessionManager] Audit: tool_executed by cairn in gjgw9z
+[ToolGateway] cairn called code_analysis: success
+  ✓ Cairn executed code_analysis successfully
+[SessionManager] Audit: tool_executed by prax in gjgw9z
+[ToolGateway] prax called deepseek: denied
+  ✓ Prax denied access to deepseek
+[SessionManager] Audit: tool_executed by unknown_agent in gjgw9z
+[ToolGateway] unknown_agent called web_search: denied
+  ✓ Unknown agent denied access
+[SessionManager] Audit: tool_executed by cairn in gjgw9z
+[ToolGateway] cairn called fake_tool: failed
+  ✓ Non-existent tool returns FAILED
+
+✅ Tool Execution via Gateway test passed!
+
+============================================================
+TEST 7: Cost Tracking
+============================================================
+[ToolGateway] Registered tool: deepseek (llm)
+[ToolGateway] Registered tool: openai (llm)
+[ToolGateway] Registered tool: claude_haiku (llm)
+[ToolGateway] Registered tool: web_search (web)
+[ToolGateway] Registered tool: url_fetch (web)
+[ToolGateway] Registered tool: code_analysis (code)
+[ToolGateway] cairn called code_analysis: success
+[ToolGateway] koda called web_search: success
+  ✓ 2 tool calls recorded
+  ✓ Total cost: $0.0000
+  ✓ Total calls: 2
+
+✅ Cost Tracking test passed!
+
+============================================================
+TEST 8: Tool Descriptions for Prompts
+============================================================
+[ToolGateway] Registered tool: deepseek (llm)
+[ToolGateway] Registered tool: openai (llm)
+[ToolGateway] Registered tool: claude_haiku (llm)
+[ToolGateway] Registered tool: web_search (web)
+[ToolGateway] Registered tool: url_fetch (web)
+[ToolGateway] Registered tool: code_analysis (code)
+  ✓ Cairn tool descriptions: 888 chars
+  ✓ Koda tool descriptions: 794 chars
+  ✓ Prax tool descriptions: 386 chars (limited)
+
+✅ Tool Descriptions test passed!
+
+============================================================
+TEST 9: Audit Logging
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session dscgoi with MCP tools
+[SessionManager] Created session dscgoi for user Test User
+[ToolGateway] Registered tool: deepseek (llm)
+[ToolGateway] Registered tool: openai (llm)
+[ToolGateway] Registered tool: claude_haiku (llm)
+[ToolGateway] Registered tool: web_search (web)
+[ToolGateway] Registered tool: url_fetch (web)
+[ToolGateway] Registered tool: code_analysis (code)
+[SessionManager] Audit: tool_executed by cairn in dscgoi
+[ToolGateway] cairn called code_analysis: success
+  ✓ Audit entry recorded: tool_executed
+  ✓ Tool: code_analysis
+  ✓ Status: success
+
+✅ Audit Logging test passed!
+
+============================================================
+  RESULTS: 9 passed, 0 failed
+============================================================
+
+🎉 All Phase 4C.3 tests passed!
+
+Phase 4C.3 Implementation Complete:
+  ✓ ToolGateway with tool registry
+  ✓ LLM integrations (DeepSeek, OpenAI, Claude Haiku)
+  ✓ Web tools (Search, URL Fetch)
+  ✓ Code Analysis tool
+  ✓ Permission-based access control
+  ✓ Cost tracking per tool
+  ✓ Audit logging of tool calls
+  ✓ Tool descriptions for agent prompts
+
+Success Criteria Met:
+  ✓ Cairn: 'Use tool deepseek' → DeepSeek called → results returned
+  ✓ Tool usage logged in audit trail
+  ✓ Permission denied for unauthorized tools
+</pre>
+    </div>
+
+    <div class="phase">
+        <div class="phase-header">
+            <div class="phase-title">Phase 4C.4: Conversation Database</div>
+            <div class="phase-status status-pass">PASSED</div>
+        </div>
+        <div class="phase-details">
+            <span>📄 test_phase4c4_database.py</span>
+            <span>✓ 9 passed</span>
+            <span>✗ 0 failed</span>
+            <span>⏱ 1.83s</span>
+            <span class="toggle" onclick="this.parentElement.nextElementSibling.style.display = this.parentElement.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+                [Show Output]
+            </span>
+        </div>
+        <pre class="output">============================================================
+  Phase 4C.4 Integration Tests
+  Conversation Database
+============================================================
+
+============================================================
+TEST 1: Database Availability
+============================================================
+  ✓ HAS_CONVERSATION_DB = True
+  ✓ Database type: sqlite
+
+✅ Database Availability test passed!
+
+============================================================
+TEST 2: SessionManager Database Init
+============================================================
+  ✓ _db_initialized = True
+  ✓ _conversation_db is set
+  ✓ Database initialized at /var/folders/1s/p9mrc0t91jv91ls1t0_7q00h0000gn/T/tmpp2njtvm7.db
+
+✅ SessionManager Database Init test passed!
+
+============================================================
+TEST 3: Auto-save Messages
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session p72g4z with MCP tools
+[SessionManager] Created session p72g4z for user Test User
+  ✓ Created session: p72g4z...
+[SessionManager] Audit: message by user1 in p72g4z
+  ✓ 3 messages saved to database
+  ✓ Message content verified
+
+✅ Auto-save Messages test passed!
+
+============================================================
+TEST 4: Search Conversation History
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session 96ehw2 with MCP tools
+[SessionManager] Created session 96ehw2 for user Test User
+[SessionManager] Audit: message by user1 in 96ehw2
+[SessionManager] Audit: message by user1 in 96ehw2
+  ✓ Found 2 results for 'JWT'
+  ✓ Found 2 results for 'HIPAA'
+  ✓ Session-filtered search works
+  ✓ Agent-filtered search works (1 results)
+
+✅ Search Conversation History test passed!
+
+============================================================
+TEST 5: Search Decisions
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session 6ycryz with MCP tools
+[SessionManager] Created session 6ycryz for user Test User
+  ✓ Found 0 decision-related messages for 'database'
+
+✅ Search Decisions test passed!
+
+============================================================
+TEST 6: Context Recovery for Prax
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session 6v3vyj with MCP tools
+[SessionManager] Created session 6v3vyj for user Test User
+[SessionManager] Audit: message by user1 in 6v3vyj
+  ✓ Recovered 5 messages
+  ✓ Summary included with 5 messages
+  ✓ 5 recovery instructions
+
+✅ Context Recovery test passed!
+
+============================================================
+TEST 7: Session Summary Updates
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session yw65qc with MCP tools
+[SessionManager] Created session yw65qc for user Test User
+[SessionManager] Audit: message by user1 in yw65qc
+  ✓ Session summary updated
+  ✓ Summary has 3 topics
+  ✓ Summary has 1 decisions
+
+✅ Session Summary test passed!
+
+============================================================
+TEST 8: Database Statistics
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session bn4yww with MCP tools
+[SessionManager] Created session bn4yww for user Test User
+  ✓ Total messages: 2
+  ✓ Total sessions: 1
+  ✓ Database type: sqlite
+
+✅ Database Statistics test passed!
+
+============================================================
+TEST 9: Fallback Without Database
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session vomyyu with MCP tools
+[SessionManager] Created session vomyyu for user Test User
+[SessionManager] Audit: message by user1 in vomyyu
+  ✓ Message added to in-memory session
+  ✓ Search returns empty list gracefully
+  ✓ Context recovery uses in-memory fallback
+  ✓ Stats correctly reports 'Database not initialized'
+
+✅ Fallback Without Database test passed!
+
+============================================================
+  RESULTS: 9 passed, 0 failed
+============================================================
+
+🎉 All Phase 4C.4 tests passed!
+
+Phase 4C.4 Implementation Complete:
+  ✓ ConversationDatabase with PostgreSQL/SQLite support
+  ✓ Auto-save messages to database
+  ✓ Full-text search across conversations
+  ✓ Decision search with keyword patterns
+  ✓ Context recovery for new Prax instances
+  ✓ Session summary with topics and decisions
+  ✓ Graceful fallback without database
+
+Success Criteria Met:
+  ✓ New Prax instance resumes from DB
+  ✓ Search: 'What did we decide about X?' → relevant messages shown
+  ✓ No data loss (messages persisted to database)
+</pre>
+    </div>
+
+    <div class="phase">
+        <div class="phase-header">
+            <div class="phase-title">Phase 4C.5: Demo Mode</div>
+            <div class="phase-status status-pass">PASSED</div>
+        </div>
+        <div class="phase-details">
+            <span>📄 test_phase4c5_demo.py</span>
+            <span>✓ 9 passed</span>
+            <span>✗ 0 failed</span>
+            <span>⏱ 0.52s</span>
+            <span class="toggle" onclick="this.parentElement.nextElementSibling.style.display = this.parentElement.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+                [Show Output]
+            </span>
+        </div>
+        <pre class="output">============================================================
+  Phase 4C.5 Integration Tests
+  Live Demo Mode
+============================================================
+
+============================================================
+TEST 1: DemoRecorder Availability
+============================================================
+  ✓ HAS_DEMO_RECORDER = True
+  ✓ DemoRecorder instantiated
+
+✅ DemoRecorder Availability test passed!
+
+============================================================
+TEST 2: Start/Stop Demo Mode
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session phidzj with MCP tools
+[SessionManager] Created session phidzj for user Test User
+  ✓ Created session: phidzj...
+[SessionManager] Demo mode started for session phidzj: c6164460
+  ✓ Demo started: c6164460
+  ✓ Session flags updated
+[SessionManager] Demo mode stopped: c6164460 (0ms)
+  ✓ Demo stopped: 0ms
+  ✓ Session flags cleared
+
+✅ Start/Stop Demo Mode test passed!
+
+============================================================
+TEST 3: Event Recording
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session 6nluty with MCP tools
+[SessionManager] Created session 6nluty for user Test User
+[SessionManager] Demo mode started for session 6nluty: 6d10a70d
+[SessionManager] Audit: message by user1 in 6nluty
+[SessionManager] Demo mode stopped: 6d10a70d (0ms)
+  ✓ Recorded 5 events
+  ✓ Recording loaded: 5 events
+  ✓ Event types: {'agent_response', 'system', 'message'}
+
+✅ Event Recording test passed!
+
+============================================================
+TEST 4: Highlight Markers
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session wbsl49 with MCP tools
+[SessionManager] Created session wbsl49 for user Test User
+[SessionManager] Demo mode started for session wbsl49: c4908780
+[SessionManager] Audit: message by user1 in wbsl49
+  ✓ Highlight added
+[SessionManager] Demo mode stopped: c4908780 (0ms)
+  ✓ 2 highlights recorded
+
+✅ Highlight Markers test passed!
+
+============================================================
+TEST 5: Custom Branding
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session 3eo0ti with MCP tools
+[SessionManager] Created session 3eo0ti for user Test User
+[SessionManager] Demo mode started for session 3eo0ti: cf912558
+[SessionManager] Audit: message by user1 in 3eo0ti
+[SessionManager] Demo mode stopped: cf912558 (0ms)
+  ✓ Custom branding applied to HTML export
+
+✅ Custom Branding test passed!
+
+============================================================
+TEST 6: HTML Export
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session qzhamp with MCP tools
+[SessionManager] Created session qzhamp for user Test User
+[SessionManager] Demo mode started for session qzhamp: 23e0bccb
+[SessionManager] Audit: message by user1 in qzhamp
+[SessionManager] Demo mode stopped: 23e0bccb (0ms)
+  ✓ HTML export: 11511 chars
+  ✓ Self-contained HTML (CSS + JS embedded)
+
+✅ HTML Export test passed!
+
+============================================================
+TEST 7: JSON Export
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session l0sjwg with MCP tools
+[SessionManager] Created session l0sjwg for user Test User
+[SessionManager] Demo mode started for session l0sjwg: 38d07a94
+[SessionManager] Audit: message by user1 in l0sjwg
+[SessionManager] Demo mode stopped: 38d07a94 (0ms)
+  ✓ JSON export: 1683 chars
+  ✓ Valid JSON with 3 events
+
+✅ JSON Export test passed!
+
+============================================================
+TEST 8: Recording Persistence
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session 8ikpaf with MCP tools
+[SessionManager] Created session 8ikpaf for user User 0
+[SessionManager] Demo mode started for session 8ikpaf: 6bd0eae6
+[SessionManager] Audit: message by user0 in 8ikpaf
+[SessionManager] Demo mode stopped: 6bd0eae6 (0ms)
+[SessionManager] Initialized AgentOrchestrator for session jqdo3v with MCP tools
+[SessionManager] Created session jqdo3v for user User 1
+[SessionManager] Demo mode started for session jqdo3v: 5b62bca8
+[SessionManager] Audit: message by user1 in jqdo3v
+[SessionManager] Demo mode stopped: 5b62bca8 (0ms)
+[SessionManager] Initialized AgentOrchestrator for session 99oq1b with MCP tools
+[SessionManager] Created session 99oq1b for user User 2
+[SessionManager] Demo mode started for session 99oq1b: 52158f87
+[SessionManager] Audit: message by user2 in 99oq1b
+[SessionManager] Demo mode stopped: 52158f87 (0ms)
+  ✓ 3 recordings persisted
+  ✓ Recordings: ['Demo 3', 'Demo 2', 'Demo 1']
+  ✓ All recordings have expected fields
+
+✅ Recording Persistence test passed!
+
+============================================================
+TEST 9: Error Handling
+============================================================
+  ✓ Non-existent session: True
+[SessionManager] Initialized AgentOrchestrator for session ljyt3s with MCP tools
+[SessionManager] Created session ljyt3s for user Test
+  ✓ Demo not active: True
+  ✓ Highlight without demo: False
+
+✅ Error Handling test passed!
+
+============================================================
+  RESULTS: 9 passed, 0 failed
+============================================================
+
+🎉 All Phase 4C.5 tests passed!
+
+Phase 4C.5 Implementation Complete:
+  ✓ Demo mode flag per session
+  ✓ Session recording with all events
+  ✓ Highlight/bookmark markers for key moments
+  ✓ Custom branding (colors, logo, text)
+  ✓ HTML export (shareable, self-contained)
+  ✓ JSON export (data interchange)
+  ✓ Recording persistence and listing
+
+Success Criteria Met:
+  ✓ Client onboarding: features built live
+  ✓ Recordings saved to disk
+  ✓ Export to shareable HTML
+</pre>
+    </div>
+
+    <div class="phase">
+        <div class="phase-header">
+            <div class="phase-title">Phase 4C.6: Configuration</div>
+            <div class="phase-status status-pass">PASSED</div>
+        </div>
+        <div class="phase-details">
+            <span>📄 test_phase4c6_config.py</span>
+            <span>✓ 9 passed</span>
+            <span>✗ 0 failed</span>
+            <span>⏱ 0.40s</span>
+            <span class="toggle" onclick="this.parentElement.nextElementSibling.style.display = this.parentElement.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+                [Show Output]
+            </span>
+        </div>
+        <pre class="output">============================================================
+  Phase 4C.6 Integration Tests
+  Configuration & Polish
+============================================================
+
+============================================================
+TEST 1: WorkspaceConfig Availability
+============================================================
+  ✓ HAS_WORKSPACE_CONFIG = True
+  ✓ WorkspaceConfig instantiated
+
+✅ WorkspaceConfig Availability test passed!
+
+============================================================
+TEST 2: CLAUDE.md Loading
+============================================================
+  ✓ Workspace name: Test Project
+  ✓ Max users: 6
+  ✓ Default agent: koda
+  ✓ Canvas enabled: True
+  ✓ Custom instructions: 3
+  ✓ System prompt loaded
+
+✅ CLAUDE.md Loading test passed!
+
+============================================================
+TEST 3: User Preferences
+============================================================
+  ✓ Default theme: dark
+  ✓ Updated theme: light, font: 18
+  ✓ Reset to defaults: theme=dark
+  ✓ Multiple user preferences work
+
+✅ User Preferences test passed!
+
+============================================================
+TEST 4: Hooks System
+============================================================
+  ✓ Registered hooks: hook_1, hook_2
+  ✓ SESSION_START hook fired: Session started: abc123
+  ✓ MESSAGE_SENT hook fired: Message from user1
+  ✓ Disabled hook not fired
+  ✓ Unregistered hook not fired
+
+✅ Hooks System test passed!
+
+============================================================
+TEST 5: Hook Priority
+============================================================
+  ✓ Hooks fired in priority order: ['high', 'mid', 'low']
+
+✅ Hook Priority test passed!
+
+============================================================
+TEST 6: SessionManager Integration
+============================================================
+[SessionManager] Loaded workspace config: Integration Workspace
+  ✓ Workspace name via SM: Integration Workspace
+[SessionManager] Initialized AgentOrchestrator for session 8srjaz with MCP tools
+[SessionManager] Created session 8srjaz for user Test User
+  ✓ User preferences via SM
+  ✓ Updated preferences via SM: theme=light
+  ✓ Agent config: temp=0.5
+
+✅ SessionManager Integration test passed!
+
+============================================================
+TEST 7: Config Reload
+============================================================
+  ✓ Initial config: Initial
+  ✓ Reloaded config: Updated, users=20
+
+✅ Config Reload test passed!
+
+============================================================
+TEST 8: Agent Configuration
+============================================================
+  ✓ Cairn: personality=analytical, temp=0.5
+  ✓ Koda: personality=practical, temp=0.3
+  ✓ Prax: personality=strategic, temp=0.7
+
+✅ Agent Configuration test passed!
+
+============================================================
+TEST 9: Export Configuration
+============================================================
+  ✓ Settings exported
+  ✓ User preferences exported
+  ✓ Hooks exported: 1
+
+✅ Export Configuration test passed!
+
+============================================================
+  RESULTS: 9 passed, 0 failed
+============================================================
+
+🎉 All Phase 4C.6 tests passed!
+
+Phase 4C.6 Implementation Complete:
+  ✓ Workspace CLAUDE.md configuration loading
+  ✓ Hooks system for all workspace events
+  ✓ User preferences with persistence
+  ✓ Per-agent configuration
+  ✓ Configuration reload support
+  ✓ Export configuration as JSON
+
+Success Criteria Met:
+  ✓ Workspace config loaded and applied
+  ✓ Hooks fire on correct events
+  ✓ Users can customize experience
+</pre>
+    </div>
+
+    <div class="phase">
+        <div class="phase-header">
+            <div class="phase-title">Edge Cases: Error Handling & Edge Cases</div>
+            <div class="phase-status status-pass">PASSED</div>
+        </div>
+        <div class="phase-details">
+            <span>📄 test_edge_cases.py</span>
+            <span>✓ 8 passed</span>
+            <span>✗ 0 failed</span>
+            <span>⏱ 1.49s</span>
+            <span class="toggle" onclick="this.parentElement.nextElementSibling.style.display = this.parentElement.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+                [Show Output]
+            </span>
+        </div>
+        <pre class="output">============================================================
+  Phase 4C Edge Case Tests
+============================================================
+
+============================================================
+EDGE CASE 1: Concurrent Canvas Edits
+============================================================
+[CanvasSyncManager] Created document: canvas_5daa4d9ca5ce (Test Doc)
+  ✓ Created document: canvas_5...
+[CanvasSyncManager] Added section: analysis to canvas_5daa4d9ca5ce
+[CanvasSyncManager] Edit applied: analysis v2 by Koda
+[CanvasSyncManager] Edit applied: analysis v3 by Cairn
+  ✓ Concurrent edits: 2 succeeded
+  ✓ Final content preserved: Cairn's analysis: PostgreSQL recommended...
+  ✓ Version: 3
+  ✓ Section lock acquired: True
+[CanvasSyncManager] Section locked by cairn
+  ✓ Edit while locked blocked: True
+[CanvasSyncManager] Edit applied: analysis v4 by Koda
+  ✓ Edit after unlock succeeded: True
+
+✅ Concurrent Canvas Edits test passed!
+
+============================================================
+EDGE CASE 2: Circular Delegation Prevention
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session n626fd with MCP tools
+[SessionManager] Created session n626fd for user Test User
+  ✓ Created session: n626fd...
+[SessionManager] Audit: agent_message_sent by prax in n626fd
+[SessionManager] Agent message: prax → cairn (priority: medium)
+[TaskDelegationManager] Task delegated: task_7d5abc4664ad (prax → cairn)
+  ✓ Task 1 delegated: Prax -&gt; Cairn (task_7d5abc4...)
+  ✓ Cairn delegation blocked: Invalid from_agent: cairn. Must be one of ['prax']...
+[SessionManager] Audit: agent_message_sent by prax in n626fd
+[SessionManager] Agent message: prax → koda (priority: medium)
+[TaskDelegationManager] Task delegated: task_e3c28369aa8d (prax → koda)
+  ✓ Task 3 delegated: Prax -&gt; Koda (task_e3c2836...)
+  ✓ Active tasks: Cairn=1, Koda=1
+  ✓ Total tasks in session: 2
+
+✅ Circular Delegation Prevention test passed!
+
+============================================================
+EDGE CASE 3: Standardized Error Codes
+============================================================
+  ✓ Session error: E001_SESSION_NOT_FOUND
+  ✓ Retryable error: E042_TOOL_RATE_LIMITED (retry after 60s)
+  ✓ All 33 error codes validated
+  ✓ Unknown error code fallback works
+
+✅ Error Codes test passed!
+
+============================================================
+EDGE CASE 4: Retry Logic
+============================================================
+  ✓ Retry succeeded after 3 attempts
+  ✓ Retry exhausted correctly: RetryExhausted
+
+✅ Retry Logic test passed!
+
+============================================================
+EDGE CASE 5: Circuit Breaker
+============================================================
+  ✓ Initial state: closed
+  ✓ After 3 failures: open
+  ✓ Requests blocked when OPEN
+  ✓ Half-open allows test call: recovered
+  ✓ After recovery: closed
+
+✅ Circuit Breaker test passed!
+
+============================================================
+EDGE CASE 6: Malformed Config Handling
+============================================================
+  ✓ Invalid format handled gracefully
+  ✓ Partial valid content handled
+  ✓ Empty content handled
+  ✓ Unicode content handled
+
+✅ Malformed Config test passed!
+
+============================================================
+EDGE CASE 7: Rate Limiting
+============================================================
+[ToolGateway] Registered tool: deepseek (llm)
+[ToolGateway] Registered tool: openai (llm)
+[ToolGateway] Registered tool: claude_haiku (llm)
+[ToolGateway] Registered tool: web_search (web)
+[ToolGateway] Registered tool: url_fetch (web)
+[ToolGateway] Registered tool: code_analysis (code)
+[ToolGateway] koda called web_search: success
+[ToolGateway] koda called web_search: success
+[ToolGateway] koda called web_search: success
+[ToolGateway] koda called web_search: success
+[ToolGateway] koda called web_search: success
+[ToolGateway] koda called web_search: success
+[ToolGateway] koda called web_search: success
+[ToolGateway] koda called web_search: success
+[ToolGateway] koda called web_search: success
+[ToolGateway] koda called web_search: success
+  ✓ 10 requests made
+  ✓ 0 rate limited (if any)
+  ✓ Tool gateway handled burst correctly
+
+✅ Rate Limiting test passed!
+
+============================================================
+EDGE CASE 8: Large Message Handling
+============================================================
+[SessionManager] Initialized AgentOrchestrator for session 46eks3 with MCP tools
+[SessionManager] Created session 46eks3 for user Test User
+  ✓ Large message (200KB) stored: dec5c4e1...
+  ✓ Large message retrieved correctly
+
+✅ Large Message Handling test passed!
+
+============================================================
+  RESULTS: 8 passed, 0 failed
+============================================================
+
+🎉 All edge case tests passed!
+</pre>
+    </div>
+
+    <div class="timestamp">Generated on 2026-01-17 10:25:24</div>
+</body>
+</html>

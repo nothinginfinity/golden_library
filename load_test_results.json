@@ -1,0 +1,74 @@
+{
+  "timestamp": "2026-01-17T14:25:45.831519",
+  "config": {
+    "num_users": 12,
+    "ws_url": "ws://localhost:8081"
+  },
+  "summary": {
+    "duration_seconds": 3.82,
+    "total_operations": 144,
+    "successful_operations": 144,
+    "failed_operations": 0,
+    "success_rate_percent": 100.0,
+    "latency_avg_ms": 15.88,
+    "latency_max_ms": 186.8,
+    "users_connected": 12
+  },
+  "operations": {
+    "connect": {
+      "total": 12,
+      "success": 12,
+      "failed": 0,
+      "success_rate": 100.0,
+      "latency_min_ms": 7.4385839980095625,
+      "latency_max_ms": 29.735749994870275,
+      "latency_avg_ms": 11.151246582206417,
+      "latency_p95_ms": 29.735749994870275
+    },
+    "join_session": {
+      "total": 12,
+      "success": 12,
+      "failed": 0,
+      "success_rate": 100.0,
+      "latency_min_ms": 33.97600000607781,
+      "latency_max_ms": 186.80158400093205,
+      "latency_avg_ms": 110.0138645027376,
+      "latency_p95_ms": 186.80158400093205
+    },
+    "ping": {
+      "total": 36,
+      "success": 36,
+      "failed": 0,
+      "success_rate": 100.0,
+      "latency_min_ms": 0.2341660001548007,
+      "latency_max_ms": 155.6610410043504,
+      "latency_avg_ms": 22.851245305193718,
+      "latency_p95_ms": 133.52266600122675
+    },
+    "typing_indicator": {
+      "total": 24,
+      "success": 24,
+      "failed": 0,
+      "success_rate": 100.0,
+      "latency_min_ms": 0.02445800055284053,
+      "latency_max_ms": 0.272374993073754,
+      "latency_avg_ms": 0.06145649967947975,
+      "latency_p95_ms": 0.21629099501296878
+    },
+    "cursor_move": {
+      "total": 60,
+      "success": 60,
+      "failed": 0,
+      "success_rate": 100.0,
+      "latency_min_ms": 0.02274999860674143,
+      "latency_max_ms": 1.6847499937284738,
+      "latency_avg_ms": 0.13194026687415317,
+      "latency_p95_ms": 0.3983329952461645
+    }
+  },
+  "success_criteria": {
+    "concurrent_users_12_plus": true,
+    "latency_under_100ms": true,
+    "zero_crashes": true
+  }
+}

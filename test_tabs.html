@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tab Test</title>
+  <style>
+    body { padding: 20px; font-family: monospace; background: #1a1a1a; color: #fff; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+    .tab-btn { padding: 10px 20px; background: #2a2a2a; border: 1px solid #4a4a4a; color: #fff; cursor: pointer; }
+    .tab-btn.active { background: #4a9eff; }
+    .tab-content { display: none; padding: 20px; background: #2a2a2a; border-radius: 8px; }
+    .tab-content.active { display: block; }
+    #debug { margin-top: 20px; padding: 10px; background: #1a1a1a; border: 1px solid #4a4a4a; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Tab Switching Test</h1>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('tab1')">Tab 1</button>
+    <button class="tab-btn" onclick="showTab('tab2')">Tab 2</button>
+    <button class="tab-btn" onclick="showTab('tab3')">Tab 3</button>
+  </div>
+
+  <div id="tab-tab1" class="tab-content active">
+    <h2>Tab 1 Content</h2>
+    <p>This is tab 1. If you can read this, tab 1 is working.</p>
+  </div>
+
+  <div id="tab-tab2" class="tab-content">
+    <h2>Tab 2 Content</h2>
+    <p>This is tab 2. If you can read this after clicking Tab 2, it's working!</p>
+  </div>
+
+  <div id="tab-tab3" class="tab-content">
+    <h2>Tab 3 Content</h2>
+    <p>This is tab 3. If you can read this after clicking Tab 3, it's working!</p>
+  </div>
+
+  <div id="debug">
+    <strong>Debug Log:</strong><br>
+    <div id="log"></div>
+  </div>
+
+  <script>
+    function log(message) {
+      const logEl = document.getElementById('log');
+      logEl.innerHTML += `[${new Date().toLocaleTimeString()}] ${message}<br>`;
+    }
+
+    function showTab(tabName) {
+      log(`showTab('${tabName}') called`);
+
+      try {
+        // Hide all tabs
+        document.querySelectorAll('.tab-content').forEach(tab => {
+          tab.classList.remove('active');
+          log(`  Removed active from ${tab.id}`);
+        });
+
+        // Remove active from all buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+          btn.classList.remove('active');
+        });
+
+        // Show selected tab
+        const tabElement = document.getElementById(`tab-${tabName}`);
+        if (!tabElement) {
+          log(`  ERROR: Tab not found: tab-${tabName}`);
+          return;
+        }
+        tabElement.classList.add('active');
+        log(`  Added active to ${tabElement.id}`);
+
+        // Find and activate the corresponding button
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+          if (btn.getAttribute('onclick')?.includes(`'${tabName}'`)) {
+            btn.classList.add('active');
+            log(`  Activated button for ${tabName}`);
+          }
+        });
+
+        log(`  Tab switch completed successfully`);
+
+      } catch (error) {
+        log(`  ERROR: ${error.message}`);
+        console.error(error);
+      }
+    }
+
+    log('Tab test page loaded');
+    log('Click Tab 2 or Tab 3 to test switching');
+  </script>
+</body>
+</html>

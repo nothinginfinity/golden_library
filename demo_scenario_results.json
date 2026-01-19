@@ -1,0 +1,232 @@
+{
+  "timestamp": "2026-01-17T16:45:46.367072",
+  "templates_tested": 5,
+  "all_passed": true,
+  "reports": [
+    {
+      "template_id": "food_services",
+      "template_name": "Food Services",
+      "passed": true,
+      "duration_s": 12.044212458000402,
+      "results": [
+        {
+          "step": "1. WebSocket Connect",
+          "passed": true,
+          "duration_ms": 25.060833999305032,
+          "error": null
+        },
+        {
+          "step": "2. Join Session",
+          "passed": true,
+          "duration_ms": 15.52179099235218,
+          "error": null
+        },
+        {
+          "step": "3. Real-time Latency",
+          "passed": true,
+          "duration_ms": 0.876124991918914,
+          "error": null
+        },
+        {
+          "step": "4. Agent Interaction",
+          "passed": true,
+          "duration_ms": 2000.9432910010219,
+          "error": null
+        },
+        {
+          "step": "5. Template Content",
+          "passed": true,
+          "duration_ms": 0.05612499080598354,
+          "error": null
+        },
+        {
+          "step": "6. Deliverables Check",
+          "passed": true,
+          "duration_ms": 0.007792012183927,
+          "error": null
+        }
+      ],
+      "friction_points": []
+    },
+    {
+      "template_id": "software_security",
+      "template_name": "Software Security",
+      "passed": true,
+      "duration_s": 12.408279083989328,
+      "results": [
+        {
+          "step": "1. WebSocket Connect",
+          "passed": true,
+          "duration_ms": 3.411625002627261,
+          "error": null
+        },
+        {
+          "step": "2. Join Session",
+          "passed": true,
+          "duration_ms": 34.77874999225605,
+          "error": null
+        },
+        {
+          "step": "3. Real-time Latency",
+          "passed": true,
+          "duration_ms": 1.3575410121120512,
+          "error": null
+        },
+        {
+          "step": "4. Agent Interaction",
+          "passed": true,
+          "duration_ms": 12367.795041995123,
+          "error": null
+        },
+        {
+          "step": "5. Template Content",
+          "passed": true,
+          "duration_ms": 0.028166992706246674,
+          "error": null
+        },
+        {
+          "step": "6. Deliverables Check",
+          "passed": true,
+          "duration_ms": 0.006333997589536011,
+          "error": null
+        }
+      ],
+      "friction_points": []
+    },
+    {
+      "template_id": "legal",
+      "template_name": "Legal Services",
+      "passed": true,
+      "duration_s": 10.936915833008243,
+      "results": [
+        {
+          "step": "1. WebSocket Connect",
+          "passed": true,
+          "duration_ms": 2.9895000043325126,
+          "error": null
+        },
+        {
+          "step": "2. Join Session",
+          "passed": true,
+          "duration_ms": 32.0235419931123,
+          "error": null
+        },
+        {
+          "step": "3. Real-time Latency",
+          "passed": true,
+          "duration_ms": 1.3350840017665178,
+          "error": null
+        },
+        {
+          "step": "4. Agent Interaction",
+          "passed": true,
+          "duration_ms": 10899.775750003755,
+          "error": null
+        },
+        {
+          "step": "5. Template Content",
+          "passed": true,
+          "duration_ms": 0.025832996470853686,
+          "error": null
+        },
+        {
+          "step": "6. Deliverables Check",
+          "passed": true,
+          "duration_ms": 0.0050000089686363935,
+          "error": null
+        }
+      ],
+      "friction_points": []
+    },
+    {
+      "template_id": "real_estate",
+      "template_name": "Real Estate",
+      "passed": true,
+      "duration_s": 12.039062166004442,
+      "results": [
+        {
+          "step": "1. WebSocket Connect",
+          "passed": true,
+          "duration_ms": 2.794542000629008,
+          "error": null
+        },
+        {
+          "step": "2. Join Session",
+          "passed": true,
+          "duration_ms": 31.371208009659313,
+          "error": null
+        },
+        {
+          "step": "3. Real-time Latency",
+          "passed": true,
+          "duration_ms": 1.4604159950977191,
+          "error": null
+        },
+        {
+          "step": "4. Agent Interaction",
+          "passed": true,
+          "duration_ms": 2001.5587080124533,
+          "error": null
+        },
+        {
+          "step": "5. Template Content",
+          "passed": true,
+          "duration_ms": 0.024916997062973678,
+          "error": null
+        },
+        {
+          "step": "6. Deliverables Check",
+          "passed": true,
+          "duration_ms": 0.005542009603232145,
+          "error": null
+        }
+      ],
+      "friction_points": []
+    },
+    {
+      "template_id": "construction",
+      "template_name": "Construction",
+      "passed": true,
+      "duration_s": 11.86376000000746,
+      "results": [
+        {
+          "step": "1. WebSocket Connect",
+          "passed": true,
+          "duration_ms": 3.190666000591591,
+          "error": null
+        },
+        {
+          "step": "2. Join Session",
+          "passed": true,
+          "duration_ms": 43.41933400428388,
+          "error": null
+        },
+        {
+          "step": "3. Real-time Latency",
+          "passed": true,
+          "duration_ms": 6.160082994028926,
+          "error": null
+        },
+        {
+          "step": "4. Agent Interaction",
+          "passed": true,
+          "duration_ms": 11810.145458002808,
+          "error": null
+        },
+        {
+          "step": "5. Template Content",
+          "passed": true,
+          "duration_ms": 0.03399999695830047,
+          "error": null
+        },
+        {
+          "step": "6. Deliverables Check",
+          "passed": true,
+          "duration_ms": 0.008041999535635114,
+          "error": null
+        }
+      ],
+      "friction_points": []
+    }
+  ]
+}

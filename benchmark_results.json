@@ -1,0 +1,63 @@
+{
+  "timestamp": "2026-01-17T14:30:08.520860",
+  "benchmarks": {
+    "websocket_latency": {
+      "iterations": 50,
+      "successful": 50,
+      "errors": 0,
+      "min_ms": 0.11,
+      "max_ms": 0.35,
+      "avg_ms": 0.13,
+      "median_ms": 0.12,
+      "p95_ms": 0.23,
+      "p99_ms": 0.35,
+      "pass": true
+    },
+    "database_queries": {
+      "skip": true,
+      "reason": "No database found"
+    },
+    "http_api": {
+      "/api/stats": {
+        "avg_ms": 2.95,
+        "max_ms": 9.09,
+        "success_rate": 100.0
+      },
+      "/api/config/list": {
+        "avg_ms": 1.01,
+        "max_ms": 3.65,
+        "success_rate": 100.0
+      },
+      "/api/daemons/list": {
+        "avg_ms": 0.87,
+        "max_ms": 3.18,
+        "success_rate": 100.0
+      },
+      "summary": {
+        "avg_ms": 1.61,
+        "pass": true
+      }
+    },
+    "session_operations": {
+      "create_session": {
+        "latency_ms": 17.97,
+        "session_id": "f44203"
+      },
+      "broadcast": {
+        "avg_ms": 0.02,
+        "max_ms": 0.04
+      },
+      "pass": true
+    }
+  },
+  "summary": {
+    "duration_seconds": 0.14,
+    "total_measurements": 54,
+    "all_pass": true,
+    "success_criteria": {
+      "websocket_latency_under_100ms": true,
+      "db_queries_fast": true,
+      "session_ops_responsive": true
+    }
+  }
+}
