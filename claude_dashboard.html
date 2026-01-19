@@ -2532,6 +2532,106 @@
       display: none !important;
     }
 
+    /* Slide-out tab style for minimized panels in Focus Mode */
+    .workspace-panel.minimized-tab {
+      position: fixed !important;
+      z-index: 1000;
+      transition: transform 0.3s ease, width 0.3s ease;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      width: 280px !important;
+      max-width: 280px !important;
+      height: auto !important;
+      max-height: 70vh !important;
+      min-height: auto !important;
+      flex: none !important;
+    }
+
+    .workspace-panel.minimized-tab.minimized {
+      width: 48px !important;
+      max-width: 48px !important;
+      min-height: 120px !important;
+      max-height: 120px !important;
+      cursor: pointer;
+    }
+
+    /* Position panels on edges */
+    .workspace-panel.minimized-tab[data-panel="koda"] {
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      border-radius: 0 12px 12px 0;
+    }
+    .workspace-panel.minimized-tab[data-panel="koda"].minimized {
+      transform: translateX(-36px) translateY(-50%);
+    }
+    .workspace-panel.minimized-tab[data-panel="koda"].minimized:hover {
+      transform: translateX(0) translateY(-50%);
+    }
+
+    .workspace-panel.minimized-tab[data-panel="cairn"] {
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      border-radius: 12px 0 0 12px;
+    }
+    .workspace-panel.minimized-tab[data-panel="cairn"].minimized {
+      transform: translateX(36px) translateY(-50%);
+    }
+    .workspace-panel.minimized-tab[data-panel="cairn"].minimized:hover {
+      transform: translateX(0) translateY(-50%);
+    }
+
+    .workspace-panel.minimized-tab[data-panel="moderator"] {
+      left: 50%;
+      bottom: 0;
+      transform: translateX(-50%);
+      border-radius: 12px 12px 0 0;
+      width: 400px !important;
+      max-width: 400px !important;
+    }
+    .workspace-panel.minimized-tab[data-panel="moderator"].minimized {
+      transform: translateX(-50%) translateY(80px);
+      width: 120px !important;
+      min-height: 48px !important;
+      max-height: 48px !important;
+    }
+    .workspace-panel.minimized-tab[data-panel="moderator"].minimized:hover {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .workspace-panel.minimized-tab[data-panel="teamChat"] {
+      right: 0;
+      bottom: 80px;
+      border-radius: 12px 0 0 12px;
+    }
+    .workspace-panel.minimized-tab[data-panel="teamChat"].minimized {
+      transform: translateX(36px);
+    }
+    .workspace-panel.minimized-tab[data-panel="teamChat"].minimized:hover {
+      transform: translateX(0);
+    }
+
+    /* Tab label for minimized panels */
+    .workspace-panel.minimized-tab.minimized .panel-header {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      padding: 12px 8px;
+      border-bottom: none;
+      height: 100%;
+      justify-content: center;
+    }
+
+    .workspace-panel.minimized-tab.minimized .panel-header h3 {
+      font-size: 0.9rem !important;
+      white-space: nowrap;
+    }
+
+    .workspace-panel.minimized-tab.minimized .panel-header span,
+    .workspace-panel.minimized-tab.minimized .panel-header button:not(.panel-minimize-btn),
+    .workspace-panel.minimized-tab.minimized .panel-minimize-btn {
+      display: none !important;
+    }
+
     .panel-header {
       padding: 12px 16px;
       border-bottom: 1px solid rgba(148, 163, 184, 0.2);
@@ -3156,7 +3256,7 @@
         <div class="workspace-toolbar-section">
           <span class="workspace-toolbar-label">Panels:</span>
           <button class="panel-toggle active" data-panel="canvas" onclick="togglePanelVisibility('canvas')">Canvas</button>
-          <button class="panel-toggle" data-panel="teamChat" onclick="togglePanelVisibility('teamChat')">Team Chat</button>
+          <button class="panel-toggle active" data-panel="teamChat" onclick="togglePanelVisibility('teamChat')">Team Chat</button>
         </div>
         <div class="workspace-toolbar-section">
           <button class="preset-btn" onclick="saveWorkspaceLayout()" title="Save current layout">Save Layout</button>
@@ -3434,7 +3534,7 @@
         <div class="resize-handle-v resize-handle-v-3" data-resize="col2-bottom" style="grid-area: 3 / 4 / 4 / 5;"></div>
 
         <!-- Panel: Team Chat -->
-        <div id="human-chat-sidebar" class="workspace-panel hidden" data-panel="teamChat">
+        <div id="human-chat-sidebar" class="workspace-panel" data-panel="teamChat">
           <div class="panel-header">
             <div>
               <h3 style="color: #a5b4fc; font-size: 1.1rem; margin-bottom: 4px;">💬 Team Chat</h3>
@@ -14097,7 +14197,7 @@ ${currentConversation.display}
           cairn: { visible: true, minimized: false },
           moderator: { visible: true, minimized: false },
           canvas: { visible: true, minimized: false },
-          teamChat: { visible: false, minimized: false }
+          teamChat: { visible: true, minimized: false }
         };
 
         // Layout: Koda (left) | Canvas (middle) | Cairn (right)
@@ -14105,7 +14205,7 @@ ${currentConversation.display}
           default: {
             cols: ['1fr', '1.2fr', '1fr'],
             rows: ['1.5fr', '1fr'],
-            panels: { koda: true, cairn: true, moderator: true, canvas: true, teamChat: false }
+            panels: { koda: true, cairn: true, moderator: true, canvas: true, teamChat: true }
           },
           chat: {
             cols: ['1fr', '0.8fr', '1fr'],
@@ -14115,12 +14215,13 @@ ${currentConversation.display}
           document: {
             cols: ['0.8fr', '1.4fr', '0.8fr'],
             rows: ['1.5fr', '0.8fr'],
-            panels: { koda: true, cairn: true, moderator: true, canvas: true, teamChat: false }
+            panels: { koda: true, cairn: true, moderator: true, canvas: true, teamChat: true }
           },
           focus: {
-            cols: ['1fr', '0fr', '0fr'],
-            rows: ['1fr', '0fr'],
-            panels: { koda: true, cairn: false, moderator: false, canvas: false, teamChat: false }
+            cols: ['0.15fr', '1fr', '0.15fr'],
+            rows: ['0.15fr', '0.15fr'],
+            panels: { koda: true, cairn: true, moderator: true, canvas: true, teamChat: true },
+            minimized: { koda: true, cairn: true, moderator: true, teamChat: true, canvas: false }
           }
         };
       }
@@ -14327,15 +14428,19 @@ ${currentConversation.display}
 
         Object.entries(preset.panels).forEach(([panelId, visible]) => {
           this.panels[panelId].visible = visible;
-          this.panels[panelId].minimized = false;
+          // Check if preset specifies minimized state
+          const shouldMinimize = preset.minimized ? preset.minimized[panelId] : false;
+          this.panels[panelId].minimized = shouldMinimize;
+
           const panel = document.getElementById(panelMap[panelId]);
           if (panel) {
             panel.classList.toggle('hidden', !visible);
-            panel.classList.remove('minimized');
+            panel.classList.toggle('minimized', shouldMinimize);
+            panel.classList.toggle('minimized-tab', shouldMinimize); // For slide-out tab style
             const btn = panel.querySelector('.panel-minimize-btn');
             if (btn) {
-              btn.textContent = '−';
-              btn.title = 'Minimize';
+              btn.textContent = shouldMinimize ? '+' : '−';
+              btn.title = shouldMinimize ? 'Expand' : 'Minimize';
             }
           }
         });
