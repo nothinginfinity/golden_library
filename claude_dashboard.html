@@ -2611,6 +2611,21 @@
       transform: translateX(-50%) translateY(0);
     }
 
+    /* Ensure minimize button is always visible in moderator panel (focus mode) */
+    .workspace-panel.minimized-tab[data-panel="moderator"]:not(.minimized) .panel-header {
+      position: relative;
+    }
+    .workspace-panel.minimized-tab[data-panel="moderator"]:not(.minimized) .panel-minimize-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 10;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      padding: 6px 10px;
+      font-size: 1rem;
+    }
+
     .workspace-panel.minimized-tab[data-panel="teamChat"] {
       right: 10px;
       bottom: 10px;
