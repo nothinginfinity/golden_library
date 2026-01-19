@@ -15153,14 +15153,20 @@ ${currentConversation.display}
         const data = await response.json();
 
         if (data.ok) {
+          console.log('[Upload] Success, files:', data.files);
           statusEl.textContent = `Uploaded ${data.count} file(s) successfully`;
 
           // Auto-convert uploaded files to canvas
           if (data.files && data.files.length > 0) {
             statusEl.textContent = `Converting to canvas...`;
+            console.log('[Upload] Converting', data.files.length, 'files to canvas');
             for (const file of data.files) {
+              console.log('[Upload] Converting file:', file.id, file.filename);
               await autoConvertFileToCanvas(file.id, file.filename);
             }
+            console.log('[Upload] Conversion complete');
+          } else {
+            console.log('[Upload] No files array in response');
           }
 
           setTimeout(() => {
@@ -15451,9 +15457,12 @@ ${escapeHtml(file.extracted_preview)}
 
     // Auto-convert file to canvas without prompts (used during upload)
     async function autoConvertFileToCanvas(fileId, filename) {
+      console.log('[Canvas] Auto-converting file:', fileId, filename);
+
       // Ensure we have a canvas document
       if (!canvasDocument) {
-        // Auto-create document in local mode
+        console.log('[Canvas] No document exists, creating new one. Session:', currentSessionId);
+        // Auto-create document
         canvasDocument = {
           id: 'local_' + Date.now(),
           name: 'Uploaded Documents',
@@ -15461,61 +15470,70 @@ ${escapeHtml(file.extracted_preview)}
           sections: {},
           isLocal: !currentSessionId
         };
-        if (!currentSessionId) {
-          saveLocalDocument();
+        saveLocalDocument();
+        const docNameEl = document.getElementById('canvas-doc-name');
+        if (docNameEl) {
+          docNameEl.textContent = canvasDocument.name;
         }
-        document.getElementById('canvas-doc-name').textContent = canvasDocument.name;
+        console.log('[Canvas] Created document:', canvasDocument.id, 'isLocal:', canvasDocument.isLocal);
       }
 
       try {
+        console.log('[Canvas] Fetching file content for conversion...');
         const response = await fetch(`${API_BASE}/api/files/${fileId}/to-canvas`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id: currentSessionId })
         });
 
-        if (!response.ok) return;
-
-        const data = await response.json();
-        const sectionName = data.suggested_name || filename.replace(/\.[^/.]+$/, '');
-
-        if (canvasDocument.isLocal) {
-          canvasDocument.sections[sectionName] = {
-            name: sectionName,
-            section_type: data.section_type || 'markdown',
-            content: data.content,
-            owner: currentUserId || 'local_user',
-            version: 1,
-            created_at: new Date().toISOString(),
-            source_file: data.filename,
-            file_id: fileId
-          };
-          if (!canvasDocument.section_order.includes(sectionName)) {
-            canvasDocument.section_order.push(sectionName);
-          }
-          saveLocalDocument();
-        } else {
-          await fetch(`${API_BASE}/api/canvas/${currentSessionId}/section`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              document_id: canvasDocument.id,
-              section_name: sectionName,
-              section_type: data.section_type || 'markdown',
-              content: data.content,
-              owner: currentUserId
-            })
-          });
-          await loadCanvasDocument();
+        if (!response.ok) {
+          const errText = await response.text();
+          console.error('[Canvas] Conversion API failed:', response.status, errText);
+          return;
         }
 
+        const data = await response.json();
+        console.log('[Canvas] Conversion response:', data.ok, 'content length:', data.content?.length);
+
+        if (!data.ok && !data.content) {
+          console.error('[Canvas] No content in response:', data);
+          return;
+        }
+
+        const sectionName = data.suggested_name || filename.replace(/\.[^/.]+$/, '');
+        console.log('[Canvas] Creating section:', sectionName);
+
+        // Always use local mode for simplicity (server sync can happen separately)
+        canvasDocument.sections[sectionName] = {
+          name: sectionName,
+          section_type: data.section_type || 'markdown',
+          content: data.content || '',
+          owner: currentUserId || 'local_user',
+          version: 1,
+          created_at: new Date().toISOString(),
+          source_file: data.filename,
+          file_id: fileId
+        };
+
+        if (!canvasDocument.section_order.includes(sectionName)) {
+          canvasDocument.section_order.push(sectionName);
+        }
+
+        saveLocalDocument();
+        console.log('[Canvas] Section added. Total sections:', canvasDocument.section_order.length);
+
         renderCanvasSections();
+
         // Auto-select the first uploaded section
         if (canvasDocument.section_order.length === 1) {
           selectCanvasSection(sectionName);
         }
+
+        showNotification(`Added "${sectionName}" to canvas`, 'success');
+
       } catch (error) {
-        console.error('Auto-convert error:', error);
+        console.error('[Canvas] Auto-convert error:', error);
+        showNotification('Failed to convert file: ' + error.message, 'error');
       }
     }
 
