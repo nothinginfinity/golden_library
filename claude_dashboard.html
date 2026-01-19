@@ -2536,46 +2536,53 @@
     .workspace-panel.minimized-tab {
       position: fixed !important;
       z-index: 1000;
-      transition: transform 0.3s ease, width 0.3s ease;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-      width: 280px !important;
-      max-width: 280px !important;
-      height: auto !important;
-      max-height: 70vh !important;
-      min-height: auto !important;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      width: 320px !important;
+      max-width: 320px !important;
+      height: 60vh !important;
+      max-height: 60vh !important;
+      min-height: 300px !important;
       flex: none !important;
+      background: rgba(15, 23, 42, 0.95) !important;
+      backdrop-filter: blur(10px);
     }
 
     .workspace-panel.minimized-tab.minimized {
       width: 48px !important;
       max-width: 48px !important;
-      min-height: 120px !important;
-      max-height: 120px !important;
+      height: 140px !important;
+      min-height: 140px !important;
+      max-height: 140px !important;
       cursor: pointer;
     }
 
-    /* Position panels on edges */
+    /* Position panels on edges - EXPANDED state */
     .workspace-panel.minimized-tab[data-panel="koda"] {
-      left: 0;
+      left: 10px;
       top: 50%;
       transform: translateY(-50%);
-      border-radius: 0 12px 12px 0;
+      border-radius: 12px;
     }
     .workspace-panel.minimized-tab[data-panel="koda"].minimized {
-      transform: translateX(-36px) translateY(-50%);
+      left: 0;
+      transform: translateX(-38px) translateY(-50%);
+      border-radius: 0 12px 12px 0;
     }
     .workspace-panel.minimized-tab[data-panel="koda"].minimized:hover {
       transform: translateX(0) translateY(-50%);
     }
 
     .workspace-panel.minimized-tab[data-panel="cairn"] {
-      right: 0;
+      right: 10px;
       top: 50%;
       transform: translateY(-50%);
-      border-radius: 12px 0 0 12px;
+      border-radius: 12px;
     }
     .workspace-panel.minimized-tab[data-panel="cairn"].minimized {
-      transform: translateX(36px) translateY(-50%);
+      right: 0;
+      transform: translateX(38px) translateY(-50%);
+      border-radius: 12px 0 0 12px;
     }
     .workspace-panel.minimized-tab[data-panel="cairn"].minimized:hover {
       transform: translateX(0) translateY(-50%);
@@ -2583,29 +2590,40 @@
 
     .workspace-panel.minimized-tab[data-panel="moderator"] {
       left: 50%;
-      bottom: 0;
+      bottom: 10px;
       transform: translateX(-50%);
-      border-radius: 12px 12px 0 0;
-      width: 400px !important;
-      max-width: 400px !important;
+      border-radius: 12px;
+      width: 500px !important;
+      max-width: 500px !important;
+      height: 350px !important;
+      min-height: 350px !important;
     }
     .workspace-panel.minimized-tab[data-panel="moderator"].minimized {
-      transform: translateX(-50%) translateY(80px);
-      width: 120px !important;
+      bottom: 0;
+      transform: translateX(-50%) translateY(100px);
+      width: 140px !important;
+      height: 48px !important;
       min-height: 48px !important;
       max-height: 48px !important;
+      border-radius: 12px 12px 0 0;
     }
     .workspace-panel.minimized-tab[data-panel="moderator"].minimized:hover {
       transform: translateX(-50%) translateY(0);
     }
 
     .workspace-panel.minimized-tab[data-panel="teamChat"] {
-      right: 0;
-      bottom: 80px;
-      border-radius: 12px 0 0 12px;
+      right: 10px;
+      bottom: 10px;
+      transform: none;
+      border-radius: 12px;
+      height: 400px !important;
+      min-height: 300px !important;
     }
     .workspace-panel.minimized-tab[data-panel="teamChat"].minimized {
-      transform: translateX(36px);
+      right: 0;
+      bottom: 80px;
+      transform: translateX(38px);
+      border-radius: 12px 0 0 12px;
     }
     .workspace-panel.minimized-tab[data-panel="teamChat"].minimized:hover {
       transform: translateX(0);
@@ -2615,7 +2633,7 @@
     .workspace-panel.minimized-tab.minimized .panel-header {
       writing-mode: vertical-rl;
       text-orientation: mixed;
-      padding: 12px 8px;
+      padding: 16px 10px;
       border-bottom: none;
       height: 100%;
       justify-content: center;
@@ -2626,9 +2644,9 @@
       white-space: nowrap;
     }
 
-    .workspace-panel.minimized-tab.minimized .panel-header span,
-    .workspace-panel.minimized-tab.minimized .panel-header button:not(.panel-minimize-btn),
-    .workspace-panel.minimized-tab.minimized .panel-minimize-btn {
+    .workspace-panel.minimized-tab.minimized .panel-header > div:first-child span,
+    .workspace-panel.minimized-tab.minimized .panel-header button,
+    .workspace-panel.minimized-tab.minimized .panel-header > div:last-child {
       display: none !important;
     }
 
@@ -14218,8 +14236,8 @@ ${currentConversation.display}
             panels: { koda: true, cairn: true, moderator: true, canvas: true, teamChat: true }
           },
           focus: {
-            cols: ['0.15fr', '1fr', '0.15fr'],
-            rows: ['0.15fr', '0.15fr'],
+            cols: ['0fr', '1fr', '0fr'],
+            rows: ['1fr', '0fr'],
             panels: { koda: true, cairn: true, moderator: true, canvas: true, teamChat: true },
             minimized: { koda: true, cairn: true, moderator: true, teamChat: true, canvas: false }
           }
@@ -14436,11 +14454,27 @@ ${currentConversation.display}
           if (panel) {
             panel.classList.toggle('hidden', !visible);
             panel.classList.toggle('minimized', shouldMinimize);
-            panel.classList.toggle('minimized-tab', shouldMinimize); // For slide-out tab style
+
+            // For focus mode, keep minimized-tab class on all non-canvas panels
+            const isFocusMode = presetName === 'focus';
+            const isOverlayPanel = panelId !== 'canvas';
+            panel.classList.toggle('minimized-tab', isFocusMode && isOverlayPanel);
+
             const btn = panel.querySelector('.panel-minimize-btn');
             if (btn) {
               btn.textContent = shouldMinimize ? '+' : '−';
               btn.title = shouldMinimize ? 'Expand' : 'Minimize';
+            }
+
+            // Add click handler for minimized panels to expand on click
+            if (isFocusMode && isOverlayPanel) {
+              panel.onclick = (e) => {
+                if (this.panels[panelId].minimized && !e.target.closest('button, input, textarea')) {
+                  this.togglePanelMinimize(panelId);
+                }
+              };
+            } else {
+              panel.onclick = null;
             }
           }
         });
