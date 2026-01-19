@@ -13758,6 +13758,14 @@ ${currentConversation.display}
       if (saved) {
         try {
           canvasDocument = JSON.parse(saved);
+          // Check if parsed result is valid (not null/undefined)
+          if (!canvasDocument || typeof canvasDocument !== 'object') {
+            console.log('[Canvas] Invalid local document, clearing');
+            localStorage.removeItem('local_canvas_document');
+            canvasDocument = null;
+            return false;
+          }
+          window.canvasDocument = canvasDocument;
           renderCanvasSections();
           if (canvasDocument.name) {
             document.getElementById('canvas-doc-name').textContent = canvasDocument.name;
@@ -13765,6 +13773,7 @@ ${currentConversation.display}
           return true;
         } catch (e) {
           console.error('Error loading local document:', e);
+          localStorage.removeItem('local_canvas_document');
         }
       }
       return false;

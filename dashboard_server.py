@@ -9313,6 +9313,10 @@ class AiohttpHandler:
         """Handle POST requests."""
         path = request.path
 
+        # Handle file upload (multipart/form-data) BEFORE trying JSON parse
+        if path == '/api/files/upload':
+            return await self._handle_file_upload_async(request)
+
         try:
             body = await request.json()
         except:
@@ -9442,6 +9446,97 @@ class AiohttpHandler:
 
         await response.write_eof()
         return response
+
+    async def _handle_file_upload_async(self, request):
+        """Handle multipart file upload for aiohttp."""
+        import uuid
+        import re
+
+        try:
+            reader = await request.multipart()
+            uploaded_files = []
+
+            while True:
+                part = await reader.next()
+                if part is None:
+                    break
+
+                if part.filename:
+                    # Read file content
+                    file_content = await part.read()
+                    filename = part.filename
+
+                    # Generate file ID
+                    file_id = str(uuid.uuid4())[:8]
+
+                    # Sanitize filename
+                    safe_filename = re.sub(r'[^\w\-_\.]', '_', filename)
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    safe_filename = f"{timestamp}_{safe_filename}"
+
+                    # Determine category
+                    ext = Path(filename).suffix.lower()
+                    doc_exts = {'.pdf', '.txt', '.md', '.doc', '.docx', '.rtf', '.odt', '.csv', '.json', '.xml', '.yaml', '.yml'}
+                    code_exts = {'.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.sh', '.bash', '.sql', '.swift', '.kt', '.rb', '.php'}
+                    image_exts = {'.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp', '.ico'}
+
+                    if ext in doc_exts:
+                        category = 'documents'
+                    elif ext in code_exts:
+                        category = 'code'
+                    elif ext in image_exts:
+                        category = 'images'
+                    else:
+                        category = 'documents'
+
+                    # Save file
+                    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+                    save_path = UPLOADS_DIR / safe_filename
+                    with open(save_path, 'wb') as f:
+                        f.write(file_content)
+
+                    # Create metadata
+                    file_meta = {
+                        'id': file_id,
+                        'filename': filename,
+                        'saved_as': safe_filename,
+                        'category': category,
+                        'path': str(save_path),
+                        'size': len(file_content),
+                        'uploaded': datetime.now().isoformat(),
+                        'thumbnail': None,
+                        'extracted_preview': None,
+                        'indexed_to_memory': False
+                    }
+
+                    # Update index
+                    try:
+                        index = {'files': [], 'version': '1.0'}
+                        if UPLOADS_INDEX_FILE.exists():
+                            with open(UPLOADS_INDEX_FILE, 'r') as f:
+                                index = json.load(f)
+                        index['files'].append(file_meta)
+                        with open(UPLOADS_INDEX_FILE, 'w') as f:
+                            json.dump(index, f, indent=2)
+                    except Exception as e:
+                        print(f"[Files] Index update failed: {e}")
+
+                    uploaded_files.append(file_meta)
+                    print(f"[Files] Uploaded (async): {filename} -> {save_path}")
+
+            if uploaded_files:
+                return web.json_response({
+                    'ok': True,
+                    'files': uploaded_files,
+                    'count': len(uploaded_files)
+                })
+            else:
+                return web.json_response({'error': 'No files found in request'}, status=400)
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return web.json_response({'error': str(e)}, status=500)
 
 
 class MockHandler:
