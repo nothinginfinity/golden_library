@@ -13649,9 +13649,21 @@ ${currentConversation.display}
     // CANVAS COLLABORATION (Phase 4C.2)
     // =========================================================================
 
-    let canvasDocument = null;
-    let activeSectionName = null;
-    let canvasEditorDebounceTimer = null;
+    // Use window scope for canvas variables so they're accessible across script blocks
+    window.canvasDocument = window.canvasDocument || null;
+    window.activeSectionName = window.activeSectionName || null;
+    window.canvasEditorDebounceTimer = window.canvasEditorDebounceTimer || null;
+
+    // Local aliases for convenience
+    let canvasDocument = window.canvasDocument;
+    let activeSectionName = window.activeSectionName;
+    let canvasEditorDebounceTimer = window.canvasEditorDebounceTimer;
+
+    // Sync function to update window scope
+    function syncCanvasState() {
+      window.canvasDocument = canvasDocument;
+      window.activeSectionName = activeSectionName;
+    }
 
     function toggleCanvasPanel() {
       const canvasPanel = document.getElementById('canvas-panel');
@@ -13737,6 +13749,8 @@ ${currentConversation.display}
       if (canvasDocument?.isLocal) {
         localStorage.setItem('local_canvas_document', JSON.stringify(canvasDocument));
       }
+      // Sync to window scope
+      window.canvasDocument = canvasDocument;
     }
 
     function loadLocalDocument() {
@@ -13809,21 +13823,27 @@ ${currentConversation.display}
 
     function renderCanvasSections() {
       const container = document.getElementById('canvas-sections-list');
-      if (!container || !canvasDocument) {
-        container.innerHTML = '<div style="color: #94a3b8; font-size: 0.85rem; text-align: center; margin-top: 20px;">Create a document to start collaborating</div>';
+      // Always read from window scope to get latest
+      const doc = window.canvasDocument;
+      canvasDocument = doc; // sync local alias
+
+      if (!container || !doc) {
+        if (container) {
+          container.innerHTML = '<div style="color: #94a3b8; font-size: 0.85rem; text-align: center; margin-top: 20px;">Create a document to start collaborating</div>';
+        }
         return;
       }
 
-      document.getElementById('canvas-doc-name').textContent = canvasDocument.name || 'Shared Document';
+      document.getElementById('canvas-doc-name').textContent = doc.name || 'Shared Document';
 
-      const sections = canvasDocument.section_order || [];
+      const sections = doc.section_order || [];
       if (sections.length === 0) {
         container.innerHTML = '<div style="color: #94a3b8; font-size: 0.85rem; text-align: center; margin-top: 20px;">No sections yet. Add one!</div>';
         return;
       }
 
       container.innerHTML = sections.map(sectionName => {
-        const section = canvasDocument.sections[sectionName] || {};
+        const section = doc.sections[sectionName] || {};
         const isActive = sectionName === activeSectionName;
         const ownerBadge = section.owner ? `<span style="font-size: 0.65rem; color: #64748b; margin-left: 4px;">(${section.owner})</span>` : '';
         const typeBadge = section.section_type ? `<span style="font-size: 0.6rem; background: rgba(99, 102, 241, 0.2); color: #a5b4fc; padding: 1px 4px; border-radius: 2px; margin-left: 4px;">${section.section_type}</span>` : '';
@@ -13848,10 +13868,12 @@ ${currentConversation.display}
     }
 
     function selectCanvasSection(sectionName) {
-      if (!canvasDocument || !canvasDocument.sections[sectionName]) return;
+      const doc = window.canvasDocument;
+      if (!doc || !doc.sections[sectionName]) return;
 
       activeSectionName = sectionName;
-      const section = canvasDocument.sections[sectionName];
+      window.activeSectionName = sectionName;
+      const section = doc.sections[sectionName];
 
       // Show editor
       const editorContainer = document.getElementById('canvas-editor-container');
@@ -15459,31 +15481,36 @@ ${escapeHtml(file.extracted_preview)}
     async function autoConvertFileToCanvas(fileId, filename) {
       console.log('[Canvas] Auto-converting file:', fileId, filename);
 
+      // Use window scope to ensure we're accessing the right variable
+      let doc = window.canvasDocument;
+
       // Ensure we have a canvas document
-      if (!canvasDocument) {
-        console.log('[Canvas] No document exists, creating new one. Session:', currentSessionId);
+      if (!doc) {
+        console.log('[Canvas] No document exists, creating new one. Session:', window.currentSessionId);
         // Auto-create document
-        canvasDocument = {
+        doc = {
           id: 'local_' + Date.now(),
           name: 'Uploaded Documents',
           section_order: [],
           sections: {},
-          isLocal: !currentSessionId
+          isLocal: true
         };
-        saveLocalDocument();
+        window.canvasDocument = doc;
+        localStorage.setItem('local_canvas_document', JSON.stringify(doc));
         const docNameEl = document.getElementById('canvas-doc-name');
         if (docNameEl) {
-          docNameEl.textContent = canvasDocument.name;
+          docNameEl.textContent = doc.name;
         }
-        console.log('[Canvas] Created document:', canvasDocument.id, 'isLocal:', canvasDocument.isLocal);
+        console.log('[Canvas] Created document:', doc.id);
       }
 
       try {
         console.log('[Canvas] Fetching file content for conversion...');
-        const response = await fetch(`${API_BASE}/api/files/${fileId}/to-canvas`, {
+        const apiBase = window.API_BASE || '';
+        const response = await fetch(`${apiBase}/api/files/${fileId}/to-canvas`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: currentSessionId })
+          body: JSON.stringify({ session_id: window.currentSessionId })
         });
 
         if (!response.ok) {
@@ -15503,37 +15530,46 @@ ${escapeHtml(file.extracted_preview)}
         const sectionName = data.suggested_name || filename.replace(/\.[^/.]+$/, '');
         console.log('[Canvas] Creating section:', sectionName);
 
-        // Always use local mode for simplicity (server sync can happen separately)
-        canvasDocument.sections[sectionName] = {
+        // Add section to document
+        doc.sections[sectionName] = {
           name: sectionName,
           section_type: data.section_type || 'markdown',
           content: data.content || '',
-          owner: currentUserId || 'local_user',
+          owner: window.currentUserId || 'local_user',
           version: 1,
           created_at: new Date().toISOString(),
           source_file: data.filename,
           file_id: fileId
         };
 
-        if (!canvasDocument.section_order.includes(sectionName)) {
-          canvasDocument.section_order.push(sectionName);
+        if (!doc.section_order.includes(sectionName)) {
+          doc.section_order.push(sectionName);
         }
 
-        saveLocalDocument();
-        console.log('[Canvas] Section added. Total sections:', canvasDocument.section_order.length);
+        // Save to localStorage and window
+        window.canvasDocument = doc;
+        localStorage.setItem('local_canvas_document', JSON.stringify(doc));
+        console.log('[Canvas] Section added. Total sections:', doc.section_order.length);
 
-        renderCanvasSections();
+        // Update UI
+        if (typeof renderCanvasSections === 'function') {
+          renderCanvasSections();
+        }
 
         // Auto-select the first uploaded section
-        if (canvasDocument.section_order.length === 1) {
+        if (doc.section_order.length === 1 && typeof selectCanvasSection === 'function') {
           selectCanvasSection(sectionName);
         }
 
-        showNotification(`Added "${sectionName}" to canvas`, 'success');
+        if (typeof showNotification === 'function') {
+          showNotification(`Added "${sectionName}" to canvas`, 'success');
+        }
 
       } catch (error) {
         console.error('[Canvas] Auto-convert error:', error);
-        showNotification('Failed to convert file: ' + error.message, 'error');
+        if (typeof showNotification === 'function') {
+          showNotification('Failed to convert file: ' + error.message, 'error');
+        }
       }
     }
 
