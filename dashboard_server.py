@@ -9483,11 +9483,12 @@ class AiohttpHandler:
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                     safe_filename = f"{timestamp}_{safe_filename}"
 
-                    # Determine category
+                    # Determine category and extract text content
                     ext = Path(filename).suffix.lower()
                     doc_exts = {'.pdf', '.txt', '.md', '.doc', '.docx', '.rtf', '.odt', '.csv', '.json', '.xml', '.yaml', '.yml'}
                     code_exts = {'.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.sh', '.bash', '.sql', '.swift', '.kt', '.rb', '.php'}
                     image_exts = {'.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp', '.ico'}
+                    text_exts = {'.txt', '.md', '.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf', '.log', '.csv', '.tsv'}
 
                     if ext in doc_exts:
                         category = 'documents'
@@ -9498,13 +9499,44 @@ class AiohttpHandler:
                     else:
                         category = 'documents'
 
-                    # Save file
-                    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-                    save_path = UPLOADS_DIR / safe_filename
-                    with open(save_path, 'wb') as f:
-                        f.write(file_content)
+                    # Extract text content immediately (before saving to disk)
+                    extracted_content = ''
+                    section_type = 'markdown'
 
-                    # Create metadata
+                    try:
+                        if ext in text_exts or ext in code_exts:
+                            extracted_content = file_content.decode('utf-8', errors='ignore')
+                            if ext in code_exts:
+                                section_type = 'code'
+                                lang = ext[1:]
+                                lang_map = {'js': 'javascript', 'ts': 'typescript', 'py': 'python', 'rb': 'ruby', 'rs': 'rust', 'kt': 'kotlin'}
+                                lang = lang_map.get(lang, lang)
+                                extracted_content = f"```{lang}\n{extracted_content}\n```"
+                        elif ext in image_exts:
+                            extracted_content = f"![{filename}](/api/files/{file_id}/content)\n\n*Image file: {filename}*"
+                        elif ext == '.pdf':
+                            extracted_content = f"[PDF file: {filename} - Upload to local server for text extraction]"
+                        else:
+                            # Try to decode as text
+                            try:
+                                extracted_content = file_content.decode('utf-8', errors='ignore')
+                            except:
+                                extracted_content = f"[Binary file: {filename}]"
+                    except Exception as e:
+                        print(f"[Files] Content extraction error: {e}")
+                        extracted_content = f"[Error extracting content: {str(e)}]"
+
+                    # Save file (optional for Railway, but try anyway)
+                    try:
+                        UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+                        save_path = UPLOADS_DIR / safe_filename
+                        with open(save_path, 'wb') as f:
+                            f.write(file_content)
+                    except Exception as e:
+                        print(f"[Files] File save failed (Railway ephemeral?): {e}")
+                        save_path = Path(f"/tmp/{safe_filename}")
+
+                    # Create metadata WITH extracted content
                     file_meta = {
                         'id': file_id,
                         'filename': filename,
@@ -9514,11 +9546,15 @@ class AiohttpHandler:
                         'size': len(file_content),
                         'uploaded': datetime.now().isoformat(),
                         'thumbnail': None,
-                        'extracted_preview': None,
-                        'indexed_to_memory': False
+                        'extracted_preview': extracted_content[:500] if extracted_content else None,
+                        'indexed_to_memory': False,
+                        # Include content for immediate canvas conversion
+                        'content': extracted_content,
+                        'section_type': section_type,
+                        'suggested_name': Path(filename).stem
                     }
 
-                    # Update index
+                    # Update index (try, but don't fail if it doesn't work)
                     try:
                         index = {'files': [], 'version': '1.0'}
                         if UPLOADS_INDEX_FILE.exists():
@@ -9531,7 +9567,7 @@ class AiohttpHandler:
                         print(f"[Files] Index update failed: {e}")
 
                     uploaded_files.append(file_meta)
-                    print(f"[Files] Uploaded (async): {filename} -> {save_path}")
+                    print(f"[Files] Uploaded (async): {filename}, content length: {len(extracted_content)}")
 
             if uploaded_files:
                 return web.json_response({
