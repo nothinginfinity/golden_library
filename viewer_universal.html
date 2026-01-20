@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal 3D Data Explorer</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; overflow: hidden; background-color: #050505; color: #fff; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; }
+
+        /* Main Filter Panel (Left) */
+        .filter-panel {
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(10, 10, 10, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 0; width: 280px; z-index: 10;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        .panel-header {
+            padding: 12px 15px; border-bottom: 1px solid #333;
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(20, 20, 20, 0.8);
+            position: sticky; top: 0; z-index: 1;
+        }
+
+        .panel-header h3 { margin: 0; font-size: 13px; color: #f7b731; letter-spacing: 1px; }
+        .win-btn { background: none; border: none; color: #666; cursor: pointer; font-size: 14px; padding: 4px 8px; }
+        .win-btn:hover { color: #fff; }
+
+        .panel-content { padding: 15px; }
+
+        /* Search */
+        .search-box {
+            background: rgba(40, 30, 15, 0.8); border: 1px solid #f7b731;
+            border-radius: 8px; padding: 12px; margin-bottom: 15px;
+        }
+        .search-box h4 { margin: 0 0 10px 0; color: #f7b731; font-size: 11px; }
+        .search-input {
+            width: 100%; background: #111; border: 1px solid #444; color: #fff;
+            padding: 10px; border-radius: 6px; font-size: 12px;
+        }
+        .search-input:focus { outline: none; border-color: #f7b731; }
+        .search-button {
+            width: 100%; background: #f7b731; color: #000; border: none;
+            padding: 8px; border-radius: 6px; font-weight: bold; cursor: pointer;
+            margin-top: 10px; font-size: 11px;
+        }
+        .search-button:hover { background: #ffcc00; }
+
+        /* Filter Section */
+        .filter-section {
+            background: rgba(25, 15, 40, 0.6); border: 1px solid #444;
+            border-radius: 8px; padding: 10px; margin-bottom: 12px;
+        }
+        .filter-section h4 {
+            margin: 0 0 10px 0; color: #888; font-size: 10px;
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+        .filter-group { display: flex; flex-wrap: wrap; gap: 6px; }
+
+        /* Checkbox Pills */
+        .filter-pill {
+            display: flex; align-items: center; gap: 4px;
+            background: #222; border: 1px solid #444;
+            padding: 4px 8px; border-radius: 4px;
+            font-size: 10px; cursor: pointer; transition: all 0.2s;
+        }
+        .filter-pill:hover { border-color: #666; }
+        .filter-pill.active { background: #333; border-color: #f7b731; }
+        .filter-pill input { display: none; }
+        .filter-pill .dot {
+            width: 8px; height: 8px; border-radius: 2px;
+        }
+
+        /* Stats Panel */
+        .stats-panel {
+            background: rgba(25, 15, 40, 0.8); border: 1px solid #aa66cc;
+            border-radius: 8px; padding: 10px; margin-bottom: 12px;
+        }
+        .stats-panel h4 { margin: 0 0 8px 0; color: #aa66cc; font-size: 10px; text-transform: uppercase; }
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .stat-label { font-size: 10px; color: #888; }
+        .stat-value { font-size: 11px; font-weight: bold; color: #fff; }
+        .stat-value.highlight { color: #00C851; }
+
+        /* Layout Controls */
+        .layout-section {
+            background: rgba(15, 35, 25, 0.6); border: 1px solid #10b981;
+            border-radius: 8px; padding: 10px; margin-bottom: 12px;
+        }
+        .layout-section h4 { margin: 0 0 10px 0; color: #10b981; font-size: 10px; text-transform: uppercase; }
+        .layout-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .layout-btn {
+            background: #222; border: 1px solid #444; color: #eee;
+            padding: 8px; border-radius: 6px; cursor: pointer; font-size: 10px;
+            transition: all 0.2s;
+        }
+        .layout-btn:hover { border-color: #10b981; color: #10b981; }
+        .layout-btn.active { background: #10b981; color: #000; border-color: #10b981; }
+
+        /* Detail Panel (Right) */
+        .detail-panel {
+            position: absolute; top: 20px; right: 20px; width: 350px;
+            max-height: calc(100vh - 40px);
+            background: rgba(15, 15, 15, 0.95); border: 1px solid #333; border-radius: 12px;
+            backdrop-filter: blur(20px); box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            display: none; flex-direction: column; z-index: 20; overflow: hidden;
+        }
+        .detail-panel.open { display: flex; }
+        .detail-header {
+            padding: 12px 15px; border-bottom: 1px solid #333;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .detail-header h3 { margin: 0; font-size: 13px; color: #fff; }
+        .detail-content { padding: 15px; overflow-y: auto; flex: 1; font-size: 12px; }
+
+        .detail-type {
+            display: inline-block; padding: 3px 8px; border-radius: 4px;
+            font-size: 10px; font-weight: bold; margin-bottom: 10px;
+        }
+        .detail-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; }
+        .detail-preview {
+            background: #1a1a1a; padding: 10px; border-radius: 6px;
+            font-size: 11px; line-height: 1.5; color: #ccc; margin-bottom: 15px;
+        }
+        .detail-meta { border-top: 1px solid #333; padding-top: 12px; }
+        .meta-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+        .meta-label { color: #888; font-size: 10px; }
+        .meta-value { color: #fff; font-size: 10px; font-weight: bold; }
+
+        .participant-tag {
+            display: inline-block; padding: 2px 6px; border-radius: 3px;
+            background: #333; font-size: 9px; margin-right: 4px; margin-bottom: 4px;
+        }
+        .participant-tag.prax { background: #f7b731; color: #000; }
+        .participant-tag.koda { background: #3b82f6; color: #fff; }
+        .participant-tag.cairn { background: #10b981; color: #000; }
+
+        /* Type Colors */
+        .type-workspace_session { background: #f7b731; color: #000; }
+        .type-canvas { background: #a855f7; color: #fff; }
+        .type-message { background: #3b82f6; color: #fff; }
+        .type-task { background: #ef4444; color: #fff; }
+        .type-calendar { background: #10b981; color: #000; }
+        .type-todo { background: #f59e0b; color: #000; }
+        .type-conversation { background: #4facfe; color: #000; }
+        .type-file { background: #8b5cf6; color: #fff; }
+        .type-inbox { background: #ec4899; color: #fff; }
+        .type-handoff { background: #00C851; color: #000; }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8); display: flex;
+            align-items: center; justify-content: center; z-index: 100;
+        }
+        .loading-spinner {
+            width: 40px; height: 40px; border: 3px solid #333;
+            border-top-color: #f7b731; border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Bottom info bar */
+        .info-bar {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(10, 10, 10, 0.9); border: 1px solid #333;
+            border-radius: 8px; padding: 8px 16px; font-size: 11px;
+            display: flex; gap: 20px; z-index: 10;
+        }
+        .info-item { display: flex; align-items: center; gap: 6px; }
+        .info-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #666; }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Filter Panel (Left) -->
+    <div class="filter-panel" id="filterPanel">
+        <div class="panel-header">
+            <h3>UNIVERSAL 3D EXPLORER</h3>
+            <button class="win-btn" onclick="toggleFilterPanel()">-</button>
+        </div>
+
+        <div class="panel-content">
+            <!-- Search -->
+            <div class="search-box">
+                <h4>SEARCH</h4>
+                <input type="text" id="searchInput" class="search-input" placeholder="Search all data...">
+                <button class="search-button" onclick="performSearch()">Search</button>
+            </div>
+
+            <!-- Type Filters -->
+            <div class="filter-section">
+                <h4>Data Types</h4>
+                <div class="filter-group" id="typeFilters"></div>
+            </div>
+
+            <!-- Participant Filters -->
+            <div class="filter-section">
+                <h4>Participants</h4>
+                <div class="filter-group" id="participantFilters"></div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-panel">
+                <h4>Statistics</h4>
+                <div class="stat-row">
+                    <span class="stat-label">Total Artifacts:</span>
+                    <span class="stat-value" id="statTotal">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Visible:</span>
+                    <span class="stat-value highlight" id="statVisible">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Date Range:</span>
+                    <span class="stat-value" id="statDateRange">-</span>
+                </div>
+            </div>
+
+            <!-- Layout Controls -->
+            <div class="layout-section">
+                <h4>Layout</h4>
+                <div class="layout-buttons">
+                    <button class="layout-btn active" onclick="changeLayout('globe')">Globe</button>
+                    <button class="layout-btn" onclick="changeLayout('timeline')">Timeline</button>
+                    <button class="layout-btn" onclick="changeLayout('hierarchy')">Hierarchy</button>
+                    <button class="layout-btn" onclick="changeLayout('clusters')">Type Clusters</button>
+                    <button class="layout-btn" onclick="changeLayout('participants')">Participants</button>
+                    <button class="layout-btn" onclick="changeLayout('helix')">Helix</button>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="filter-section">
+                <h4>Controls</h4>
+                <div class="layout-buttons">
+                    <button class="layout-btn" id="orbitBtn" onclick="toggleAutoOrbit()">Auto-Orbit: OFF</button>
+                    <button class="layout-btn" onclick="toggleConnections()">Connections</button>
+                    <button class="layout-btn" onclick="reloadData()">Reload</button>
+                    <button class="layout-btn" onclick="resetView()">Reset View</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Panel (Right) -->
+    <div class="detail-panel" id="detailPanel">
+        <div class="detail-header">
+            <h3 id="detailTitle">Artifact Details</h3>
+            <button class="win-btn" onclick="closeDetailPanel()">x</button>
+        </div>
+        <div class="detail-content" id="detailContent">
+            <!-- Dynamic content -->
+        </div>
+    </div>
+
+    <!-- Info Bar -->
+    <div class="info-bar">
+        <div class="info-item"><div class="info-dot" style="background:#f7b731"></div>Sessions</div>
+        <div class="info-item"><div class="info-dot" style="background:#a855f7"></div>Canvas</div>
+        <div class="info-item"><div class="info-dot" style="background:#3b82f6"></div>Messages</div>
+        <div class="info-item"><div class="info-dot" style="background:#ef4444"></div>Tasks</div>
+        <div class="info-item"><div class="info-dot" style="background:#10b981"></div>Calendar</div>
+        <div class="info-item"><div class="info-dot" style="background:#f59e0b"></div>Todos</div>
+        <div class="info-item"><div class="info-dot" style="background:#4facfe"></div>Conversations</div>
+        <div class="info-item"><div class="info-dot" style="background:#8b5cf6"></div>Files</div>
+        <div class="info-item"><div class="info-dot" style="background:#ec4899"></div>Inbox</div>
+        <div class="info-item"><div class="info-dot" style="background:#00C851"></div>Handoffs</div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // =====================================================================
+        // Configuration
+        // =====================================================================
+
+        const ARTIFACT_CONFIG = {
+            workspace_session: { geometry: 'box', size: 2.5, color: 0xf7b731 },
+            canvas:            { geometry: 'plane', size: 2, color: 0xa855f7 },
+            message:           { geometry: 'sphere', size: 0.8, color: 0x3b82f6 },
+            task:              { geometry: 'octahedron', size: 1.2, color: 0xef4444 },
+            calendar:          { geometry: 'cone', size: 1, color: 0x10b981 },
+            todo:              { geometry: 'torus', size: 0.7, color: 0xf59e0b },
+            conversation:      { geometry: 'cylinder', size: 1, color: 0x4facfe },
+            file:              { geometry: 'flatbox', size: 1.5, color: 0x8b5cf6 },
+            inbox:             { geometry: 'dodecahedron', size: 1, color: 0xec4899 },
+            handoff:           { geometry: 'icosahedron', size: 1.2, color: 0x00C851 }
+        };
+
+        const RELATIONSHIP_COLORS = {
+            parent_child: 0xffffff,
+            temporal: 0x888888,
+            participant: 0xf7b731,
+            tag: 0x4facfe
+        };
+
+        // =====================================================================
+        // State
+        // =====================================================================
+
+        let scene, camera, renderer, controls;
+        let artifacts = [];
+        let nodes = [];
+        let lines = [];
+        let selectedNode = null;
+        let autoOrbit = false;
+        let showConnections = true;
+        let currentLayout = 'globe';
+        let activeFilters = {
+            types: new Set(),
+            participants: new Set()
+        };
+        let stats = {};
+
+        // =====================================================================
+        // Initialize Three.js
+        // =====================================================================
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050505);
+            scene.fog = new THREE.FogExp2(0x050505, 0.008);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 30, 80);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 200;
+            controls.minDistance = 10;
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(50, 50, 50);
+            scene.add(directionalLight);
+
+            const pointLight = new THREE.PointLight(0xf7b731, 0.5, 100);
+            pointLight.position.set(0, 0, 0);
+            scene.add(pointLight);
+
+            // Grid helper
+            const gridHelper = new THREE.GridHelper(200, 50, 0x222222, 0x111111);
+            gridHelper.position.y = -30;
+            scene.add(gridHelper);
+
+            // Event listeners
+            window.addEventListener('resize', onWindowResize);
+            renderer.domElement.addEventListener('click', onCanvasClick);
+            document.getElementById('searchInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') performSearch();
+            });
+
+            // Start animation
+            animate();
+
+            // Load data
+            loadData();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (autoOrbit) {
+                const time = Date.now() * 0.0001;
+                camera.position.x = Math.cos(time) * 80;
+                camera.position.z = Math.sin(time) * 80;
+                camera.lookAt(0, 0, 0);
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // =====================================================================
+        // Data Loading
+        // =====================================================================
+
+        async function loadData() {
+            showLoading(true);
+
+            try {
+                // Load artifacts
+                const response = await fetch('/api/3d/universal/artifacts?limit=500');
+                const data = await response.json();
+
+                if (data.ok) {
+                    artifacts = data.artifacts || [];
+                    console.log(`Loaded ${artifacts.length} artifacts`);
+                }
+
+                // Load stats
+                const statsResponse = await fetch('/api/3d/universal/stats');
+                const statsData = await statsResponse.json();
+
+                if (statsData.ok) {
+                    stats = statsData.stats || {};
+                    updateStats();
+                    initializeFilters();
+                }
+
+                // Create 3D nodes
+                createNodes();
+                applyLayout(currentLayout);
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+            }
+
+            showLoading(false);
+        }
+
+        async function reloadData() {
+            clearScene();
+            await loadData();
+        }
+
+        function clearScene() {
+            nodes.forEach(node => scene.remove(node));
+            lines.forEach(line => scene.remove(line));
+            nodes = [];
+            lines = [];
+        }
+
+        // =====================================================================
+        // Filter Initialization
+        // =====================================================================
+
+        function initializeFilters() {
+            // Type filters
+            const typeContainer = document.getElementById('typeFilters');
+            typeContainer.innerHTML = '';
+
+            const types = Object.keys(ARTIFACT_CONFIG);
+            types.forEach(type => {
+                const count = (stats.by_type && stats.by_type[type]) || 0;
+                const color = ARTIFACT_CONFIG[type].color;
+                const label = type.replace('_', ' ');
+
+                const pill = document.createElement('label');
+                pill.className = 'filter-pill active';
+                pill.innerHTML = `
+                    <input type="checkbox" checked data-type="${type}">
+                    <span class="dot" style="background:#${color.toString(16).padStart(6, '0')}"></span>
+                    ${label} (${count})
+                `;
+                pill.onclick = (e) => {
+                    if (e.target.tagName !== 'INPUT') return;
+                    toggleTypeFilter(type, e.target.checked);
+                    pill.classList.toggle('active', e.target.checked);
+                };
+                typeContainer.appendChild(pill);
+                activeFilters.types.add(type);
+            });
+
+            // Participant filters
+            const participantContainer = document.getElementById('participantFilters');
+            participantContainer.innerHTML = '';
+
+            const participants = Object.keys(stats.by_participant || {}).slice(0, 10);
+            participants.forEach(participant => {
+                const count = stats.by_participant[participant];
+                let pillClass = '';
+                if (participant.toLowerCase().includes('prax')) pillClass = 'prax';
+                else if (participant.toLowerCase().includes('koda')) pillClass = 'koda';
+                else if (participant.toLowerCase().includes('cairn')) pillClass = 'cairn';
+
+                const pill = document.createElement('label');
+                pill.className = 'filter-pill active';
+                pill.innerHTML = `
+                    <input type="checkbox" checked data-participant="${participant}">
+                    <span class="participant-tag ${pillClass}">${participant}</span>
+                    (${count})
+                `;
+                pill.onclick = (e) => {
+                    if (e.target.tagName !== 'INPUT') return;
+                    toggleParticipantFilter(participant, e.target.checked);
+                    pill.classList.toggle('active', e.target.checked);
+                };
+                participantContainer.appendChild(pill);
+                activeFilters.participants.add(participant);
+            });
+        }
+
+        function updateStats() {
+            document.getElementById('statTotal').textContent = stats.total || 0;
+            document.getElementById('statVisible').textContent = artifacts.length;
+
+            if (stats.date_range) {
+                const from = stats.date_range.from ? new Date(stats.date_range.from).toLocaleDateString() : '-';
+                const to = stats.date_range.to ? new Date(stats.date_range.to).toLocaleDateString() : '-';
+                document.getElementById('statDateRange').textContent = `${from} - ${to}`;
+            }
+        }
+
+        // =====================================================================
+        // Node Creation
+        // =====================================================================
+
+        function createGeometry(type, size) {
+            const config = ARTIFACT_CONFIG[type] || ARTIFACT_CONFIG.message;
+            const s = size * config.size;
+
+            switch (config.geometry) {
+                case 'box':
+                    return new THREE.BoxGeometry(s, s, s);
+                case 'plane':
+                    return new THREE.PlaneGeometry(s, s * 1.3);
+                case 'sphere':
+                    return new THREE.SphereGeometry(s * 0.5, 16, 16);
+                case 'octahedron':
+                    return new THREE.OctahedronGeometry(s * 0.6);
+                case 'cone':
+                    return new THREE.ConeGeometry(s * 0.4, s, 8);
+                case 'torus':
+                    return new THREE.TorusGeometry(s * 0.4, s * 0.15, 8, 16);
+                case 'cylinder':
+                    return new THREE.CylinderGeometry(s * 0.4, s * 0.4, s * 0.8, 16);
+                case 'flatbox':
+                    return new THREE.BoxGeometry(s, s * 1.2, s * 0.2);
+                case 'dodecahedron':
+                    return new THREE.DodecahedronGeometry(s * 0.5);
+                case 'icosahedron':
+                    return new THREE.IcosahedronGeometry(s * 0.6);
+                default:
+                    return new THREE.SphereGeometry(s * 0.5, 16, 16);
+            }
+        }
+
+        function createNodes() {
+            clearScene();
+
+            const filteredArtifacts = artifacts.filter(a => {
+                const typeMatch = activeFilters.types.size === 0 || activeFilters.types.has(a.type);
+                const participantMatch = activeFilters.participants.size === 0 ||
+                    (a.participants && a.participants.some(p => activeFilters.participants.has(p)));
+                return typeMatch && participantMatch;
+            });
+
+            filteredArtifacts.forEach((artifact, index) => {
+                const config = ARTIFACT_CONFIG[artifact.type] || ARTIFACT_CONFIG.message;
+
+                const geometry = createGeometry(artifact.type, 1);
+                const material = new THREE.MeshPhongMaterial({
+                    color: config.color,
+                    transparent: true,
+                    opacity: 0.85,
+                    shininess: 30
+                });
+
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.userData = { artifact, index };
+
+                // Add glow effect for important types
+                if (['workspace_session', 'handoff', 'task'].includes(artifact.type)) {
+                    const glowGeometry = createGeometry(artifact.type, 1.3);
+                    const glowMaterial = new THREE.MeshBasicMaterial({
+                        color: config.color,
+                        transparent: true,
+                        opacity: 0.15
+                    });
+                    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+                    mesh.add(glow);
+                }
+
+                scene.add(mesh);
+                nodes.push(mesh);
+            });
+
+            document.getElementById('statVisible').textContent = nodes.length;
+
+            // Create connection lines
+            if (showConnections) {
+                createConnectionLines();
+            }
+        }
+
+        function createConnectionLines() {
+            // Remove existing lines
+            lines.forEach(line => scene.remove(line));
+            lines = [];
+
+            // Create parent-child connections
+            const artifactMap = new Map(artifacts.map(a => [a.id, a]));
+
+            nodes.forEach(node => {
+                const artifact = node.userData.artifact;
+                if (artifact.parent_id) {
+                    const parentNode = nodes.find(n => n.userData.artifact.id === artifact.parent_id);
+                    if (parentNode) {
+                        const points = [node.position.clone(), parentNode.position.clone()];
+                        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                        const material = new THREE.LineBasicMaterial({
+                            color: RELATIONSHIP_COLORS.parent_child,
+                            transparent: true,
+                            opacity: 0.3
+                        });
+                        const line = new THREE.Line(geometry, material);
+                        scene.add(line);
+                        lines.push(line);
+                    }
+                }
+            });
+        }
+
+        // =====================================================================
+        // Layout Algorithms
+        // =====================================================================
+
+        function applyLayout(layout) {
+            currentLayout = layout;
+
+            // Update button states
+            document.querySelectorAll('.layout-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === layout);
+            });
+
+            switch (layout) {
+                case 'globe':
+                    layoutGlobe();
+                    break;
+                case 'timeline':
+                    layoutTimeline();
+                    break;
+                case 'hierarchy':
+                    layoutHierarchy();
+                    break;
+                case 'clusters':
+                    layoutTypeClusters();
+                    break;
+                case 'participants':
+                    layoutParticipants();
+                    break;
+                case 'helix':
+                    layoutHelix();
+                    break;
+                default:
+                    layoutGlobe();
+            }
+
+            // Update connection lines
+            if (showConnections) {
+                createConnectionLines();
+            }
+        }
+
+        function layoutGlobe() {
+            const radius = 40;
+
+            nodes.forEach((node, i) => {
+                const phi = Math.acos(-1 + (2 * i) / nodes.length);
+                const theta = Math.sqrt(nodes.length * Math.PI) * phi;
+
+                node.position.x = radius * Math.cos(theta) * Math.sin(phi);
+                node.position.y = radius * Math.cos(phi);
+                node.position.z = radius * Math.sin(theta) * Math.sin(phi);
+            });
+        }
+
+        function layoutTimeline() {
+            // Sort by date
+            const sorted = [...nodes].sort((a, b) => {
+                const dateA = new Date(a.userData.artifact.created_at || 0);
+                const dateB = new Date(b.userData.artifact.created_at || 0);
+                return dateA - dateB;
+            });
+
+            const types = Object.keys(ARTIFACT_CONFIG);
+            const spacing = 3;
+
+            sorted.forEach((node, i) => {
+                const typeIndex = types.indexOf(node.userData.artifact.type);
+                node.position.x = (i - sorted.length / 2) * spacing;
+                node.position.y = 0;
+                node.position.z = typeIndex * 8 - 40;
+            });
+        }
+
+        function layoutHierarchy() {
+            // Group by participant, with agents at center
+            const agents = ['prax', 'koda', 'cairn'];
+            const agentNodes = new Map();
+            const otherNodes = [];
+
+            nodes.forEach(node => {
+                const participants = node.userData.artifact.participants || [];
+                let assigned = false;
+
+                for (const agent of agents) {
+                    if (participants.some(p => p.toLowerCase().includes(agent))) {
+                        if (!agentNodes.has(agent)) agentNodes.set(agent, []);
+                        agentNodes.get(agent).push(node);
+                        assigned = true;
+                        break;
+                    }
+                }
+
+                if (!assigned) otherNodes.push(node);
+            });
+
+            // Position agent groups
+            let angleOffset = 0;
+            agentNodes.forEach((agentNodeList, agent) => {
+                const baseAngle = angleOffset;
+                const radius = 30;
+
+                agentNodeList.forEach((node, i) => {
+                    const angle = baseAngle + (i / agentNodeList.length) * Math.PI * 0.6;
+                    const r = radius + (i % 5) * 5;
+                    node.position.x = Math.cos(angle) * r;
+                    node.position.z = Math.sin(angle) * r;
+                    node.position.y = (i % 3 - 1) * 5;
+                });
+
+                angleOffset += Math.PI * 2 / 3;
+            });
+
+            // Position other nodes in center
+            otherNodes.forEach((node, i) => {
+                const angle = (i / otherNodes.length) * Math.PI * 2;
+                node.position.x = Math.cos(angle) * 10;
+                node.position.z = Math.sin(angle) * 10;
+                node.position.y = 0;
+            });
+        }
+
+        function layoutTypeClusters() {
+            const types = Object.keys(ARTIFACT_CONFIG);
+            const clustersPerRow = 4;
+            const clusterSpacing = 30;
+
+            types.forEach((type, typeIndex) => {
+                const typeNodes = nodes.filter(n => n.userData.artifact.type === type);
+                if (typeNodes.length === 0) return;
+
+                const row = Math.floor(typeIndex / clustersPerRow);
+                const col = typeIndex % clustersPerRow;
+                const centerX = (col - clustersPerRow / 2 + 0.5) * clusterSpacing;
+                const centerZ = (row - 1) * clusterSpacing;
+
+                typeNodes.forEach((node, i) => {
+                    const phi = Math.acos(-1 + (2 * i) / Math.max(typeNodes.length, 1));
+                    const theta = Math.sqrt(typeNodes.length * Math.PI) * phi;
+                    const r = 8 + Math.sqrt(typeNodes.length);
+
+                    node.position.x = centerX + r * Math.cos(theta) * Math.sin(phi);
+                    node.position.y = r * Math.cos(phi);
+                    node.position.z = centerZ + r * Math.sin(theta) * Math.sin(phi);
+                });
+            });
+        }
+
+        function layoutParticipants() {
+            const participantGroups = new Map();
+
+            nodes.forEach(node => {
+                const participants = node.userData.artifact.participants || ['unknown'];
+                const primary = participants[0] || 'unknown';
+
+                if (!participantGroups.has(primary)) {
+                    participantGroups.set(primary, []);
+                }
+                participantGroups.get(primary).push(node);
+            });
+
+            const groupCount = participantGroups.size;
+            let groupIndex = 0;
+
+            participantGroups.forEach((groupNodes, participant) => {
+                const angle = (groupIndex / groupCount) * Math.PI * 2;
+                const centerX = Math.cos(angle) * 35;
+                const centerZ = Math.sin(angle) * 35;
+
+                groupNodes.forEach((node, i) => {
+                    const subAngle = (i / groupNodes.length) * Math.PI * 2;
+                    const r = 5 + Math.sqrt(groupNodes.length) * 2;
+                    node.position.x = centerX + Math.cos(subAngle) * r;
+                    node.position.z = centerZ + Math.sin(subAngle) * r;
+                    node.position.y = (i % 5 - 2) * 2;
+                });
+
+                groupIndex++;
+            });
+        }
+
+        function layoutHelix() {
+            const turns = 3;
+            const height = 60;
+            const radius = 25;
+
+            nodes.forEach((node, i) => {
+                const t = i / nodes.length;
+                const angle = t * Math.PI * 2 * turns;
+
+                node.position.x = Math.cos(angle) * radius;
+                node.position.z = Math.sin(angle) * radius;
+                node.position.y = (t - 0.5) * height;
+            });
+        }
+
+        // =====================================================================
+        // Interaction
+        // =====================================================================
+
+        function onCanvasClick(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            const mouse = new THREE.Vector2(
+                ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                -((event.clientY - rect.top) / rect.height) * 2 + 1
+            );
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects(nodes);
+
+            if (intersects.length > 0) {
+                const clickedNode = intersects[0].object;
+                selectNode(clickedNode);
+            } else {
+                deselectNode();
+            }
+        }
+
+        function selectNode(node) {
+            // Deselect previous
+            if (selectedNode) {
+                selectedNode.material.emissive.setHex(0x000000);
+            }
+
+            selectedNode = node;
+            node.material.emissive.setHex(0x444444);
+
+            showDetailPanel(node.userData.artifact);
+        }
+
+        function deselectNode() {
+            if (selectedNode) {
+                selectedNode.material.emissive.setHex(0x000000);
+                selectedNode = null;
+            }
+            closeDetailPanel();
+        }
+
+        function showDetailPanel(artifact) {
+            const panel = document.getElementById('detailPanel');
+            const content = document.getElementById('detailContent');
+
+            const typeClass = `type-${artifact.type}`;
+            const participants = (artifact.participants || []).map(p => {
+                let cls = '';
+                if (p.toLowerCase().includes('prax')) cls = 'prax';
+                else if (p.toLowerCase().includes('koda')) cls = 'koda';
+                else if (p.toLowerCase().includes('cairn')) cls = 'cairn';
+                return `<span class="participant-tag ${cls}">${p}</span>`;
+            }).join('');
+
+            const created = artifact.created_at ?
+                new Date(artifact.created_at).toLocaleString() : 'Unknown';
+
+            content.innerHTML = `
+                <span class="detail-type ${typeClass}">${artifact.type.replace('_', ' ').toUpperCase()}</span>
+                <div class="detail-title">${artifact.title || 'Untitled'}</div>
+                <div class="detail-preview">${artifact.preview || 'No preview available'}</div>
+
+                <div class="detail-meta">
+                    <div class="meta-row">
+                        <span class="meta-label">ID:</span>
+                        <span class="meta-value">${artifact.id}</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Created:</span>
+                        <span class="meta-value">${created}</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Source:</span>
+                        <span class="meta-value">${artifact.source || 'Unknown'}</span>
+                    </div>
+                    ${artifact.status ? `
+                    <div class="meta-row">
+                        <span class="meta-label">Status:</span>
+                        <span class="meta-value">${artifact.status}</span>
+                    </div>` : ''}
+                    <div class="meta-row">
+                        <span class="meta-label">Participants:</span>
+                    </div>
+                    <div style="margin-top: 4px;">${participants || '<span style="color:#666">None</span>'}</div>
+                    ${artifact.tags && artifact.tags.length ? `
+                    <div class="meta-row" style="margin-top: 10px;">
+                        <span class="meta-label">Tags:</span>
+                    </div>
+                    <div style="margin-top: 4px;">${artifact.tags.map(t => `<span class="participant-tag">${t}</span>`).join('')}</div>` : ''}
+                </div>
+            `;
+
+            panel.classList.add('open');
+        }
+
+        function closeDetailPanel() {
+            document.getElementById('detailPanel').classList.remove('open');
+        }
+
+        // =====================================================================
+        // Filter Actions
+        // =====================================================================
+
+        function toggleTypeFilter(type, enabled) {
+            if (enabled) {
+                activeFilters.types.add(type);
+            } else {
+                activeFilters.types.delete(type);
+            }
+            createNodes();
+            applyLayout(currentLayout);
+        }
+
+        function toggleParticipantFilter(participant, enabled) {
+            if (enabled) {
+                activeFilters.participants.add(participant);
+            } else {
+                activeFilters.participants.delete(participant);
+            }
+            createNodes();
+            applyLayout(currentLayout);
+        }
+
+        async function performSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) {
+                await reloadData();
+                return;
+            }
+
+            showLoading(true);
+
+            try {
+                const response = await fetch(`/api/3d/universal/search?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (data.ok) {
+                    artifacts = data.results || [];
+                    createNodes();
+                    applyLayout(currentLayout);
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+            }
+
+            showLoading(false);
+        }
+
+        // =====================================================================
+        // UI Controls
+        // =====================================================================
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'flex' : 'none';
+        }
+
+        function toggleFilterPanel() {
+            const content = document.querySelector('.filter-panel .panel-content');
+            content.style.display = content.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function toggleAutoOrbit() {
+            autoOrbit = !autoOrbit;
+            document.getElementById('orbitBtn').textContent = `Auto-Orbit: ${autoOrbit ? 'ON' : 'OFF'}`;
+            document.getElementById('orbitBtn').classList.toggle('active', autoOrbit);
+        }
+
+        function toggleConnections() {
+            showConnections = !showConnections;
+            if (showConnections) {
+                createConnectionLines();
+            } else {
+                lines.forEach(line => scene.remove(line));
+                lines = [];
+            }
+        }
+
+        function resetView() {
+            camera.position.set(0, 30, 80);
+            camera.lookAt(0, 0, 0);
+            controls.reset();
+        }
+
+        function changeLayout(layout) {
+            applyLayout(layout);
+        }
+
+        // Export functions to window
+        window.toggleFilterPanel = toggleFilterPanel;
+        window.toggleAutoOrbit = toggleAutoOrbit;
+        window.toggleConnections = toggleConnections;
+        window.resetView = resetView;
+        window.changeLayout = changeLayout;
+        window.performSearch = performSearch;
+        window.closeDetailPanel = closeDetailPanel;
+        window.reloadData = reloadData;
+
+        // Initialize
+        init();
+    </script>
+</body>
+</html>

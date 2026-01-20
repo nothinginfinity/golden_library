@@ -67,6 +67,14 @@ except ImportError:
     demo_store = None
     print("Warning: demo_session_store not found. Demo sharing features disabled.")
 
+# Import unified artifact adapter for Universal 3D Explorer
+try:
+    from unified_artifact_adapter import get_unified_adapter
+    unified_adapter = get_unified_adapter()
+except ImportError:
+    unified_adapter = None
+    print("Warning: unified_artifact_adapter not found. Universal 3D Explorer disabled.")
+
 # Redis for persistent API key storage
 try:
     import redis
@@ -383,6 +391,28 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif path.startswith('/api/files/') and path.count('/') == 3:
             file_id = path.split('/')[-1]
             self.serve_file_info(file_id)
+            return
+        # =========================================================================
+        # Universal 3D Explorer API
+        # =========================================================================
+        elif path == '/api/3d/universal/artifacts':
+            self.serve_universal_artifacts(parsed_path.query)
+            return
+        elif path == '/api/3d/universal/stats':
+            self.serve_universal_stats()
+            return
+        elif path == '/api/3d/universal/search':
+            self.serve_universal_search(parsed_path.query)
+            return
+        elif path == '/api/3d/universal/relationships':
+            self.serve_universal_relationships(parsed_path.query)
+            return
+        elif path.startswith('/api/3d/universal/artifact/'):
+            artifact_id = path.split('/')[-1]
+            self.serve_universal_artifact_detail(artifact_id)
+            return
+        elif path == '/viewer_universal' or path == '/viewer_universal.html':
+            self.serve_viewer_universal()
             return
         else:
             # Return 404 for other paths
@@ -3609,6 +3639,174 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 'ok': False,
                 'error': str(e),
                 'message': 'Failed to calculate statistics'
+            }, status=500)
+
+    # =========================================================================
+    # Universal 3D Explorer API
+    # =========================================================================
+
+    def serve_viewer_universal(self):
+        """Serve the universal 3D viewer HTML."""
+        viewer_path = Path(__file__).parent / "viewer_universal.html"
+        if viewer_path.exists():
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html')
+            self.end_headers()
+            with open(viewer_path, 'rb') as f:
+                self.wfile.write(f.read())
+        else:
+            self.send_error(404, "Universal viewer not found")
+
+    def serve_universal_artifacts(self, query_string):
+        """List all unified artifacts with filtering."""
+        if not unified_adapter:
+            self.serve_json({
+                'ok': False,
+                'error': 'Unified adapter not available'
+            }, status=500)
+            return
+
+        try:
+            params = parse_qs(query_string) if query_string else {}
+
+            # Parse filter parameters
+            types = params.get('types', [None])[0]
+            types = types.split(',') if types else None
+
+            participants = params.get('participants', [None])[0]
+            participants = participants.split(',') if participants else None
+
+            date_from = params.get('from', [None])[0]
+            date_to = params.get('to', [None])[0]
+            limit = int(params.get('limit', [500])[0])
+
+            artifacts = unified_adapter.get_all_artifacts(
+                types=types,
+                participants=participants,
+                date_from=date_from,
+                date_to=date_to,
+                limit=limit
+            )
+
+            self.serve_json({
+                'ok': True,
+                'artifacts': artifacts,
+                'count': len(artifacts)
+            })
+        except Exception as e:
+            self.serve_json({
+                'ok': False,
+                'error': str(e)
+            }, status=500)
+
+    def serve_universal_stats(self):
+        """Get aggregate statistics for all artifacts."""
+        if not unified_adapter:
+            self.serve_json({
+                'ok': False,
+                'error': 'Unified adapter not available'
+            }, status=500)
+            return
+
+        try:
+            stats = unified_adapter.get_stats()
+            self.serve_json({
+                'ok': True,
+                'stats': stats
+            })
+        except Exception as e:
+            self.serve_json({
+                'ok': False,
+                'error': str(e)
+            }, status=500)
+
+    def serve_universal_search(self, query_string):
+        """Search across all artifacts."""
+        if not unified_adapter:
+            self.serve_json({
+                'ok': False,
+                'error': 'Unified adapter not available'
+            }, status=500)
+            return
+
+        try:
+            params = parse_qs(query_string) if query_string else {}
+            query = params.get('q', [''])[0]
+            types = params.get('types', [None])[0]
+            types = types.split(',') if types else None
+
+            results = unified_adapter.search_artifacts(query, types=types)
+
+            self.serve_json({
+                'ok': True,
+                'results': results,
+                'count': len(results),
+                'query': query
+            })
+        except Exception as e:
+            self.serve_json({
+                'ok': False,
+                'error': str(e)
+            }, status=500)
+
+    def serve_universal_relationships(self, query_string):
+        """Get relationships for an artifact."""
+        if not unified_adapter:
+            self.serve_json({
+                'ok': False,
+                'error': 'Unified adapter not available'
+            }, status=500)
+            return
+
+        try:
+            params = parse_qs(query_string) if query_string else {}
+            artifact_id = params.get('id', [''])[0]
+
+            if not artifact_id:
+                self.serve_json({
+                    'ok': False,
+                    'error': 'Missing artifact id parameter'
+                }, status=400)
+                return
+
+            relationships = unified_adapter.get_relationships(artifact_id)
+
+            self.serve_json({
+                'ok': True,
+                'relationships': relationships
+            })
+        except Exception as e:
+            self.serve_json({
+                'ok': False,
+                'error': str(e)
+            }, status=500)
+
+    def serve_universal_artifact_detail(self, artifact_id):
+        """Get detailed information for a single artifact."""
+        if not unified_adapter:
+            self.serve_json({
+                'ok': False,
+                'error': 'Unified adapter not available'
+            }, status=500)
+            return
+
+        try:
+            artifact = unified_adapter.get_artifact_detail(artifact_id)
+
+            if artifact:
+                self.serve_json({
+                    'ok': True,
+                    'artifact': artifact
+                })
+            else:
+                self.serve_json({
+                    'ok': False,
+                    'error': 'Artifact not found'
+                }, status=404)
+        except Exception as e:
+            self.serve_json({
+                'ok': False,
+                'error': str(e)
             }, status=500)
 
     # =========================================================================
