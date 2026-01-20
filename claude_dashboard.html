@@ -13883,12 +13883,12 @@ ${currentConversation.display}
         return `
           <div class="canvas-section-card"
                draggable="true"
-               ondragstart="handleDragStart(event, '${escapedName}')"
-               ondragend="handleDragEnd(event)"
-               ondragover="handleDragOver(event)"
-               ondragenter="handleDragEnter(event, '${escapedName}')"
-               ondragleave="handleDragLeave(event)"
-               ondrop="handleDrop(event, '${escapedName}')"
+               ondragstart="handleSectionDragStart(event, '${escapedName}')"
+               ondragend="handleSectionDragEnd(event)"
+               ondragover="handleSectionDragOver(event)"
+               ondragenter="handleSectionDragEnter(event, '${escapedName}')"
+               ondragleave="handleSectionDragLeave(event)"
+               ondrop="handleSectionDrop(event, '${escapedName}')"
                style="padding: 10px 12px; margin-bottom: 6px; background: ${isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(30, 41, 59, 0.5)'}; border: 1px solid ${isActive ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.2)'}; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div style="display: flex; align-items: center; flex: 1;">
@@ -13983,7 +13983,7 @@ ${currentConversation.display}
     // Drag & Drop Section Reordering
     let draggedSectionName = null;
 
-    function handleDragStart(e, sectionName) {
+    function handleSectionDragStart(e, sectionName) {
       draggedSectionName = sectionName;
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', sectionName);
@@ -13993,7 +13993,7 @@ ${currentConversation.display}
       }, 0);
     }
 
-    function handleDragEnd(e) {
+    function handleSectionDragEnd(e) {
       e.target.style.opacity = '1';
       draggedSectionName = null;
       // Remove all drag-over styles
@@ -14003,12 +14003,12 @@ ${currentConversation.display}
       });
     }
 
-    function handleDragOver(e) {
+    function handleSectionDragOver(e) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
     }
 
-    function handleDragEnter(e, sectionName) {
+    function handleSectionDragEnter(e, sectionName) {
       if (draggedSectionName && draggedSectionName !== sectionName) {
         const doc = window.canvasDocument;
         const order = doc.section_order;
@@ -14027,12 +14027,12 @@ ${currentConversation.display}
       }
     }
 
-    function handleDragLeave(e) {
+    function handleSectionDragLeave(e) {
       e.currentTarget.style.borderTop = '';
       e.currentTarget.style.borderBottom = '';
     }
 
-    function handleDrop(e, targetSectionName) {
+    function handleSectionDrop(e, targetSectionName) {
       e.preventDefault();
       e.currentTarget.style.borderTop = '';
       e.currentTarget.style.borderBottom = '';
@@ -14076,13 +14076,13 @@ ${currentConversation.display}
       }
     }
 
-    // Expose drag handlers to window
-    window.handleDragStart = handleDragStart;
-    window.handleDragEnd = handleDragEnd;
-    window.handleDragOver = handleDragOver;
-    window.handleDragEnter = handleDragEnter;
-    window.handleDragLeave = handleDragLeave;
-    window.handleDrop = handleDrop;
+    // Expose section drag handlers to window
+    window.handleSectionDragStart = handleSectionDragStart;
+    window.handleSectionDragEnd = handleSectionDragEnd;
+    window.handleSectionDragOver = handleSectionDragOver;
+    window.handleSectionDragEnter = handleSectionDragEnter;
+    window.handleSectionDragLeave = handleSectionDragLeave;
+    window.handleSectionDrop = handleSectionDrop;
 
     let canvasPreviewMode = 'split'; // 'split', 'edit', 'preview'
 
