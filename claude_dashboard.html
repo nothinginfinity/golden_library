@@ -13856,19 +13856,24 @@ ${currentConversation.display}
         const isActive = sectionName === activeSectionName;
         const ownerBadge = section.owner ? `<span style="font-size: 0.65rem; color: #64748b; margin-left: 4px;">(${section.owner})</span>` : '';
         const typeBadge = section.section_type ? `<span style="font-size: 0.6rem; background: rgba(99, 102, 241, 0.2); color: #a5b4fc; padding: 1px 4px; border-radius: 2px; margin-left: 4px;">${section.section_type}</span>` : '';
+        const escapedName = sectionName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
         return `
-          <div onclick="selectCanvasSection('${sectionName}')"
-               style="padding: 10px 12px; margin-bottom: 6px; background: ${isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(30, 41, 59, 0.5)'}; border: 1px solid ${isActive ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.2)'}; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+          <div style="padding: 10px 12px; margin-bottom: 6px; background: ${isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(30, 41, 59, 0.5)'}; border: 1px solid ${isActive ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.2)'}; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-              <div>
+              <div onclick="selectCanvasSection('${escapedName}')" style="flex: 1;">
                 <span style="color: ${isActive ? '#34d399' : '#e2e8f0'}; font-size: 0.85rem; font-weight: 500;">${sectionName}</span>
                 ${ownerBadge}
                 ${typeBadge}
               </div>
-              <span style="font-size: 0.65rem; color: #64748b;">v${section.version || 1}</span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 0.65rem; color: #64748b;">v${section.version || 1}</span>
+                <button onclick="event.stopPropagation(); deleteCanvasSection('${escapedName}')"
+                        style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; width: 20px; height: 20px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; display: flex; align-items: center; justify-content: center;"
+                        title="Delete section">×</button>
+              </div>
             </div>
-            <div style="color: #94a3b8; font-size: 0.75rem; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <div onclick="selectCanvasSection('${escapedName}')" style="color: #94a3b8; font-size: 0.75rem; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
               ${(section.content || '').substring(0, 60)}${(section.content || '').length > 60 ? '...' : ''}
             </div>
           </div>
@@ -13905,6 +13910,41 @@ ${currentConversation.display}
 
       // Re-render sections list to update highlighting
       renderCanvasSections();
+    }
+
+    function deleteCanvasSection(sectionName) {
+      if (!confirm(`Delete section "${sectionName}"?`)) return;
+
+      const doc = window.canvasDocument;
+      if (!doc) return;
+
+      // Remove from sections object
+      delete doc.sections[sectionName];
+
+      // Remove from section_order array
+      const idx = doc.section_order.indexOf(sectionName);
+      if (idx > -1) {
+        doc.section_order.splice(idx, 1);
+      }
+
+      // Clear editor if this was the active section
+      if (activeSectionName === sectionName) {
+        activeSectionName = null;
+        window.activeSectionName = null;
+        const editorContainer = document.getElementById('canvas-editor-container');
+        if (editorContainer) {
+          editorContainer.style.display = 'none';
+        }
+      }
+
+      // Save and re-render
+      window.canvasDocument = doc;
+      localStorage.setItem('local_canvas_document', JSON.stringify(doc));
+      renderCanvasSections();
+
+      if (typeof showNotification === 'function') {
+        showNotification(`Deleted "${sectionName}"`, 'success');
+      }
     }
 
     let canvasPreviewMode = 'split'; // 'split', 'edit', 'preview'
@@ -14264,6 +14304,7 @@ ${currentConversation.display}
     window.createCanvasDocument = createCanvasDocument;
     window.addCanvasSection = addCanvasSection;
     window.selectCanvasSection = selectCanvasSection;
+    window.deleteCanvasSection = deleteCanvasSection;
     window.saveCanvasSection = saveCanvasSection;
     window.exportCanvasMarkdown = exportCanvasMarkdown;
     window.onCanvasEditorInput = onCanvasEditorInput;
