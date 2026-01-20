@@ -9317,6 +9317,15 @@ class AiohttpHandler:
         if path == '/api/files/upload':
             return await self._handle_file_upload_async(request)
 
+        # Handle file to-canvas conversion
+        if path.startswith('/api/files/') and '/to-canvas' in path:
+            file_id = path.split('/')[3]
+            try:
+                body = await request.json()
+            except:
+                body = {}
+            return await self._convert_file_to_canvas_async(file_id, body)
+
         try:
             body = await request.json()
         except:
@@ -9532,6 +9541,90 @@ class AiohttpHandler:
                 })
             else:
                 return web.json_response({'error': 'No files found in request'}, status=400)
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return web.json_response({'error': str(e)}, status=500)
+
+    async def _convert_file_to_canvas_async(self, file_id, data):
+        """Convert an uploaded file to canvas section content (async version)."""
+        try:
+            # Load uploads index
+            index = {'files': [], 'version': '1.0'}
+            if UPLOADS_INDEX_FILE.exists():
+                with open(UPLOADS_INDEX_FILE, 'r') as f:
+                    index = json.load(f)
+
+            # Find file metadata
+            file_meta = None
+            for f in index.get('files', []):
+                if f.get('id') == file_id:
+                    file_meta = f
+                    break
+
+            if not file_meta:
+                return web.json_response({'error': 'File not found'}, status=404)
+
+            file_path = Path(file_meta.get('path', ''))
+            if not file_path.exists():
+                return web.json_response({'error': 'File path not found'}, status=404)
+
+            category = file_meta.get('category', 'document')
+            filename = file_meta.get('filename', 'untitled')
+            ext = file_path.suffix.lower()
+
+            # Extract content based on file type
+            content = ''
+            section_type = 'markdown'
+
+            text_extensions = ['.txt', '.md', '.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf', '.log', '.csv', '.tsv']
+            code_extensions = ['.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.go', '.rs', '.rb', '.php', '.swift', '.kt', '.scala', '.r', '.sql', '.sh', '.bash', '.zsh', '.ps1', '.html', '.css', '.scss', '.less', '.vue', '.svelte']
+
+            if ext in text_extensions:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                section_type = 'markdown'
+
+            elif ext in code_extensions:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                section_type = 'code'
+                lang = ext[1:]
+                lang_map = {'js': 'javascript', 'ts': 'typescript', 'py': 'python', 'rb': 'ruby', 'rs': 'rust', 'kt': 'kotlin'}
+                lang = lang_map.get(lang, lang)
+                content = f"```{lang}\n{content}\n```"
+
+            elif ext == '.pdf':
+                content = f"[PDF file: {filename} - Text extraction not available in async mode. View original file.]"
+                section_type = 'markdown'
+
+            elif category == 'images':
+                content = f"![{filename}](/api/files/{file_id}/content)\n\n*Image file: {filename}*"
+                section_type = 'markdown'
+
+            elif category == 'videos':
+                content = f"[Video: {filename}](/api/files/{file_id}/content)\n\n*Video file: {filename}*"
+                section_type = 'markdown'
+
+            else:
+                try:
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                except:
+                    content = f"[Binary file: {filename} - Cannot display content]"
+                section_type = 'markdown'
+
+            print(f"[Files] Converted to canvas (async): {filename}, content length: {len(content)}")
+
+            return web.json_response({
+                'ok': True,
+                'file_id': file_id,
+                'filename': filename,
+                'content': content,
+                'section_type': section_type,
+                'suggested_name': file_path.stem
+            })
 
         except Exception as e:
             import traceback
