@@ -274,6 +274,24 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             session_id = path.split('/')[-1]
             self.serve_session_info(session_id)
             return
+        # Workspace Storage API (exported sessions)
+        elif path == '/api/workspace/storage/list':
+            self.serve_workspace_storage_list(parsed_path.query)
+            return
+        elif path == '/api/workspace/storage/stats':
+            self.serve_workspace_storage_stats()
+            return
+        elif path == '/api/workspace/timeline':
+            self.serve_workspace_timeline()
+            return
+        elif path == '/api/workspace/search':
+            self.serve_workspace_search(parsed_path.query)
+            return
+        elif path.startswith('/api/workspace/storage/'):
+            # GET /api/workspace/storage/{session_id}
+            session_id = path.split('/')[-1]
+            self.serve_workspace_session_detail(session_id)
+            return
         # Webhook & Triggers GET endpoints
         elif path == '/api/webhooks/list':
             self.serve_webhooks_list()
@@ -458,6 +476,10 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif path.startswith('/api/storage/open/'):
             location_key = path.split('/')[-1]
             self.open_storage_location(location_key)
+            return
+        elif path.startswith('/api/workspace/storage/delete/'):
+            filename = path.split('/')[-1]
+            self.delete_workspace_export(filename)
             return
         elif path == '/api/keys/save':
             self.save_api_keys(data)
@@ -6389,6 +6411,142 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             traceback.print_exc()
             self.serve_json({'ok': False, 'error': str(e)}, status=500)
 
+    # ===== Workspace Storage API (Exported Sessions) =====
+
+    def serve_workspace_storage_list(self, query_string):
+        """List all exported workspace sessions."""
+        from urllib.parse import parse_qs
+
+        try:
+            params = parse_qs(query_string) if query_string else {}
+            limit = int(params.get('limit', ['50'])[0])
+
+            sessions = session_manager.list_exported_sessions(limit=limit)
+
+            self.serve_json({
+                'ok': True,
+                'sessions': sessions,
+                'count': len(sessions)
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def serve_workspace_storage_stats(self):
+        """Get workspace storage statistics."""
+        try:
+            stats = session_manager.get_workspace_storage_stats()
+
+            # Format size for display
+            def format_bytes(bytes):
+                if bytes == 0:
+                    return '0 B'
+                k = 1024
+                sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+                i = 0
+                while bytes >= k and i < len(sizes) - 1:
+                    bytes /= k
+                    i += 1
+                return f'{bytes:.2f} {sizes[i]}'
+
+            stats['total_size_formatted'] = format_bytes(stats['total_size_bytes'])
+
+            self.serve_json({
+                'ok': True,
+                **stats
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def serve_workspace_session_detail(self, session_id):
+        """Get full detail for an exported workspace session."""
+        try:
+            session_data = session_manager.get_exported_session(session_id)
+
+            if not session_data:
+                self.serve_json({'ok': False, 'error': 'Session not found'}, status=404)
+                return
+
+            self.serve_json({
+                'ok': True,
+                'session': session_data
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def serve_workspace_timeline(self):
+        """Get workspace sessions formatted for timeline display."""
+        try:
+            items = session_manager.get_workspace_timeline_items(limit=100)
+
+            self.serve_json({
+                'ok': True,
+                'items': items,
+                'count': len(items)
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def serve_workspace_search(self, query_string):
+        """Search across exported workspace sessions."""
+        from urllib.parse import parse_qs
+
+        try:
+            params = parse_qs(query_string) if query_string else {}
+            query = params.get('q', [''])[0]
+            limit = int(params.get('limit', ['20'])[0])
+
+            if not query:
+                self.serve_json({'ok': False, 'error': 'Query parameter required'}, status=400)
+                return
+
+            results = session_manager.search_exported_sessions(query=query, limit=limit)
+
+            self.serve_json({
+                'ok': True,
+                'results': results,
+                'count': len(results),
+                'query': query
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
+    def delete_workspace_export(self, filename):
+        """Delete an exported workspace session file."""
+        try:
+            # Security validation (already done in session_manager method)
+            success = session_manager.delete_exported_session(filename)
+
+            if success:
+                self.serve_json({
+                    'ok': True,
+                    'message': f'Deleted {filename}'
+                })
+            else:
+                self.serve_json({
+                    'ok': False,
+                    'error': 'File not found or could not be deleted'
+                }, status=404)
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.serve_json({'ok': False, 'error': str(e)}, status=500)
+
     def serve_history_list(self, query_string):
         """List conversation history with pagination and filters."""
         from urllib.parse import parse_qs
@@ -6913,12 +7071,14 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         file_history = self.index_file_history()
         todos = self.index_todos()
         plans = self.index_plans()
+        workspace_sessions = self.index_workspace_sessions()
 
         # Combine all items
-        all_items = conversations + projects + file_history + todos + plans
+        all_items = conversations + projects + file_history + todos + plans + workspace_sessions
 
         print(f"[Unified Index] Found {len(conversations)} conversations, {len(projects)} projects, "
-              f"{len(file_history)} file edits, {len(todos)} todo lists, {len(plans)} plans")
+              f"{len(file_history)} file edits, {len(todos)} todo lists, {len(plans)} plans, "
+              f"{len(workspace_sessions)} workspace sessions")
 
         # Extract tags and categories for all items
         for item in all_items:
@@ -6937,7 +7097,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 'project_session': len(projects),
                 'file_edit': len(file_history),
                 'todo_list': len(todos),
-                'plan': len(plans)
+                'plan': len(plans),
+                'workspace_session': len(workspace_sessions)
             }
         }
 
@@ -6984,6 +7145,55 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                         continue
         except Exception as e:
             print(f"[Unified Index] Error indexing conversations: {e}")
+
+        return items
+
+    def index_workspace_sessions(self):
+        """Index workspace sessions from exported files."""
+        from pathlib import Path
+
+        export_dir = Path.home() / '.claude' / 'workspace_sessions'
+        if not export_dir.exists():
+            return []
+
+        items = []
+
+        try:
+            for filepath in export_dir.glob('session_*.json'):
+                try:
+                    with open(filepath, 'r') as f:
+                        data = json.load(f)
+
+                    # Parse timestamp from created_at
+                    created_at = data.get('created_at', '')
+                    try:
+                        dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                        timestamp = int(dt.timestamp() * 1000)
+                    except:
+                        timestamp = int(filepath.stat().st_mtime * 1000)
+
+                    participants = [p.get('name', 'Unknown') for p in data.get('participants', [])]
+                    message_count = data.get('message_count', 0)
+
+                    items.append({
+                        'type': 'workspace_session',
+                        'id': f'workspace-{data.get("session_id", "")}',
+                        'sessionId': data.get('session_id', ''),
+                        'timestamp': timestamp,
+                        'timeFormatted': datetime.fromtimestamp(timestamp / 1000).strftime('%Y-%m-%d %H:%M:%S'),
+                        'display': f'Workspace Session - {", ".join(participants[:3])}',
+                        'preview': f'{message_count} messages with {len(participants)} participants',
+                        'participants': participants,
+                        'messageCount': message_count,
+                        'filename': filepath.name,
+                        'source': 'workspaceSessions'
+                    })
+                except Exception as e:
+                    print(f"[Unified Index] Error indexing workspace {filepath}: {e}")
+                    continue
+
+        except Exception as e:
+            print(f"[Unified Index] Error indexing workspace sessions: {e}")
 
         return items
 

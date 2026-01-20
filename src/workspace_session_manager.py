@@ -505,8 +505,17 @@ class WorkspaceSessionManager:
             if session.orchestrator:
                 session.orchestrator.update_session_users(session.users)
 
-        # Delete session if no users left
+        # Auto-export and delete session if no users left
         if not session.users:
+            # Auto-export if session had messages
+            if len(session.messages) > 0:
+                print(f"[SessionManager] Auto-exporting session {session_id} before deletion")
+                export_path = self.export_session_to_file(session_id)
+                if export_path:
+                    print(f"[SessionManager] Session {session_id} exported to {export_path}")
+                else:
+                    print(f"[SessionManager] Warning: Failed to export session {session_id}")
+
             del self.sessions[session_id]
             print(f"[SessionManager] Deleted empty session {session_id}")
 
@@ -2435,6 +2444,310 @@ class WorkspaceSessionManager:
             tasks = [t for t in tasks if t.get('status') == status]
 
         return tasks
+
+
+    # ===== Phase: Storage Integration - Export Methods =====
+
+    def export_session_to_file(self, session_id: str) -> Optional[str]:
+        """
+        Export full session data to JSON file for storage.
+
+        Args:
+            session_id: Session ID to export
+
+        Returns:
+            Path to exported file, or None if session not found
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            print(f"[SessionManager] Cannot export: session {session_id} not found")
+            return None
+
+        # Create export directory
+        export_dir = Path.home() / '.claude' / 'workspace_sessions'
+        export_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate filename with timestamp
+        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        filename = f"session_{session_id}_{timestamp}.json"
+        filepath = export_dir / filename
+
+        # Build export data
+        export_data = {
+            'session_id': session.id,
+            'created_at': session.created_at,
+            'expires_at': session.expires_at,
+            'exported_at': datetime.utcnow().isoformat(),
+            'owner_id': session.owner_id,
+            'participants': [
+                {
+                    'id': user.id,
+                    'name': user.name,
+                    'role': user.role.value,
+                    'joined_at': user.joined_at,
+                    'avatar_color': user.avatar_color
+                }
+                for user in session.users.values()
+            ],
+            'messages': [msg.to_dict() for msg in session.messages],
+            'message_count': len(session.messages),
+            'canvas_sections': session.canvas_sections,
+            'delegated_tasks': session.delegated_tasks,
+            'workflows': {wid: wf.to_dict() for wid, wf in session.workflows.items()},
+            'agent_inboxes': {
+                agent: [msg.to_dict() for msg in msgs]
+                for agent, msgs in session.agent_inboxes.items()
+            },
+            'shared_contexts': session.shared_contexts,
+            'audit_log': [entry.to_dict() for entry in session.audit_log],
+            'audit_log_count': len(session.audit_log),
+            'demo_mode': session.demo_mode,
+            'demo_title': session.demo_title
+        }
+
+        try:
+            with open(filepath, 'w') as f:
+                json.dump(export_data, f, indent=2, default=str)
+
+            print(f"[SessionManager] Exported session {session_id} to {filepath}")
+            return str(filepath)
+        except Exception as e:
+            print(f"[SessionManager] Error exporting session: {e}")
+            return None
+
+    def list_exported_sessions(self, limit: int = 50) -> List[Dict]:
+        """
+        List all exported workspace sessions.
+
+        Args:
+            limit: Maximum number of sessions to return
+
+        Returns:
+            List of session metadata dicts
+        """
+        export_dir = Path.home() / '.claude' / 'workspace_sessions'
+        if not export_dir.exists():
+            return []
+
+        sessions = []
+        for filepath in sorted(export_dir.glob('session_*.json'), reverse=True)[:limit]:
+            try:
+                stat = filepath.stat()
+                # Read header info only
+                with open(filepath, 'r') as f:
+                    data = json.load(f)
+
+                sessions.append({
+                    'filename': filepath.name,
+                    'session_id': data.get('session_id'),
+                    'created_at': data.get('created_at'),
+                    'exported_at': data.get('exported_at'),
+                    'message_count': data.get('message_count', 0),
+                    'participant_count': len(data.get('participants', [])),
+                    'participants': [p.get('name') for p in data.get('participants', [])],
+                    'file_size': stat.st_size,
+                    'file_modified': datetime.fromtimestamp(stat.st_mtime).isoformat()
+                })
+            except Exception as e:
+                print(f"[SessionManager] Error reading {filepath}: {e}")
+                continue
+
+        return sessions
+
+    def get_exported_session(self, session_id: str) -> Optional[Dict]:
+        """
+        Get full data for an exported session.
+
+        Args:
+            session_id: Session ID to retrieve
+
+        Returns:
+            Full session data dict, or None
+        """
+        export_dir = Path.home() / '.claude' / 'workspace_sessions'
+        if not export_dir.exists():
+            return None
+
+        # Find matching session file (most recent if multiple)
+        matching = sorted(export_dir.glob(f'session_{session_id}_*.json'), reverse=True)
+        if not matching:
+            return None
+
+        try:
+            with open(matching[0], 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[SessionManager] Error reading session {session_id}: {e}")
+            return None
+
+    def get_workspace_storage_stats(self) -> Dict:
+        """
+        Get statistics about workspace session storage.
+
+        Returns:
+            Stats dict with counts, sizes, etc.
+        """
+        export_dir = Path.home() / '.claude' / 'workspace_sessions'
+
+        stats = {
+            'total_sessions': 0,
+            'total_size_bytes': 0,
+            'total_messages': 0,
+            'oldest_session': None,
+            'newest_session': None,
+            'path': str(export_dir)
+        }
+
+        if not export_dir.exists():
+            return stats
+
+        sessions = []
+        for filepath in export_dir.glob('session_*.json'):
+            try:
+                stat = filepath.stat()
+                stats['total_sessions'] += 1
+                stats['total_size_bytes'] += stat.st_size
+
+                with open(filepath, 'r') as f:
+                    data = json.load(f)
+                stats['total_messages'] += data.get('message_count', 0)
+
+                sessions.append({
+                    'created_at': data.get('created_at'),
+                    'exported_at': data.get('exported_at')
+                })
+            except:
+                continue
+
+        if sessions:
+            sessions.sort(key=lambda x: x.get('created_at', ''))
+            stats['oldest_session'] = sessions[0].get('created_at')
+            stats['newest_session'] = sessions[-1].get('created_at')
+
+        return stats
+
+    def search_exported_sessions(self, query: str, limit: int = 20) -> List[Dict]:
+        """
+        Search across exported workspace sessions.
+
+        Args:
+            query: Search query
+            limit: Max results
+
+        Returns:
+            List of matching session/message results
+        """
+        export_dir = Path.home() / '.claude' / 'workspace_sessions'
+        if not export_dir.exists():
+            return []
+
+        query_lower = query.lower()
+        results = []
+
+        for filepath in sorted(export_dir.glob('session_*.json'), reverse=True):
+            try:
+                with open(filepath, 'r') as f:
+                    data = json.load(f)
+
+                # Search in messages
+                for msg in data.get('messages', []):
+                    content = msg.get('content', '')
+                    if query_lower in content.lower():
+                        results.append({
+                            'type': 'message',
+                            'session_id': data.get('session_id'),
+                            'filename': filepath.name,
+                            'message_id': msg.get('id'),
+                            'content_preview': content[:200],
+                            'timestamp': msg.get('timestamp'),
+                            'user_id': msg.get('user_id'),
+                            'agent_id': msg.get('agent_id')
+                        })
+
+                        if len(results) >= limit:
+                            return results
+
+                # Search in canvas sections
+                for section_name, section_data in data.get('canvas_sections', {}).items():
+                    content = section_data.get('content', '')
+                    if query_lower in content.lower() or query_lower in section_name.lower():
+                        results.append({
+                            'type': 'canvas',
+                            'session_id': data.get('session_id'),
+                            'filename': filepath.name,
+                            'section_name': section_name,
+                            'content_preview': content[:200],
+                            'owner': section_data.get('owner'),
+                            'updated_at': section_data.get('updated_at')
+                        })
+
+                        if len(results) >= limit:
+                            return results
+
+            except Exception as e:
+                continue
+
+        return results
+
+    def delete_exported_session(self, filename: str) -> bool:
+        """
+        Delete an exported session file.
+
+        Args:
+            filename: Filename to delete
+
+        Returns:
+            True if deleted successfully
+        """
+        export_dir = Path.home() / '.claude' / 'workspace_sessions'
+        filepath = export_dir / filename
+
+        # Security: ensure file is in expected directory
+        if not filepath.parent.resolve() == export_dir.resolve():
+            print(f"[SessionManager] Security: attempted path traversal with {filename}")
+            return False
+
+        if not filepath.exists():
+            return False
+
+        try:
+            filepath.unlink()
+            print(f"[SessionManager] Deleted exported session: {filename}")
+            return True
+        except Exception as e:
+            print(f"[SessionManager] Error deleting {filename}: {e}")
+            return False
+
+    def get_workspace_timeline_items(self, limit: int = 100) -> List[Dict]:
+        """
+        Get workspace sessions formatted for timeline display.
+
+        Args:
+            limit: Max items
+
+        Returns:
+            List of timeline-formatted items
+        """
+        sessions = self.list_exported_sessions(limit=limit)
+        timeline_items = []
+
+        for session in sessions:
+            timeline_items.append({
+                'id': f"workspace_{session['session_id']}",
+                'type': 'workspace_session',
+                'title': f"Workspace Session ({session['participant_count']} participants)",
+                'preview': f"{session['message_count']} messages, participants: {', '.join(session['participants'][:3])}",
+                'timestamp': session.get('created_at'),
+                'source': 'workspaceSessions',
+                'metadata': {
+                    'session_id': session['session_id'],
+                    'filename': session['filename'],
+                    'message_count': session['message_count'],
+                    'participants': session['participants']
+                }
+            })
+
+        return timeline_items
 
 
 # Global session manager instance

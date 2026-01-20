@@ -4665,6 +4665,9 @@
           <button class="tab-btn" data-storage-section="config" onclick="showStorageSection('config')">
             ⚙️ Config
           </button>
+          <button class="tab-btn" data-storage-section="workspace" onclick="showStorageSection('workspace')">
+            👥 Workspace
+          </button>
         </div>
 
         <!-- Storage Content -->
@@ -4860,6 +4863,87 @@
           <div class="storage-section" id="storage-section-config" style="display: none;">
             <div id="storage-locations-config" class="config-grid">
               <div class="loading">Loading storage data...</div>
+            </div>
+          </div>
+
+          <!-- Workspace Section -->
+          <div class="storage-section" id="storage-section-workspace" style="display: none;">
+            <!-- Workspace Stats Cards -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
+              <div class="stat-card">
+                <div class="stat-value" id="workspace-total-sessions">-</div>
+                <div class="stat-label">Total Sessions</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value" id="workspace-total-messages">-</div>
+                <div class="stat-label">Total Messages</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value" id="workspace-storage-size">-</div>
+                <div class="stat-label">Storage Used</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value" id="workspace-date-range">-</div>
+                <div class="stat-label">Date Range</div>
+              </div>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="search-box" style="margin-bottom: 20px;">
+              <input type="text"
+                     id="workspace-search-input"
+                     class="search-input"
+                     placeholder="Search workspace sessions..."
+                     onkeypress="if(event.key==='Enter') searchWorkspaceSessions()">
+              <button class="search-btn" onclick="searchWorkspaceSessions()">🔍 Search</button>
+              <button class="filter-btn" onclick="clearWorkspaceSearch()">Clear</button>
+              <button class="filter-btn" onclick="refreshWorkspaceStorage()">🔄 Refresh</button>
+            </div>
+
+            <!-- Session List -->
+            <div class="chart-container">
+              <div class="chart-title">📁 Exported Workspace Sessions</div>
+              <div id="workspace-sessions-list" style="max-height: 500px; overflow-y: auto;">
+                <div class="loading">Loading workspace sessions...</div>
+              </div>
+            </div>
+
+            <!-- Session Detail Modal -->
+            <div id="workspace-session-detail" class="chart-container" style="display: none; margin-top: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div class="chart-title" id="workspace-detail-title">Session Details</div>
+                <div style="display: flex; gap: 8px;">
+                  <button class="filter-btn" onclick="exportWorkspaceSession()">💾 Export JSON</button>
+                  <button class="filter-btn" onclick="closeWorkspaceDetail()">✕ Close</button>
+                </div>
+              </div>
+
+              <!-- Participants -->
+              <div style="margin-bottom: 16px;">
+                <h4 style="color: #a5b4fc; margin-bottom: 8px;">Participants</h4>
+                <div id="workspace-detail-participants" style="display: flex; gap: 8px; flex-wrap: wrap;"></div>
+              </div>
+
+              <!-- Messages -->
+              <div style="margin-bottom: 16px;">
+                <h4 style="color: #a5b4fc; margin-bottom: 8px;">Messages (<span id="workspace-detail-message-count">0</span>)</h4>
+                <div id="workspace-detail-messages" style="background: rgba(0, 0, 0, 0.3); padding: 16px; border-radius: 8px; max-height: 400px; overflow-y: auto;">
+                </div>
+              </div>
+
+              <!-- Canvas Sections -->
+              <div style="margin-bottom: 16px;">
+                <h4 style="color: #a5b4fc; margin-bottom: 8px;">Canvas Sections</h4>
+                <div id="workspace-detail-canvas" style="display: flex; flex-direction: column; gap: 8px;">
+                </div>
+              </div>
+
+              <!-- Tasks -->
+              <div>
+                <h4 style="color: #a5b4fc; margin-bottom: 8px;">Delegated Tasks</h4>
+                <div id="workspace-detail-tasks" style="display: flex; flex-direction: column; gap: 8px;">
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -7300,6 +7384,13 @@
 
     // Load storage section data
     async function loadStorageSection(section) {
+      // Special handling for workspace section
+      if (section === 'workspace') {
+        await loadWorkspaceStorageStats();
+        await loadWorkspaceSessions();
+        return;
+      }
+
       if (!storageStats) {
         await refreshStorageStats();
         return;
@@ -7452,6 +7543,290 @@
       } catch (err) {
         console.error('[Storage Manager] Open error:', err);
         alert(`Failed to open ${locationKey}: ${err.message}`);
+      }
+    };
+
+    // =========================================================================
+    // WORKSPACE STORAGE
+    // =========================================================================
+
+    let currentWorkspaceSession = null;
+
+    // Load workspace storage stats
+    window.loadWorkspaceStorageStats = async function() {
+      try {
+        console.log('[Workspace Storage] Loading stats...');
+
+        const response = await fetch(`${API_BASE}/api/workspace/storage/stats`);
+        if (!response.ok) {
+          throw new Error('Failed to load workspace stats');
+        }
+
+        const stats = await response.json();
+
+        // Update stat cards
+        document.getElementById('workspace-total-sessions').textContent = stats.total_sessions || 0;
+        document.getElementById('workspace-total-messages').textContent = stats.total_messages || 0;
+        document.getElementById('workspace-storage-size').textContent = stats.total_size_formatted || '0 B';
+
+        // Date range
+        if (stats.oldest_session && stats.newest_session) {
+          const oldest = new Date(stats.oldest_session).toLocaleDateString();
+          const newest = new Date(stats.newest_session).toLocaleDateString();
+          document.getElementById('workspace-date-range').textContent = `${oldest} - ${newest}`;
+        } else {
+          document.getElementById('workspace-date-range').textContent = 'No sessions';
+        }
+
+        console.log('[Workspace Storage] Stats loaded:', stats);
+      } catch (err) {
+        console.error('[Workspace Storage] Stats error:', err);
+      }
+    };
+
+    // Load workspace sessions list
+    window.loadWorkspaceSessions = async function() {
+      try {
+        console.log('[Workspace Storage] Loading sessions...');
+
+        const response = await fetch(`${API_BASE}/api/workspace/storage/list?limit=50`);
+        if (!response.ok) {
+          throw new Error('Failed to load workspace sessions');
+        }
+
+        const result = await response.json();
+        const listEl = document.getElementById('workspace-sessions-list');
+
+        if (!result.sessions || result.sessions.length === 0) {
+          listEl.innerHTML = '<div class="empty">No exported workspace sessions found. Sessions are automatically exported when all participants leave.</div>';
+          return;
+        }
+
+        let html = '';
+        for (const session of result.sessions) {
+          const createdDate = new Date(session.created_at).toLocaleString();
+          const participants = session.participants?.join(', ') || 'Unknown';
+
+          html += `
+            <div class="history-item" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 8px; cursor: pointer;" onclick="viewWorkspaceSession('${session.session_id}')">
+              <div style="flex: 1;">
+                <div style="font-weight: 600; color: #e2e8f0;">
+                  Session ${session.session_id}
+                  <span style="font-weight: normal; color: #64748b; font-size: 0.85rem; margin-left: 8px;">${createdDate}</span>
+                </div>
+                <div style="color: #94a3b8; font-size: 0.85rem; margin-top: 4px;">
+                  👥 ${session.participant_count} participants: ${participants}
+                </div>
+                <div style="color: #64748b; font-size: 0.8rem; margin-top: 2px;">
+                  💬 ${session.message_count} messages | 📦 ${formatBytes(session.file_size)}
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="filter-btn" onclick="event.stopPropagation(); viewWorkspaceSession('${session.session_id}')">
+                  👁️ View
+                </button>
+                <button class="filter-btn" onclick="event.stopPropagation(); deleteWorkspaceExport('${session.filename}')">
+                  🗑️
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
+        listEl.innerHTML = html;
+        console.log('[Workspace Storage] Sessions loaded:', result.sessions.length);
+      } catch (err) {
+        console.error('[Workspace Storage] Sessions error:', err);
+        document.getElementById('workspace-sessions-list').innerHTML =
+          `<div class="error">Error loading sessions: ${err.message}</div>`;
+      }
+    };
+
+    // View workspace session detail
+    window.viewWorkspaceSession = async function(sessionId) {
+      try {
+        console.log('[Workspace Storage] Loading session detail:', sessionId);
+
+        const response = await fetch(`${API_BASE}/api/workspace/storage/${sessionId}`);
+        if (!response.ok) {
+          throw new Error('Failed to load session detail');
+        }
+
+        const result = await response.json();
+        const session = result.session;
+        currentWorkspaceSession = session;
+
+        // Update title
+        document.getElementById('workspace-detail-title').textContent =
+          `Session ${session.session_id} - ${new Date(session.created_at).toLocaleString()}`;
+
+        // Participants
+        const participantsEl = document.getElementById('workspace-detail-participants');
+        participantsEl.innerHTML = (session.participants || []).map(p => `
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: ${p.avatar_color || '#3b82f6'}30; border: 1px solid ${p.avatar_color || '#3b82f6'}; border-radius: 16px;">
+            <div style="width: 24px; height: 24px; border-radius: 50%; background: ${p.avatar_color || '#3b82f6'}; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold;">${p.name?.substring(0, 2).toUpperCase() || '??'}</div>
+            <span style="color: #e2e8f0;">${p.name || 'Unknown'}</span>
+            <span style="color: #64748b; font-size: 0.8rem;">(${p.role})</span>
+          </div>
+        `).join('');
+
+        // Messages
+        document.getElementById('workspace-detail-message-count').textContent = session.message_count || 0;
+        const messagesEl = document.getElementById('workspace-detail-messages');
+        if (session.messages && session.messages.length > 0) {
+          messagesEl.innerHTML = session.messages.map(msg => `
+            <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span style="color: ${msg.role === 'assistant' ? '#a78bfa' : '#6ee7b7'}; font-weight: 600;">
+                  ${msg.role === 'assistant' ? '🤖 ' + (msg.agent_id || 'Agent') : '👤 User'}
+                </span>
+                <span style="color: #64748b; font-size: 0.8rem;">${new Date(msg.timestamp).toLocaleTimeString()}</span>
+              </div>
+              <div style="color: #e2e8f0; white-space: pre-wrap; font-size: 0.9rem;">${escapeHtml(msg.content?.substring(0, 500) || '')}${msg.content?.length > 500 ? '...' : ''}</div>
+            </div>
+          `).join('');
+        } else {
+          messagesEl.innerHTML = '<div class="empty">No messages in this session</div>';
+        }
+
+        // Canvas sections
+        const canvasEl = document.getElementById('workspace-detail-canvas');
+        const canvasSections = Object.entries(session.canvas_sections || {});
+        if (canvasSections.length > 0) {
+          canvasEl.innerHTML = canvasSections.map(([name, data]) => `
+            <div style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+              <div style="font-weight: 600; color: #e2e8f0; margin-bottom: 4px;">📝 ${escapeHtml(name)}</div>
+              <div style="color: #64748b; font-size: 0.8rem;">Owner: ${data.owner || 'Shared'} | v${data.version || 1}</div>
+              <div style="color: #94a3b8; font-size: 0.85rem; margin-top: 4px; white-space: pre-wrap;">${escapeHtml(data.content?.substring(0, 200) || '')}${data.content?.length > 200 ? '...' : ''}</div>
+            </div>
+          `).join('');
+        } else {
+          canvasEl.innerHTML = '<div class="empty">No canvas sections</div>';
+        }
+
+        // Tasks
+        const tasksEl = document.getElementById('workspace-detail-tasks');
+        const tasks = Object.entries(session.delegated_tasks || {});
+        if (tasks.length > 0) {
+          tasksEl.innerHTML = tasks.map(([taskId, task]) => `
+            <div style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+              <div style="font-weight: 600; color: #e2e8f0;">${escapeHtml(task.description || taskId)}</div>
+              <div style="color: #64748b; font-size: 0.8rem;">
+                ${task.from_agent} → ${task.to_agent} | Status: ${task.status || 'unknown'}
+              </div>
+            </div>
+          `).join('');
+        } else {
+          tasksEl.innerHTML = '<div class="empty">No delegated tasks</div>';
+        }
+
+        // Show detail modal
+        document.getElementById('workspace-session-detail').style.display = 'block';
+
+      } catch (err) {
+        console.error('[Workspace Storage] Session detail error:', err);
+        alert(`Failed to load session: ${err.message}`);
+      }
+    };
+
+    // Close workspace detail
+    window.closeWorkspaceDetail = function() {
+      document.getElementById('workspace-session-detail').style.display = 'none';
+      currentWorkspaceSession = null;
+    };
+
+    // Export workspace session
+    window.exportWorkspaceSession = function() {
+      if (!currentWorkspaceSession) return;
+
+      const dataStr = JSON.stringify(currentWorkspaceSession, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `workspace_session_${currentWorkspaceSession.session_id}.json`;
+      a.click();
+
+      URL.revokeObjectURL(url);
+    };
+
+    // Search workspace sessions
+    window.searchWorkspaceSessions = async function() {
+      const query = document.getElementById('workspace-search-input').value.trim();
+      if (!query) {
+        loadWorkspaceSessions();
+        return;
+      }
+
+      try {
+        console.log('[Workspace Storage] Searching:', query);
+
+        const response = await fetch(`${API_BASE}/api/workspace/search?q=${encodeURIComponent(query)}`);
+        if (!response.ok) {
+          throw new Error('Search failed');
+        }
+
+        const result = await response.json();
+        const listEl = document.getElementById('workspace-sessions-list');
+
+        if (!result.results || result.results.length === 0) {
+          listEl.innerHTML = `<div class="empty">No results found for "${escapeHtml(query)}"</div>`;
+          return;
+        }
+
+        let html = `<div style="margin-bottom: 12px; color: #94a3b8;">Found ${result.count} results for "${escapeHtml(query)}"</div>`;
+        for (const item of result.results) {
+          html += `
+            <div class="history-item" style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 8px; cursor: pointer;" onclick="viewWorkspaceSession('${item.session_id}')">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span style="color: #a5b4fc; font-weight: 600;">${item.type === 'message' ? '💬 Message' : '📝 Canvas'}</span>
+                <span style="color: #64748b; font-size: 0.8rem;">Session ${item.session_id}</span>
+              </div>
+              <div style="color: #e2e8f0; font-size: 0.9rem;">${escapeHtml(item.content_preview || '')}</div>
+            </div>
+          `;
+        }
+
+        listEl.innerHTML = html;
+
+      } catch (err) {
+        console.error('[Workspace Storage] Search error:', err);
+        alert(`Search failed: ${err.message}`);
+      }
+    };
+
+    // Clear workspace search
+    window.clearWorkspaceSearch = function() {
+      document.getElementById('workspace-search-input').value = '';
+      loadWorkspaceSessions();
+    };
+
+    // Refresh workspace storage
+    window.refreshWorkspaceStorage = function() {
+      loadWorkspaceStorageStats();
+      loadWorkspaceSessions();
+    };
+
+    // Delete workspace export
+    window.deleteWorkspaceExport = async function(filename) {
+      if (!confirm(`Delete exported session ${filename}?`)) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/workspace/storage/delete/${filename}`, {
+          method: 'POST'
+        });
+
+        if (!response.ok) {
+          throw new Error('Delete failed');
+        }
+
+        console.log('[Workspace Storage] Deleted:', filename);
+        refreshWorkspaceStorage();
+
+      } catch (err) {
+        console.error('[Workspace Storage] Delete error:', err);
+        alert(`Failed to delete: ${err.message}`);
       }
     };
 
