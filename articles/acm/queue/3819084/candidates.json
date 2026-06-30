@@ -1,0 +1,25 @@
+{
+  "source": "https://queue.acm.org/detail.cfm?id=3819084",
+  "candidates": [
+    {
+      "name": "article_url_to_safe_mini_repo",
+      "kind": "mcp_tool",
+      "purpose": "Parse a URL into a copyright-safe artifact repo with metadata, provenance, derived notes, and permission flags."
+    },
+    {
+      "name": "article_stone_source_boundary_checker",
+      "kind": "mcp_tool",
+      "purpose": "Inspect a stoned article artifact and confirm whether it contains only allowed metadata/derived content or requires permissioned text."
+    },
+    {
+      "name": "article_to_tool_candidate_miner",
+      "kind": "mcp_tool",
+      "purpose": "Convert article concepts, notes, and citations into ranked MCP tool opportunities with evidence pointers."
+    },
+    {
+      "name": "mini_repo_to_cairnstone_chain",
+      "kind": "mcp_tool",
+      "purpose": "Stone all files in an article mini-repo, create orientation, link evidence, and set a chain HEAD."
+    }
+  ]
+}
